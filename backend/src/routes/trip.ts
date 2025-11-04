@@ -23,10 +23,10 @@ export async function tripRoutes(app: FastifyInstance) {
     try {
       const trips = await prisma.trip.findMany({
         include: { 
-          expenses: {
+          TripExpense: {
             orderBy: { date: 'desc' }
           },
-          truck: {
+          Truck: {
             select: {
               id: true,
               name: true,
@@ -50,10 +50,10 @@ export async function tripRoutes(app: FastifyInstance) {
       const trip = await prisma.trip.findUniqueOrThrow({
         where: { id },
         include: { 
-          expenses: {
+          TripExpense: {
             orderBy: { date: 'desc' }
           },
-          truck: {
+          Truck: {
             select: {
               id: true,
               name: true,
@@ -65,9 +65,7 @@ export async function tripRoutes(app: FastifyInstance) {
       return trip;
     } catch (error) {
       console.error("Erro ao buscar viagem:", error);
-      if (error.code === 'P2025') {
-        return rep.code(404).send({ message: "Viagem não encontrada" });
-      }
+     
       return rep.code(500).send({ message: "Erro ao buscar viagem" });
     }
   });
@@ -79,10 +77,10 @@ export async function tripRoutes(app: FastifyInstance) {
       const trips = await prisma.trip.findMany({
         where: { truckId },
         include: { 
-          expenses: {
+          TripExpense: {
             orderBy: { date: 'desc' }
           },
-          truck: {
+          Truck: {
             select: {
               id: true,
               name: true,
@@ -126,7 +124,7 @@ export async function tripRoutes(app: FastifyInstance) {
           notes: data.notes,
         },
         include: {
-          truck: {
+          Truck: {
             select: {
               id: true,
               name: true,
@@ -181,7 +179,7 @@ export async function tripRoutes(app: FastifyInstance) {
           notes: data.notes,
         },
         include: {
-          truck: {
+          Truck: {
             select: {
               id: true,
               name: true,
@@ -207,7 +205,7 @@ export async function tripRoutes(app: FastifyInstance) {
       const trip = await prisma.trip.findUnique({
         where: { id },
         include: {
-          expenses: true
+          TripExpense: true
         }
       });
       
@@ -216,7 +214,7 @@ export async function tripRoutes(app: FastifyInstance) {
       }
 
       // Verificar se tem despesas
-      if (trip.expenses.length > 0) {
+      if (trip.TripExpense.length > 0) {
         return rep.code(400).send({ 
           message: "Não é possível deletar uma viagem com despesas registradas" 
         });
@@ -242,7 +240,7 @@ export async function tripRoutes(app: FastifyInstance) {
         where: { id },
         data: { status },
         include: {
-          truck: {
+          Truck: {
             select: {
               id: true,
               name: true,

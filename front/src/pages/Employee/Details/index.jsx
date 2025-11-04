@@ -54,7 +54,7 @@ export default function EmployeeDetails() {
       setLoading(true)
       const response = await api.get(`/employees/${id}`)
       setEmployee(response.data)
-      setTransactions(response.data.transactions || [])
+      setTransactions(response.data.Transaction || [])
     } catch (error) {
       console.error('Erro ao carregar funcionário:', error)
       message.error('Erro ao carregar dados do funcionário')
@@ -260,7 +260,6 @@ export default function EmployeeDetails() {
       </Card>
 
       <Row gutter={[20, 20]}>
-        {/* Informações do Funcionário */}
         <Col span={16}>
           <Card title="Informações do Funcionário" style={{ height: '100%' }}>
             <Descriptions column={2} bordered>
@@ -297,7 +296,6 @@ export default function EmployeeDetails() {
           </Card>
         </Col>
 
-        {/* Estatísticas */}
         <Col span={8}>
           <Card title="Resumo Financeiro" style={{ height: '100%' }}>
             <Space direction="vertical" style={{ width: '100%' }} size="large">
@@ -487,7 +485,6 @@ export default function EmployeeDetails() {
         </Form>
       </Modal>
 
-      {/* Modal de Transação */}
       <Modal
         title="Adicionar Transação"
         open={transactionModalVisible}
@@ -531,6 +528,9 @@ export default function EmployeeDetails() {
           <Form.Item
             label="Data"
             name="date"
+            rules={[
+              { required: true, message: 'Data é obrigatória!' },
+            ]}
           >
             <DatePicker
               style={{ width: '100%' }}

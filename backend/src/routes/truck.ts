@@ -33,13 +33,13 @@ export async function truckRoutes(app: FastifyInstance) {
     try {
       const trucks = await prisma.truck.findMany({
         include: { 
-          maintenances: {
+          Maintenance: {
             orderBy: { date: 'desc' }
           }, 
-          trips: {
+          Trip: {
             orderBy: { date: 'desc' },
             include: {
-              expenses: true
+              TripExpense: true
             }
           } 
         },
@@ -59,13 +59,13 @@ export async function truckRoutes(app: FastifyInstance) {
       const truck = await prisma.truck.findUniqueOrThrow({
         where: { id },
         include: { 
-          maintenances: {
+          Maintenance: {
             orderBy: { date: 'desc' }
           }, 
-          trips: {
+          Trip: {
             orderBy: { date: 'desc' },
             include: {
-              expenses: true
+              TripExpense: true
             }
           } 
         },
@@ -73,9 +73,7 @@ export async function truckRoutes(app: FastifyInstance) {
       return truck;
     } catch (error) {
       console.error("Erro ao buscar caminhão:", error);
-      if (error.code === 'P2025') {
-        return rep.code(404).send({ message: "Caminhão não encontrado" });
-      }
+    
       return rep.code(500).send({ message: "Erro ao buscar caminhão" });
     }
   });
@@ -221,8 +219,8 @@ export async function truckRoutes(app: FastifyInstance) {
       const truck = await prisma.truck.findUnique({
         where: { id },
         include: {
-          trips: true,
-          maintenances: true
+          Trip: true,
+          Maintenance: true
         }
       });
 
@@ -230,7 +228,7 @@ export async function truckRoutes(app: FastifyInstance) {
         return rep.code(404).send({ message: "Caminhão não encontrado" });
       }
 
-      if (truck.trips.length > 0 || truck.maintenances.length > 0) {
+      if (truck.Trip.length > 0 || truck.Maintenance.length > 0) {
         return rep.code(400).send({ 
           message: "Não é possível deletar um caminhão com viagens ou manutenções registradas" 
         });
@@ -251,7 +249,7 @@ export async function truckRoutes(app: FastifyInstance) {
       const maintenance = await prisma.maintenance.findUniqueOrThrow({
         where: { id },
         include: {
-          truck: {
+          Truck: {
             select: {
               id: true,
               name: true,
@@ -263,9 +261,7 @@ export async function truckRoutes(app: FastifyInstance) {
       return maintenance;
     } catch (error) {
       console.error("Erro ao buscar manutenção:", error);
-      if (error.code === 'P2025') {
-        return rep.code(404).send({ message: "Manutenção não encontrada" });
-      }
+     
       return rep.code(500).send({ message: "Erro ao buscar manutenção" });
     }
   });

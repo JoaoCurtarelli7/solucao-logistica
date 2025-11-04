@@ -65,39 +65,41 @@ export async function closingRoutes(app: FastifyInstance) {
         whereClause.status = status;
       }
 
-      let closings;
-      if (monthId) {
-        closings = await prisma.$queryRaw`
-          SELECT 
-            c.*,
-            m.name as monthName,
-            m.year as monthYear,
-            m.month as monthNumber,
-            comp.name as companyName,
-            comp.cnpj as companyCnpj
-          FROM Closing c
-          LEFT JOIN Month m ON c.monthId = m.id
-          LEFT JOIN Company comp ON c.companyId = comp.id
-          WHERE c.monthId = ${parseInt(monthId)}
-          ORDER BY c.createdAt DESC
-        ` as any[];
-      } else {
-        closings = await prisma.$queryRaw`
-          SELECT 
-            c.*,
-            m.name as monthName,
-            m.year as monthYear,
-            m.month as monthNumber,
-            comp.name as companyName,
-            comp.cnpj as companyCnpj
-          FROM Closing c
-          LEFT JOIN Month m ON c.monthId = m.id
-          LEFT JOIN Company comp ON c.companyId = comp.id
-          ORDER BY c.createdAt DESC
-        ` as any[];
-      }
+      const closings = await prisma.closing.findMany({
+        where: whereClause,
+        include: {
+          Month: {
+            select: {
+              id: true,
+              name: true,
+              year: true,
+              month: true,
+            },
+          },
+          Company: {
+            select: {
+              id: true,
+              name: true,
+              cnpj: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
 
-      return rep.send(closings);
+      // Formatar resposta para manter compatibilidade com o frontend
+      const formattedClosings = closings.map(c => ({
+        ...c,
+        monthName: c.Month?.name,
+        monthYear: c.Month?.year,
+        monthNumber: c.Month?.month,
+        companyName: c.Company?.name,
+        companyCnpj: c.Company?.cnpj,
+      }));
+
+      return rep.send(formattedClosings);
     } catch (error: any) {
       return rep.code(500).send({ 
         message: "Erro interno do servidor",
@@ -114,7 +116,7 @@ export async function closingRoutes(app: FastifyInstance) {
       const closing = await prisma.closing.findUnique({
         where: { id },
         include: {
-          month: {
+          Month: {
             select: {
               id: true,
               name: true,
@@ -122,14 +124,14 @@ export async function closingRoutes(app: FastifyInstance) {
               month: true,
             },
           },
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
               cnpj: true,
             },
           },
-          entries: {
+          FinancialEntry: {
             orderBy: { date: 'desc' },
           },
         },
@@ -151,21 +153,21 @@ export async function closingRoutes(app: FastifyInstance) {
       const data = createClosingSchema.parse(req.body);
 
       // Verificar se o mês existe
-      const month = await prisma.$queryRaw`
-        SELECT * FROM Month WHERE id = ${data.monthId}
-      ` as any[];
+      const month = await prisma.month.findUnique({
+        where: { id: data.monthId },
+      });
 
-      if (month.length === 0) {
+      if (!month) {
         return rep.code(404).send({ message: "Mês não encontrado" });
       }
 
       // Verificar se a empresa existe (se fornecida)
       if (data.companyId) {
-        const company = await prisma.$queryRaw`
-          SELECT * FROM Company WHERE id = ${data.companyId}
-        ` as any[];
+        const company = await prisma.company.findUnique({
+          where: { id: data.companyId },
+        });
 
-        if (company.length === 0) {
+        if (!company) {
           return rep.code(404).send({ message: "Empresa não encontrada" });
         }
       }
@@ -183,7 +185,7 @@ export async function closingRoutes(app: FastifyInstance) {
       const newClosing = await prisma.closing.create({
         data: closingData,
         include: {
-          month: {
+          Month: {
             select: {
               id: true,
               name: true,
@@ -191,7 +193,7 @@ export async function closingRoutes(app: FastifyInstance) {
               month: true,
             },
           },
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -227,7 +229,7 @@ export async function closingRoutes(app: FastifyInstance) {
           status: data.status,
         },
         include: {
-          month: {
+          Month: {
             select: {
               id: true,
               name: true,
@@ -235,7 +237,7 @@ export async function closingRoutes(app: FastifyInstance) {
               month: true,
             },
           },
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -261,23 +263,23 @@ export async function closingRoutes(app: FastifyInstance) {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
       // Verificar se o fechamento existe
-      const closing = await prisma.$queryRaw`
-        SELECT * FROM Closing WHERE id = ${id}
-      ` as any[];
+      const closing = await prisma.closing.findUnique({
+        where: { id },
+      });
 
-      if (closing.length === 0) {
+      if (!closing) {
         return rep.code(404).send({ message: "Fechamento não encontrado" });
       }
 
-      if (closing[0].status === 'fechado') {
+      if (closing.status === 'fechado') {
         return rep.code(400).send({ 
           message: "Não é possível deletar um fechamento que já foi fechado" 
         });
       }
 
-      await prisma.$queryRaw`
-        DELETE FROM Closing WHERE id = ${id}
-      `;
+      await prisma.closing.delete({
+        where: { id },
+      });
 
       return rep.send({ message: "Fechamento deletado com sucesso" });
     } catch (error) {
@@ -293,7 +295,7 @@ export async function closingRoutes(app: FastifyInstance) {
       const closing = await prisma.closing.findUnique({
         where: { id },
         include: {
-          entries: true,
+          FinancialEntry: true,
         },
       });
 
@@ -306,15 +308,15 @@ export async function closingRoutes(app: FastifyInstance) {
       }
 
       // Calcular totais reais
-      const totalEntries = closing.entries
+      const totalEntries = closing.FinancialEntry
         .filter(e => e.type === 'entrada')
         .reduce((sum, e) => sum + e.amount, 0);
       
-      const totalExpenses = closing.entries
+      const totalExpenses = closing.FinancialEntry
         .filter(e => e.type === 'saida')
         .reduce((sum, e) => sum + e.amount, 0);
       
-      const totalTaxes = closing.entries
+      const totalTaxes = closing.FinancialEntry
         .filter(e => e.type === 'imposto')
         .reduce((sum, e) => sum + e.amount, 0);
       
@@ -333,7 +335,7 @@ export async function closingRoutes(app: FastifyInstance) {
           profitMargin,
         },
         include: {
-          month: {
+          Month: {
             select: {
               id: true,
               name: true,
@@ -341,7 +343,7 @@ export async function closingRoutes(app: FastifyInstance) {
               month: true,
             },
           },
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -363,39 +365,53 @@ export async function closingRoutes(app: FastifyInstance) {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
-      const closing = await prisma.$queryRaw`
-        SELECT * FROM Closing WHERE id = ${id}
-      ` as any[];
+      const closing = await prisma.closing.findUnique({
+        where: { id },
+      });
 
-      if (closing.length === 0) {
+      if (!closing) {
         return rep.code(404).send({ message: "Fechamento não encontrado" });
       }
 
-      if (closing[0].status !== 'fechado') {
+      if (closing.status !== 'fechado') {
         return rep.code(400).send({ message: "Apenas fechamentos fechados podem ser reabertos" });
       }
 
-      await prisma.$queryRaw`
-        UPDATE Closing 
-        SET status = 'aberto', updatedAt = datetime('now')
-        WHERE id = ${id}
-      `;
+      const updatedClosing = await prisma.closing.update({
+        where: { id },
+        data: {
+          status: 'aberto',
+        },
+        include: {
+          Month: {
+            select: {
+              id: true,
+              name: true,
+              year: true,
+              month: true,
+            },
+          },
+          Company: {
+            select: {
+              id: true,
+              name: true,
+              cnpj: true,
+            },
+          },
+        },
+      });
 
-      const updatedClosing = await prisma.$queryRaw`
-        SELECT 
-          c.*,
-          m.name as monthName,
-          m.year as monthYear,
-          m.month as monthNumber,
-          comp.name as companyName,
-          comp.cnpj as companyCnpj
-        FROM Closing c
-        LEFT JOIN Month m ON c.monthId = m.id
-        LEFT JOIN Company comp ON c.companyId = comp.id
-        WHERE c.id = ${id}
-      ` as any[];
+      // Formatar resposta para manter compatibilidade com o frontend
+      const formattedClosing = {
+        ...updatedClosing,
+        monthName: updatedClosing.Month?.name,
+        monthYear: updatedClosing.Month?.year,
+        monthNumber: updatedClosing.Month?.month,
+        companyName: updatedClosing.Company?.name,
+        companyCnpj: updatedClosing.Company?.cnpj,
+      };
 
-      return rep.send(updatedClosing[0] || {});
+      return rep.send(formattedClosing);
     } catch (error) {
       return rep.code(500).send({ message: "Erro interno do servidor" });
     }
@@ -409,9 +425,9 @@ export async function closingRoutes(app: FastifyInstance) {
       const closing = await prisma.closing.findUnique({
         where: { id },
         include: {
-          entries: {
+          FinancialEntry: {
             include: {
-              company: {
+              Company: {
                 select: {
                   id: true,
                   name: true,
@@ -435,8 +451,13 @@ export async function closingRoutes(app: FastifyInstance) {
           status: closing.status,
           startDate: closing.startDate,
           endDate: closing.endDate,
+          totalEntries: closing.totalEntries,
+          totalExpenses: closing.totalExpenses,
+          totalTaxes: closing.totalTaxes,
+          balance: closing.balance,
+          profitMargin: closing.profitMargin,
         },
-        entries: closing.entries,
+        entries: closing.FinancialEntry,
       });
     } catch (error) {
       console.error("Erro ao buscar entradas do fechamento:", error);
@@ -452,9 +473,9 @@ export async function closingRoutes(app: FastifyInstance) {
       const closing = await prisma.closing.findUnique({
         where: { id },
         include: {
-          entries: true,
-          month: true,
-          company: true,
+          FinancialEntry: true,
+          Month: true,
+          Company: true,
         },
       });
 
@@ -463,11 +484,11 @@ export async function closingRoutes(app: FastifyInstance) {
       }
 
       // Calcular estatísticas
-      const totalEntries = closing.entries.filter(e => e.type === 'entrada').length;
-      const totalExpenses = closing.entries.filter(e => e.type === 'saida').length;
-      const totalTaxes = closing.entries.filter(e => e.type === 'imposto').length;
+      const totalEntries = closing.FinancialEntry.filter(e => e.type === 'entrada').length;
+      const totalExpenses = closing.FinancialEntry.filter(e => e.type === 'saida').length;
+      const totalTaxes = closing.FinancialEntry.filter(e => e.type === 'imposto').length;
 
-      const entriesByCategory = closing.entries.reduce((acc, entry) => {
+      const entriesByCategory = closing.FinancialEntry.reduce((acc, entry) => {
         acc[entry.category] = (acc[entry.category] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);

@@ -218,12 +218,7 @@ export default function AddEmployeeModal({
               <Form.Item
                 label="Email"
                 name="email"
-                rules={[
-                  {
-                    type: 'email',
-                    message: 'Por favor, insira um email válido!',
-                  },
-                ]}
+                rules={[{ required: true, message: 'Por favor, insira um email válido!' }]}
               >
                 <Input prefix={<MailOutlined />} placeholder="email@exemplo.com" />
               </Form.Item>
@@ -232,6 +227,9 @@ export default function AddEmployeeModal({
               <Form.Item
                 label="Data de Contratação"
                 name="dataContratacao"
+                rules={[
+                  { required: true, message: 'Por favor, selecione a data de contratação!' },
+                ]}
               >
                 <DatePicker
                   style={{ width: '100%' }}

@@ -13,12 +13,42 @@ async function authenticate(req: AuthenticatedRequest, rep: FastifyReply) {
       return rep.code(401).send({ message: "Token não fornecido" });
     }
 
-    const token = authHeader.split(" ")[1];
-    const decoded: any = jwt.verify(token, "secreta-chave");
+    const parts = authHeader.split(" ");
+    if (parts.length !== 2 || parts[0] !== "Bearer") {
+      return rep.code(401).send({ message: "Formato de token inválido. Use: Bearer <token>" });
+    }
 
-    req.user = { id: decoded.userId }; 
-  } catch (error) {
-    return rep.code(401).send({ message: "Token inválido ou expirado" });
+    const token = parts[1];
+    
+    if (!token) {
+      return rep.code(401).send({ message: "Token não fornecido" });
+    }
+
+    try {
+      const decoded: any = jwt.verify(token, "secreta-chave");
+      
+      if (!decoded.userId) {
+        return rep.code(401).send({ message: "Token inválido - userId não encontrado" });
+      }
+
+      req.user = { id: decoded.userId };
+      // Não retorna nada, continua para o próximo handler
+    } catch (jwtError: any) {
+      console.error("Erro ao verificar token:", jwtError.message);
+      
+      if (jwtError.name === 'TokenExpiredError') {
+        return rep.code(401).send({ message: "Token expirado" });
+      }
+      
+      if (jwtError.name === 'JsonWebTokenError') {
+        return rep.code(401).send({ message: "Token inválido" });
+      }
+
+      return rep.code(401).send({ message: "Token inválido ou expirado" });
+    }
+  } catch (error: any) {
+    console.error("Erro no middleware de autenticação:", error.message);
+    return rep.code(401).send({ message: "Erro na autenticação" });
   }
 }
 

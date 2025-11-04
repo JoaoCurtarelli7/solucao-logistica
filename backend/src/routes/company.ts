@@ -19,7 +19,7 @@ export async function companyRoutes(app: FastifyInstance) {
   });
 
   // Listar todas as empresas (rota pública para permitir seleção)
-  app.get("/companies", async () => {
+  app.get("/companies", async (req, rep) => {
     try {
       const companies = await prisma.company.findMany({
         select: {
@@ -32,12 +32,23 @@ export async function companyRoutes(app: FastifyInstance) {
           responsible: true,
           commission: true,
         },
+        orderBy: {
+          name: 'asc',
+        },
       });
 
-      return companies;
-    } catch (error) {
-      console.error("Erro ao buscar empresas:", error);
-      throw error;
+      return rep.send(companies);
+    } catch (error: any) {
+      console.error("❌ Erro ao buscar empresas:", error);
+      console.error("Detalhes:", {
+        message: error?.message,
+        code: error?.code,
+        meta: error?.meta,
+      });
+      return rep.code(500).send({ 
+        message: "Erro ao buscar empresas",
+        error: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      });
     }
   });
 
@@ -46,13 +57,24 @@ export async function companyRoutes(app: FastifyInstance) {
 
   // Obter uma empresa pelo ID
   app.get("/company/:id", async (req, rep) => {
-    const { id } = paramsSchema.parse(req.params);
+    try {
+      const { id } = paramsSchema.parse(req.params);
 
-    const company = await prisma.company.findUniqueOrThrow({
-      where: { id },
-    });
+      const company = await prisma.company.findUniqueOrThrow({
+        where: { id },
+      });
 
-    return company;
+      return rep.send(company);
+    } catch (error: any) {
+      if (error.code === "P2025") {
+        return rep.code(404).send({ message: "Empresa não encontrada" });
+      }
+      console.error("❌ Erro ao buscar empresa:", error);
+      return rep.code(500).send({ 
+        message: "Erro interno do servidor",
+        error: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      });
+    }
   });
 
   // Criar uma nova empresa

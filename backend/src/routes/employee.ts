@@ -1,7 +1,20 @@
+// src/routes/employee.ts
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authenticate } from "../middlewares/authMiddleware";
+
+function parseMaybeBrDate(str?: string | null) {
+  if (!str) return null;
+  const s = String(str).trim();
+  if (!s) return null;
+  // aceita DD/MM/YYYY ou YYYY-MM-DDTHH:mm...
+  if (s.includes("/")) {
+    const [day, month, year] = s.split("/");
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+  return new Date(s);
+}
 
 export async function employeeRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({
@@ -17,21 +30,13 @@ export async function employeeRoutes(app: FastifyInstance) {
     phone: z.string().optional(),
     email: z.string().email("Email inválido").optional().or(z.literal("")),
     address: z.string().optional(),
-    hireDate: z.string().optional().transform((str) => {
-      if (!str) return null;
-      // Aceitar tanto DD/MM/YYYY quanto YYYY-MM-DD
-      if (str.includes('/')) {
-        const [day, month, year] = str.split('/');
-        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      }
-      return new Date(str);
-    }),
+    hireDate: z.string().optional().transform(parseMaybeBrDate),
   });
 
   app.addHook("preHandler", authenticate);
 
-  // Listar todos os funcionários
-  app.get("/employees", async (req, rep) => {
+  // LISTAR
+  app.get("/employees", async (_req, rep) => {
     try {
       const employees = await prisma.employee.findMany({
         select: {
@@ -48,11 +53,8 @@ export async function employeeRoutes(app: FastifyInstance) {
           createdAt: true,
           updatedAt: true,
         },
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: { createdAt: "desc" },
       });
-
       return rep.send(employees);
     } catch (error) {
       console.error("Erro ao buscar funcionários:", error);
@@ -60,7 +62,7 @@ export async function employeeRoutes(app: FastifyInstance) {
     }
   });
 
-  // Obter um funcionário pelo ID
+  // OBTER POR ID
   app.get("/employees/:id", async (req, rep) => {
     try {
       const { id } = paramsSchema.parse(req.params);
@@ -68,18 +70,13 @@ export async function employeeRoutes(app: FastifyInstance) {
       const employee = await prisma.employee.findUnique({
         where: { id },
         include: {
-          transactions: {
-            orderBy: {
-              date: "desc",
-            },
-          },
+          Transaction: { orderBy: { date: "desc" } }, // relação conforme seu schema
         },
       });
 
       if (!employee) {
         return rep.code(404).send({ message: "Funcionário não encontrado" });
       }
-
       return rep.send(employee);
     } catch (error) {
       console.error("Erro ao buscar funcionário:", error);
@@ -87,23 +84,23 @@ export async function employeeRoutes(app: FastifyInstance) {
     }
   });
 
-  // Criar um funcionário
+  // CRIAR
   app.post("/employees", async (req, rep) => {
     try {
       const data = bodySchema.parse(req.body);
 
-      // Verificar se CPF já existe (se fornecido)
+      // CPF duplicado? (se fornecer CPF e não for vazio)
       if (data.cpf && data.cpf.trim() !== "") {
-        const existingEmployee = await prisma.employee.findUnique({
+        const exists = await prisma.employee.findFirst({
           where: { cpf: data.cpf },
+          select: { id: true },
         });
-        if (existingEmployee) {
+        if (exists) {
           return rep.code(400).send({ message: "CPF já cadastrado" });
         }
       }
 
-      // Converter data de contratação se fornecida
-      const hireDate = data.hireDate || new Date();
+      const hireDate = data.hireDate ?? new Date();
 
       const employee = await prisma.employee.create({
         data: {
@@ -116,6 +113,7 @@ export async function employeeRoutes(app: FastifyInstance) {
           email: data.email && data.email.trim() !== "" ? data.email : null,
           address: data.address && data.address.trim() !== "" ? data.address : null,
           hireDate,
+          // createdAt/updatedAt seguem defaults do banco/schema
         },
       });
 
@@ -123,53 +121,48 @@ export async function employeeRoutes(app: FastifyInstance) {
     } catch (error) {
       console.error("Erro ao criar funcionário:", error);
       if (error instanceof z.ZodError) {
-        return rep.code(400).send({ 
+        return rep.code(400).send({
           message: "Dados inválidos",
-          errors: error.errors.map(err => ({
-            field: err.path.join('.'),
-            message: err.message
-          }))
+          errors: error.errors.map((err) => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
         });
       }
-      if (error.code === "P2002") {
-        return rep.code(400).send({ message: "CPF já cadastrado" });
-      }
-      return rep.code(500).send({ 
+      // Prisma unique (se em algum momento você tornar cpf único):
+      // if ((error as any)?.code === "P2002") { ... }
+      return rep.code(500).send({
         message: "Erro interno do servidor",
-        error: error instanceof Error ? error.message : "Erro desconhecido"
+        error: error instanceof Error ? error.message : "Erro desconhecido",
       });
     }
   });
 
-  // Atualizar um funcionário
+  // ATUALIZAR
   app.put("/employees/:id", async (req, rep) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const data = bodySchema.parse(req.body);
 
-      // Verificar se funcionário existe
-      const existingEmployee = await prisma.employee.findUnique({
-        where: { id },
-      });
-
-      if (!existingEmployee) {
+      const existing = await prisma.employee.findUnique({ where: { id } });
+      if (!existing) {
         return rep.code(404).send({ message: "Funcionário não encontrado" });
       }
 
-      // Verificar se CPF já existe em outro funcionário (se fornecido)
-      if (data.cpf && data.cpf.trim() !== "" && data.cpf !== existingEmployee.cpf) {
-        const duplicateCpf = await prisma.employee.findUnique({
-          where: { cpf: data.cpf },
+      // CPF duplicado em outro registro?
+      if (data.cpf && data.cpf.trim() !== "" && data.cpf !== existing.cpf) {
+        const duplicate = await prisma.employee.findFirst({
+          where: { cpf: data.cpf, NOT: { id } },
+          select: { id: true },
         });
-        if (duplicateCpf) {
+        if (duplicate) {
           return rep.code(400).send({ message: "CPF já cadastrado" });
         }
       }
 
-      // Converter data de contratação se fornecida
-      const hireDate = data.hireDate || existingEmployee.hireDate;
+      const hireDate = data.hireDate ?? existing.hireDate;
 
-      const updatedEmployee = await prisma.employee.update({
+      const updated = await prisma.employee.update({
         where: { id },
         data: {
           name: data.name,
@@ -181,47 +174,40 @@ export async function employeeRoutes(app: FastifyInstance) {
           email: data.email && data.email.trim() !== "" ? data.email : null,
           address: data.address && data.address.trim() !== "" ? data.address : null,
           hireDate,
+          updatedAt: new Date(),
         },
       });
 
-      return rep.send(updatedEmployee);
+      return rep.send(updated);
     } catch (error) {
       console.error("Erro ao atualizar funcionário:", error);
       if (error instanceof z.ZodError) {
-        return rep.code(400).send({ 
+        return rep.code(400).send({
           message: "Dados inválidos",
-          errors: error.errors.map(err => ({
-            field: err.path.join('.'),
-            message: err.message
-          }))
+          errors: error.errors.map((err) => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
         });
       }
-      if (error.code === "P2002") {
-        return rep.code(400).send({ message: "CPF já cadastrado" });
-      }
-      return rep.code(500).send({ 
+      return rep.code(500).send({
         message: "Erro interno do servidor",
-        error: error instanceof Error ? error.message : "Erro desconhecido"
+        error: error instanceof Error ? error.message : "Erro desconhecido",
       });
     }
   });
 
-  // Deletar um funcionário
+  // DELETAR
   app.delete("/employees/:id", async (req, rep) => {
     try {
       const { id } = paramsSchema.parse(req.params);
 
-      // Verificar se funcionário existe
-      const existingEmployee = await prisma.employee.findUnique({
-        where: { id },
-      });
-
-      if (!existingEmployee) {
+      const existing = await prisma.employee.findUnique({ where: { id } });
+      if (!existing) {
         return rep.code(404).send({ message: "Funcionário não encontrado" });
       }
 
       await prisma.employee.delete({ where: { id } });
-
       return rep.code(204).send();
     } catch (error) {
       console.error("Erro ao deletar funcionário:", error);
@@ -229,69 +215,70 @@ export async function employeeRoutes(app: FastifyInstance) {
     }
   });
 
-  // Listar transações do funcionário
+  // LISTAR TRANSAÇÕES DO FUNCIONÁRIO
+  app.post("/employees/:id/transactions", async (req, rep) => {
+    try {
+      const { id } = paramsSchema.parse(req.params);
+  
+      const transactionSchema = z.object({
+        type: z.enum(["Crédito", "Débito"]),
+        amount: z.coerce.number().min(0.01, "Valor deve ser maior que zero"),
+        date: z.string().optional(), // aceita ISO; se vier vazio, usa agora
+      });
+  
+      const { type, amount, date } = transactionSchema.parse(req.body);
+  
+      // garante que o funcionário existe (evita criar "solto")
+      await prisma.employee.findUniqueOrThrow({ where: { id } });
+  
+      const transactionDate = date ? new Date(date) : new Date();
+  
+      // ✅ cria já vinculado via relação (não usa employeeId direto)
+      const transaction = await prisma.transaction.create({
+        data: {
+          type,
+          amount,
+          date: transactionDate,
+          Employee: { connect: { id } }, // <- este é o pulo do gato
+        },
+      });
+  
+      return rep.code(201).send(transaction);
+    } catch (error) {
+      if ((error as any)?.code === "P2025") {
+        return rep.code(404).send({ message: "Funcionário não encontrado" });
+      }
+      console.error("Erro ao criar transação:", error);
+      return rep.code(500).send({ message: "Erro interno do servidor" });
+    }
+  });
+  
+  // Listar transações do funcionário (opção 1: via relação)
   app.get("/employees/:id/transactions", async (req, rep) => {
     try {
       const { id } = paramsSchema.parse(req.params);
-
-      const transactions = await prisma.transaction.findMany({
-        where: { employeeId: id },
-        select: {
-          id: true,
-          type: true,
-          amount: true,
-          date: true,
-        },
-        orderBy: {
-          date: "desc",
+  
+      const employee = await prisma.employee.findUnique({
+        where: { id },
+        include: {
+          Transaction: {
+            select: { id: true, type: true, amount: true, date: true },
+            orderBy: { date: "desc" },
+          },
         },
       });
-
-      return rep.send(transactions);
+  
+      if (!employee) {
+        return rep.code(404).send({ message: "Funcionário não encontrado" });
+      }
+  
+      return rep.send(employee.Transaction);
     } catch (error) {
       console.error("Erro ao buscar transações:", error);
       return rep.code(500).send({ message: "Erro interno do servidor" });
     }
   });
-
-  // Adicionar transação para funcionário
-  app.post("/employees/:id/transactions", async (req, rep) => {
-    try {
-      const { id } = paramsSchema.parse(req.params);
-
-      const transactionSchema = z.object({
-        type: z.enum(["Crédito", "Débito"]),
-        amount: z.coerce.number().min(0.01, "Valor deve ser maior que zero"),
-        date: z.string().optional(),
-      });
-
-      const { type, amount, date } = transactionSchema.parse(req.body);
-
-      // Verifica se o funcionário existe
-      const employee = await prisma.employee.findUnique({ where: { id } });
-      if (!employee) {
-        return rep.code(404).send({ message: "Funcionário não encontrado" });
-      }
-
-      const transactionDate = date ? new Date(date) : new Date();
-
-      const transaction = await prisma.transaction.create({
-        data: {
-          employeeId: id,
-          type,
-          amount,
-          date: transactionDate,
-        },
-      });
-
-      return rep.code(201).send(transaction);
-    } catch (error) {
-      console.error("Erro ao criar transação:", error);
-      return rep.code(500).send({ message: "Erro interno do servidor" });
-    }
-  });
-
-  // Buscar funcionários por filtros
+  // BUSCA COM FILTROS
   app.get("/employees/search", async (req, rep) => {
     try {
       const querySchema = z.object({
@@ -303,15 +290,9 @@ export async function employeeRoutes(app: FastifyInstance) {
       const { name, role, status } = querySchema.parse(req.query);
 
       const where: any = {};
-      if (name) {
-        where.name = { contains: name };
-      }
-      if (role) {
-        where.role = { contains: role };
-      }
-      if (status) {
-        where.status = status;
-      }
+      if (name) where.name = { contains: name };
+      if (role) where.role = { contains: role };
+      if (status) where.status = status;
 
       const employees = await prisma.employee.findMany({
         where,
@@ -329,9 +310,7 @@ export async function employeeRoutes(app: FastifyInstance) {
           createdAt: true,
           updatedAt: true,
         },
-        orderBy: {
-          name: "asc",
-        },
+        orderBy: { name: "asc" },
       });
 
       return rep.send(employees);

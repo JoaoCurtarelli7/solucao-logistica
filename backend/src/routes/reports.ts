@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { z } from "zod";
 
 export async function reportRoutes(app: FastifyInstance) {
   // Autenticação desativada temporariamente para facilitar testes
@@ -53,17 +53,21 @@ export async function reportRoutes(app: FastifyInstance) {
   // Relatório de funcionários
   app.get("/reports/employees", async (req, rep) => {
     try {
-      const { status, startDate, endDate } = req.query;
+      const { status, startDate, endDate } = z.object({
+        status: z.enum(["Ativo", "Inativo"]).optional(),
+        startDate: z.coerce.date().optional(),
+        endDate: z.string().optional(),
+      }).parse(req.query);
 
       let whereClause: any = {};
 
-      if (status && status !== 'todos') {
+      if (status && status !== 'Ativo') {
         whereClause.status = status;
       }
 
       if (startDate && endDate) {
         whereClause.hireDate = {
-          gte: new Date(startDate as string),
+          gte: new Date(startDate as unknown as string),
           lte: new Date(endDate as string)
         };
       }
@@ -71,7 +75,7 @@ export async function reportRoutes(app: FastifyInstance) {
       const employees = await prisma.employee.findMany({
         where: whereClause,
         include: {
-          transactions: {
+          Transaction: {
             orderBy: { date: 'desc' },
             take: 5
           }
@@ -103,17 +107,21 @@ export async function reportRoutes(app: FastifyInstance) {
   // Relatório de empresas
   app.get("/reports/companies", async (req, rep) => {
     try {
-      const { status, startDate, endDate } = req.query;
+      const { status, startDate, endDate } = z.object({
+        status: z.enum(["Ativo", "Inativo"]).optional(),
+        startDate: z.coerce.date().optional(),
+        endDate: z.string().optional(),
+      }).parse(req.query);
 
       let whereClause: any = {};
 
-      if (status && status !== 'todos') {
+      if (status && status !== 'Ativo') {
         whereClause.status = status;
       }
 
       if (startDate && endDate) {
         whereClause.dateRegistration = {
-          gte: new Date(startDate as string),
+          gte: new Date(startDate as unknown as string),
           lte: new Date(endDate as string)
         };
       }
@@ -121,7 +129,7 @@ export async function reportRoutes(app: FastifyInstance) {
       const companies = await prisma.company.findMany({
         where: whereClause,
         include: {
-          loads: {
+          Load: {
             orderBy: { date: 'desc' },
             take: 3
           }
@@ -148,21 +156,26 @@ export async function reportRoutes(app: FastifyInstance) {
   // Relatório de cargas
   app.get("/reports/loads", async (req, rep) => {
     try {
-      const { status, startDate, endDate, companyId } = req.query;
+      const { status, startDate, endDate, companyId } = z.object({
+        status: z.enum(["Ativo", "Inativo"]).optional(),
+        startDate: z.coerce.date().optional(),
+        endDate: z.string().optional(),
+        companyId: z.coerce.number().optional(),
+      }).parse(req.query);
 
       let whereClause: any = {};
 
-      if (status && status !== 'todos') {
+      if (status && status !== 'Ativo') {
         whereClause.status = status;
       }
 
-      if (companyId && companyId !== 'todos') {
-        whereClause.companyId = parseInt(companyId as string);
+      if (companyId) {
+        whereClause.companyId = companyId;
       }
 
       if (startDate && endDate) {
         whereClause.createdAt = {
-          gte: new Date(startDate as string),
+          gte: new Date(startDate as unknown as string),
           lte: new Date(endDate as string)
         };
       }
@@ -170,7 +183,7 @@ export async function reportRoutes(app: FastifyInstance) {
       const loads = await prisma.load.findMany({
         where: whereClause,
         include: {
-          company: true
+          Company: true
         },
         orderBy: { date: 'desc' }
       });
@@ -183,9 +196,12 @@ export async function reportRoutes(app: FastifyInstance) {
           total: loads.length,
           totalValue,
           byStatus: loads.reduce((acc, load) => {
-            acc[load.status] = (acc[load.status] || 0) + 1;
+            const status = (load as any).status ?? (load as any).Company?.status;
+            if (status) {
+              acc[status] = (acc[status] || 0) + 1;
+            }
             return acc;
-          }, {} as any)
+          }, {} as Record<string, number>)
         },
         filters: { status, startDate, endDate, companyId },
         generatedAt: new Date().toISOString()
@@ -199,25 +215,29 @@ export async function reportRoutes(app: FastifyInstance) {
   // Relatório de manutenções
   app.get("/reports/maintenance", async (req, rep) => {
     try {
-      const { startDate, endDate, truckId } = req.query;
+      const { startDate, endDate, truckId } = z.object({
+        startDate: z.coerce.date().optional(),
+        endDate: z.string().optional(),
+        truckId: z.coerce.number().optional(),
+      }).parse(req.query);
 
       let whereClause: any = {};
 
-      if (truckId && truckId !== 'todos') {
-        whereClause.truckId = parseInt(truckId as string);
+      if (truckId) {
+        whereClause.truckId = parseInt(truckId as unknown as string);
       }
 
       if (startDate && endDate) {
         whereClause.date = {
-          gte: new Date(startDate as string),
-          lte: new Date(endDate as string)
+          gte: new Date(startDate as unknown as string),
+          lte: new Date(endDate as unknown as string)
         };
       }
 
       const maintenance = await prisma.maintenance.findMany({
         where: whereClause,
         include: {
-          truck: {
+          Truck: {
             select: {
               id: true,
               name: true,
@@ -249,25 +269,29 @@ export async function reportRoutes(app: FastifyInstance) {
   // Relatório financeiro
   app.get("/reports/financial", async (req, rep) => {
     try {
-      const { startDate, endDate, type } = req.query;
+      const { startDate, endDate, type } = z.object({
+        startDate: z.coerce.date().optional(),
+        endDate: z.string().optional(),
+        type: z.enum(["Crédito", "Débito"]).optional(),
+      }).parse(req.query);
 
       let whereClause: any = {};
 
-      if (type && type !== 'todos') {
+      if (type) {
         whereClause.type = type;
       }
 
       if (startDate && endDate) {
         whereClause.date = {
-          gte: new Date(startDate as string),
-          lte: new Date(endDate as string)
+          gte: new Date(startDate as unknown as string),
+          lte: new Date(endDate as unknown as string)
         };
       }
 
       const transactions = await prisma.transaction.findMany({
         where: whereClause,
         include: {
-          employee: true
+          Employee: true
         },
         orderBy: { date: 'desc' }
       });
@@ -306,36 +330,41 @@ export async function reportRoutes(app: FastifyInstance) {
   // Relatório de viagens
   app.get("/reports/trips", async (req, rep) => {
     try {
-      const { startDate, endDate, truckId, status } = req.query;
+      const { startDate, endDate, truckId, status } = z.object({
+        startDate: z.coerce.date().optional(),
+        endDate: z.string().optional(),
+        truckId: z.coerce.number().optional(),
+        status: z.enum(["em_andamento", "finalizado"]).optional(),
+      }).parse(req.query);
 
       let whereClause: any = {};
 
-      if (status && status !== 'todos') {
+      if (status) {
         whereClause.status = status;
       }
 
-      if (truckId && truckId !== 'todos') {
-        whereClause.truckId = parseInt(truckId as string);
+      if (truckId) {
+        whereClause.truckId = parseInt(truckId as unknown as string);
       }
 
       if (startDate && endDate) {
         whereClause.date = {
-          gte: new Date(startDate as string),
-          lte: new Date(endDate as string)
+          gte: new Date(startDate as unknown as string),
+          lte: new Date(endDate as unknown as string)
         };
       }
 
       const trips = await prisma.trip.findMany({
         where: whereClause,
         include: {
-          truck: {
+          Truck: {
             select: {
               id: true,
               name: true,
               plate: true
             }
           },
-          expenses: {
+          TripExpense: {
             orderBy: { date: 'desc' }
           }
         },
@@ -343,7 +372,7 @@ export async function reportRoutes(app: FastifyInstance) {
       });
 
       const totalExpenses = trips.reduce((sum, trip) => {
-        return sum + trip.expenses.reduce((expSum, exp) => expSum + (exp.amount || 0), 0);
+        return sum + trip.TripExpense.reduce((expSum, exp) => expSum + (exp.amount || 0), 0);
       }, 0);
 
       return rep.send({
@@ -376,19 +405,27 @@ export async function reportRoutes(app: FastifyInstance) {
         groupBy,
         sortBy,
         limit 
-      } = req.body;
+      } = z.object({
+        reportType: z.enum(["employees", "financial", "operations"]),
+        filters: z.any().optional(),
+        startDate: z.coerce.date().optional(),
+        endDate: z.string().optional(),
+        groupBy: z.string().optional(),
+        sortBy: z.string().optional(),
+        limit: z.coerce.number().optional(),
+      }).parse(req.body);
 
       let result: any = {};
 
       switch (reportType) {
         case 'employees':
-          result = await generateEmployeeReport(filters, startDate, endDate, groupBy, sortBy, limit);
+          result = await generateEmployeeReport(filters, startDate as unknown as string, endDate as unknown as string, groupBy as string, sortBy as string, limit as number);
           break;
         case 'financial':
-          result = await generateFinancialReport(filters, startDate, endDate, groupBy, sortBy, limit);
+          result = await generateFinancialReport(filters, startDate as unknown as string, endDate as unknown as string, groupBy as string, sortBy as string, limit as number);
           break;
         case 'operations':
-          result = await generateOperationsReport(filters, startDate, endDate, groupBy, sortBy, limit);
+          result = await generateOperationsReport(filters, startDate as unknown as string, endDate as unknown as string, groupBy as string, sortBy as string, limit as number);
           break;
         default:
           return rep.code(400).send({ message: "Tipo de relatório não suportado" });
@@ -408,8 +445,18 @@ export async function reportRoutes(app: FastifyInstance) {
   // Exportar relatório em diferentes formatos
   app.get("/reports/export/:format", async (req, rep) => {
     try {
-      const { format } = req.params;
-      const { reportType, ...filters } = req.query;
+      const { format } = z.object({
+        format: z.enum(["csv", "pdf", "excel"]),
+      }).parse(req.params);
+      const { reportType, ...filters } = z.object({
+        reportType: z.enum(["employees", "financial", "operations"]),
+        filters: z.any().optional(),
+        startDate: z.coerce.date().optional(),
+        endDate: z.string().optional(),
+        groupBy: z.string().optional(),
+        sortBy: z.string().optional(),
+        limit: z.coerce.number().optional(),
+      }).parse(req.query);
 
       if (!['csv', 'pdf', 'excel'].includes(format)) {
         return rep.code(400).send({ message: "Formato não suportado" });
@@ -420,38 +467,10 @@ export async function reportRoutes(app: FastifyInstance) {
       // Gerar dados baseado no tipo de relatório
       switch (reportType) {
         case 'employees':
-          reportData = await generateEmployeeReport(filters, filters.startDate, filters.endDate, '', '', 0);
+          reportData = await generateEmployeeReport(filters, filters.startDate as unknown as string, filters.endDate as unknown as string, '', '', 0);
           break;
-        case 'companies':
-          const companies = await prisma.company.findMany({
-            where: buildWhereClause(filters),
-            include: { loads: true }
-          });
-          reportData = { data: companies };
-          break;
-        case 'loads':
-          const loads = await prisma.load.findMany({
-            where: buildWhereClause(filters),
-            include: { company: true, truck: true }
-          });
-          reportData = { data: loads };
-          break;
-        case 'maintenance':
-          const maintenance = await prisma.maintenance.findMany({
-            where: buildWhereClause(filters),
-            include: { truck: true }
-          });
-          reportData = { data: maintenance };
-          break;
-        case 'financial':
-          reportData = await generateFinancialReport(filters, filters.startDate, filters.endDate, '', '', 0);
-          break;
-        case 'trips':
-          const trips = await prisma.trip.findMany({
-            where: buildWhereClause(filters),
-            include: { truck: true, driver: true, expenses: true }
-          });
-          reportData = { data: trips };
+        case 'operations':
+          reportData = await generateOperationsReport(filters, filters.startDate as unknown as string, filters.endDate as unknown as string, '', '', 0);
           break;
         default:
           return rep.code(400).send({ message: "Tipo de relatório não suportado" });
@@ -536,7 +555,7 @@ async function generateOperationsReport(filters: any, startDate: string, endDate
   const [loads, maintenance, trips] = await Promise.all([
     prisma.load.findMany({
       where: startDate && endDate ? {
-        createdAt: {
+        date: {
           gte: new Date(startDate),
           lte: new Date(endDate)
         }
@@ -554,7 +573,7 @@ async function generateOperationsReport(filters: any, startDate: string, endDate
     }),
     prisma.trip.findMany({
       where: startDate && endDate ? {
-        startDate: {
+        date: {
           gte: new Date(startDate),
           lte: new Date(endDate)
         }

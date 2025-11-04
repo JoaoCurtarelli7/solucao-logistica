@@ -1,5 +1,30 @@
 import { PrismaClient } from "@prisma/client";
 
+// Configuração do Prisma Client com tratamento de erros melhorado
 export const prisma = new PrismaClient({
-  log: ["query"],
+  log: process.env.NODE_ENV === 'development' ? ["query", "error", "warn"] : ["error"],
+  errorFormat: 'pretty',
+});
+
+// Testar conexão ao inicializar
+prisma.$connect()
+  .then(() => {
+    console.log("✅ Prisma Client conectado ao PostgreSQL");
+  })
+  .catch((error) => {
+    console.error("❌ Erro ao conectar Prisma Client:", error.message);
+    console.error("   Verifique se o PostgreSQL está rodando e a DATABASE_URL está correta");
+  });
+
+// Graceful shutdown
+process.on('beforeExit', async () => {
+  await prisma.$disconnect();
+});
+
+process.on('SIGINT', async () => {
+  await prisma.$disconnect();
+});
+
+process.on('SIGTERM', async () => {
+  await prisma.$disconnect();
 });

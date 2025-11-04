@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Button, Input, Form, Table, Typography, Space, message, Popconfirm } from 'antd';
+import { Card, Button, Input, Form, Table, Typography, Space, message, Popconfirm, DatePicker } from 'antd';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { api } from '../../../lib';
@@ -60,7 +60,7 @@ export default function TripExpenses() {
       const payload = { 
         ...values, 
         tripId,
-        date: values?.date ? new Date(values.date).toISOString() : new Date().toISOString(),
+        date: values?.date ? new Date(values.date).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR'),
         category: values?.category || 'Outro'
       };
       const response = await api.post(`/expenses`, payload);
@@ -177,7 +177,7 @@ export default function TripExpenses() {
           rules={[{ required: true, message: 'Data obrigatória' }]}
           style={{ flex: 1 }}
         >
-          <Input placeholder="Data (YYYY-MM-DD)" />
+          <DatePicker placeholder="Data (DD/MM/YYYY)" format="DD/MM/YYYY" />
         </Form.Item>
         <Form.Item>
           <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>

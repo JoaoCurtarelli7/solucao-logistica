@@ -3,18 +3,24 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authenticate } from "../middlewares/authMiddleware";
 
-export async function loadRoutes(app: FastifyInstance) {
-  const paramsSchema = z.object({
-    id: z.coerce.number(),
-  });
+function parseMaybeBrDateToDate(d: unknown): Date {
+  if (d instanceof Date) return d;
+  const s = String(d ?? "").trim();
+  if (!s) return new Date();
+  if (s.includes("/")) {
+    const [day, month, year] = s.split("/");
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+  return new Date(s);
+}
 
-  const companyParamsSchema = z.object({
-    companyId: z.coerce.number(),
-  });
+export async function loadRoutes(app: FastifyInstance) {
+  const paramsSchema = z.object({ id: z.coerce.number() });
+  const companyParamsSchema = z.object({ companyId: z.coerce.number() });
 
   const bodySchema = z.object({
-    date: z.coerce.date(),
-    loadingNumber: z.string(),
+    date: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate),
+    loadingNumber: z.string().min(1),
     deliveries: z.coerce.number(),
     cargoWeight: z.coerce.number(),
     totalValue: z.coerce.number(),
@@ -22,12 +28,12 @@ export async function loadRoutes(app: FastifyInstance) {
     totalFreight: z.coerce.number(),
     closings: z.coerce.number(),
     observations: z.string().optional(),
-    companyId: z.number(),  
+    companyId: z.coerce.number(),
   });
-  
+
   const updateBodySchema = z.object({
-    date: z.coerce.date().optional(),
-    loadingNumber: z.string().optional(),
+    date: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate).optional(),
+    loadingNumber: z.string().min(1).optional(),
     deliveries: z.coerce.number().optional(),
     cargoWeight: z.coerce.number().optional(),
     totalValue: z.coerce.number().optional(),
@@ -35,103 +41,68 @@ export async function loadRoutes(app: FastifyInstance) {
     totalFreight: z.coerce.number().optional(),
     closings: z.coerce.number().optional(),
     observations: z.string().optional(),
-    companyId: z.number().optional(),
+    companyId: z.coerce.number().optional(),
   });
 
+  // protege todas as rotas deste módulo
   app.addHook("preHandler", authenticate);
 
-  // Listar todas as cargas/pedidos
-  app.get("/loads", async (req, rep) => {
+  // LISTAR
+  app.get("/loads", async (_req, rep) => {
     try {
       const loads = await prisma.load.findMany({
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true,
-              cnpj: true,
-            },
-          },
-        },
-        orderBy: {
-          date: 'desc',
-        },
+        include: { Company: { select: { id: true, name: true, cnpj: true } } },
+        orderBy: { date: "desc" },
       });
-
-      return loads;
+      return rep.send(loads);
     } catch (error) {
-      console.error(error);
+      app.log.error(error);
       return rep.code(500).send({ message: "Erro interno ao buscar os carregamentos" });
     }
   });
 
-  // Listar todas as cargas/pedidos de uma empresa específica
+  // LISTAR POR EMPRESA
   app.get("/loads/company/:companyId", async (req, rep) => {
     const { companyId } = companyParamsSchema.parse(req.params);
 
     try {
-      // Verificar se a empresa existe
-      const companyExists = await prisma.company.findUnique({
-        where: { id: companyId },
-      });
-
-      if (!companyExists) {
-        return rep.code(404).send({ message: "Empresa não encontrada" });
-      }
+      await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
 
       const loads = await prisma.load.findMany({
         where: { companyId },
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true,
-              cnpj: true,
-            },
-          },
-        },
-        orderBy: {
-          date: 'desc',
-        },
+        include: { Company: { select: { id: true, name: true, cnpj: true } } },
+        orderBy: { date: "desc" },
       });
 
-      return loads;
-    } catch (error) {
-      console.error(error);
+      return rep.send(loads);
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return rep.code(404).send({ message: "Empresa não encontrada" });
+      }
+      app.log.error(error);
       return rep.code(500).send({ message: "Erro interno ao buscar os carregamentos da empresa" });
     }
   });
 
-  // Buscar uma carga específica por ID
+  // POR ID
   app.get("/loads/:id", async (req, rep) => {
     const { id } = paramsSchema.parse(req.params);
 
     try {
       const load = await prisma.load.findUnique({
         where: { id },
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true,
-              cnpj: true,
-            },
-          },
-        },
+        include: { Company: { select: { id: true, name: true, cnpj: true } } },
       });
 
-      if (!load) {
-        return rep.code(404).send({ message: "Carregamento não encontrado" });
-      }
-
-      return load;
+      if (!load) return rep.code(404).send({ message: "Carregamento não encontrado" });
+      return rep.send(load);
     } catch (error) {
-      console.error(error);
+      app.log.error(error);
       return rep.code(500).send({ message: "Erro interno ao buscar o carregamento" });
     }
   });
 
-  // Criar um novo carregamento/pedido
+  // CRIAR
   app.post("/loads", async (req, rep) => {
     const {
       date,
@@ -145,29 +116,18 @@ export async function loadRoutes(app: FastifyInstance) {
       observations,
       companyId,
     } = bodySchema.parse(req.body);
-  
+
     try {
-      // Verificar se a empresa existe
-      const companyExists = await prisma.company.findUnique({
-        where: { id: companyId },
-      });
-  
-      if (!companyExists) {
-        return rep.code(404).send({ message: "Empresa não encontrada" });
-      }
+      await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
 
-      // Verificar se já existe um carregamento com o mesmo número
-      const existingLoad = await prisma.load.findFirst({
-        where: {
-          loadingNumber,
-          companyId,
-        },
+      const existing = await prisma.load.findFirst({
+        where: { loadingNumber, companyId },
+        select: { id: true },
       });
-
-      if (existingLoad) {
+      if (existing) {
         return rep.code(400).send({ message: "Já existe um carregamento com este número para esta empresa" });
       }
-  
+
       const load = await prisma.load.create({
         data: {
           date,
@@ -178,159 +138,125 @@ export async function loadRoutes(app: FastifyInstance) {
           freight4,
           totalFreight,
           closings,
-          observations,
-          company: {
-            connect: {
-              id: companyId,
-            },
-          },
+          observations: observations?.trim() ? observations : null,
+          Company: { connect: { id: companyId } },
         },
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true,
-              cnpj: true,
-            },
-          },
-        },
+        include: { Company: { select: { id: true, name: true, cnpj: true } } },
       });
-  
+
       return rep.code(201).send(load);
-    } catch (error) {
-      console.error("Erro ao criar carregamento:", error);
-      return rep.code(500).send({ message: "Erro interno ao criar o carregamento", error });
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return rep.code(404).send({ message: "Empresa não encontrada" });
+      }
+      app.log.error("Erro ao criar carregamento:", error);
+      return rep.code(500).send({ message: "Erro interno ao criar o carregamento" });
     }
   });
-  
-  // Atualizar um carregamento/pedido
+
+  // ATUALIZAR
   app.put("/loads/:id", async (req, rep) => {
     const { id } = paramsSchema.parse(req.params);
     const updateData = updateBodySchema.parse(req.body);
 
     try {
-      // Verificar se o carregamento existe
-      const existingLoad = await prisma.load.findUnique({
-        where: { id },
-      });
+      const existing = await prisma.load.findUnique({ where: { id } });
+      if (!existing) return rep.code(404).send({ message: "Carregamento não encontrado" });
 
-      if (!existingLoad) {
-        return rep.code(404).send({ message: "Carregamento não encontrado" });
-      }
-
-      // Se estiver atualizando a empresa, verificar se ela existe
       if (updateData.companyId) {
-        const companyExists = await prisma.company.findUnique({
-          where: { id: updateData.companyId },
-        });
-
-        if (!companyExists) {
-          return rep.code(404).send({ message: "Empresa não encontrada" });
-        }
+        await prisma.company.findUniqueOrThrow({ where: { id: updateData.companyId } });
       }
 
-      // Se estiver atualizando o número do carregamento, verificar se não existe duplicata
-      if (updateData.loadingNumber && updateData.companyId) {
-        const duplicateLoad = await prisma.load.findFirst({
+      if (updateData.loadingNumber && (updateData.companyId ?? existing.companyId)) {
+        const targetCompanyId = updateData.companyId ?? existing.companyId;
+        const duplicate = await prisma.load.findFirst({
           where: {
             loadingNumber: updateData.loadingNumber,
-            companyId: updateData.companyId,
+            companyId: targetCompanyId,
             id: { not: id },
           },
+          select: { id: true },
         });
-
-        if (duplicateLoad) {
+        if (duplicate) {
           return rep.code(400).send({ message: "Já existe um carregamento com este número para esta empresa" });
         }
       }
 
-      const updatedLoad = await prisma.load.update({
+      const data: any = {
+        ...(updateData.date !== undefined ? { date: updateData.date } : {}),
+        ...(updateData.loadingNumber !== undefined ? { loadingNumber: updateData.loadingNumber } : {}),
+        ...(updateData.deliveries !== undefined ? { deliveries: updateData.deliveries } : {}),
+        ...(updateData.cargoWeight !== undefined ? { cargoWeight: updateData.cargoWeight } : {}),
+        ...(updateData.totalValue !== undefined ? { totalValue: updateData.totalValue } : {}),
+        ...(updateData.freight4 !== undefined ? { freight4: updateData.freight4 } : {}),
+        ...(updateData.totalFreight !== undefined ? { totalFreight: updateData.totalFreight } : {}),
+        ...(updateData.closings !== undefined ? { closings: updateData.closings } : {}),
+        ...(updateData.observations !== undefined
+          ? { observations: updateData.observations?.trim() ? updateData.observations : null }
+          : {}),
+      };
+
+      if (updateData.companyId !== undefined) {
+        data.Company = { connect: { id: updateData.companyId } };
+      }
+
+      const updated = await prisma.load.update({
         where: { id },
-        data: updateData,
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true,
-              cnpj: true,
-            },
-          },
-        },
+        data,
+        include: { Company: { select: { id: true, name: true, cnpj: true } } },
       });
 
-      return rep.send(updatedLoad);
-    } catch (error) {
-      console.error(error);
+      return rep.send(updated);
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return rep.code(404).send({ message: "Empresa não encontrada" });
+      }
+      app.log.error(error);
       return rep.code(500).send({ message: "Erro interno ao atualizar o carregamento" });
     }
   });
 
-  // Deletar um carregamento/pedido
+  // DELETAR
   app.delete("/loads/:id", async (req, rep) => {
     const { id } = paramsSchema.parse(req.params);
 
     try {
-      // Verificar se o carregamento existe
-      const existingLoad = await prisma.load.findUnique({
-        where: { id },
-      });
+      const existing = await prisma.load.findUnique({ where: { id } });
+      if (!existing) return rep.code(404).send({ message: "Carregamento não encontrado" });
 
-      if (!existingLoad) {
-        return rep.code(404).send({ message: "Carregamento não encontrado" });
-      }
-
-      await prisma.load.delete({
-        where: { id },
-      });
-
+      await prisma.load.delete({ where: { id } });
       return rep.code(204).send();
     } catch (error) {
-      console.error(error);
+      app.log.error(error);
       return rep.code(500).send({ message: "Erro interno ao deletar o carregamento" });
     }
   });
 
-  // Buscar cargas por período
+  // POR PERÍODO
   app.get("/loads/period", async (req, rep) => {
     const querySchema = z.object({
-      startDate: z.coerce.date(),
-      endDate: z.coerce.date(),
+      startDate: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate),
+      endDate: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate),
       companyId: z.coerce.number().optional(),
     });
 
     try {
       const { startDate, endDate, companyId } = querySchema.parse(req.query);
 
-      const whereClause: any = {
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
+      const where: any = {
+        date: { gte: startDate, lte: endDate },
+        ...(companyId ? { companyId } : {}),
       };
 
-      if (companyId) {
-        whereClause.companyId = companyId;
-      }
-
       const loads = await prisma.load.findMany({
-        where: whereClause,
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true,
-              cnpj: true,
-            },
-          },
-        },
-        orderBy: {
-          date: 'desc',
-        },
+        where,
+        include: { Company: { select: { id: true, name: true, cnpj: true } } },
+        orderBy: { date: "desc" },
       });
 
-      return loads;
+      return rep.send(loads);
     } catch (error) {
-      console.error(error);
+      app.log.error(error);
       return rep.code(500).send({ message: "Erro interno ao buscar carregamentos por período" });
     }
   });

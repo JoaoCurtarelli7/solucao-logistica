@@ -3,17 +3,48 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authenticate } from "../middlewares/authMiddleware";
 
+// Converte "DD/MM/YYYY" -> Date, ou ISO -> Date, ou retorna null se vazio
+function parsePtBrOrIsoToDate(input?: string | Date | null): Date | null {
+  if (!input) return null;
+  if (input instanceof Date) return input;
+
+  const str = String(input).trim();
+  if (!str) return null;
+
+  // DD/MM/YYYY
+  if (str.includes("/")) {
+    const [dd, mm, yyyy] = str.split("/");
+    const d = Number(dd), m = Number(mm), y = Number(yyyy);
+    if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+      return new Date(y, m - 1, d);
+    }
+  }
+
+  // tenta ISO/Date parseável
+  const maybe = new Date(str);
+  if (!isNaN(maybe.getTime())) return maybe;
+
+  return null;
+}
+
 export async function tripExpenseRoutes(app: FastifyInstance) {
-  const paramsSchema = z.object({ id: z.coerce.number() });
-  const tripIdSchema = z.object({ tripId: z.coerce.number() });
-  
+  const idParam = z.object({ id: z.coerce.number() });
+  const tripIdParam = z.object({ tripId: z.coerce.number() });
+
+  // schema do corpo para criar/atualizar despesa
   const expenseBodySchema = z.object({
     description: z.string().min(1, "Descrição é obrigatória"),
     amount: z.coerce.number().min(0.01, "Valor deve ser maior que zero"),
-    date: z.string().transform((str) => new Date(str)),
+    date: z.union([z.string(), z.date()]).transform((v) => {
+      const parsed = parsePtBrOrIsoToDate(v as any);
+      if (!parsed) {
+        throw new Error("Data inválida. Use DD/MM/YYYY ou ISO.");
+      }
+      return parsed;
+    }),
     category: z.string().min(1, "Categoria é obrigatória"),
     notes: z.string().optional(),
-    tripId: z.coerce.number() // adicionei tripId para criar despesa vinculada
+    tripId: z.coerce.number(),
   });
 
   app.addHook("preHandler", authenticate);
@@ -21,39 +52,42 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   // Listar todas as despesas (com filtros opcionais)
   app.get("/expenses", async (req, rep) => {
     try {
-      const { tripId, category, startDate, endDate } = z.object({
-        tripId: z.coerce.number().optional(),
-        category: z.string().optional(),
-        startDate: z.string().optional().transform((str) => str ? new Date(str) : undefined),
-        endDate: z.string().optional().transform((str) => str ? new Date(str) : undefined),
-      }).parse(req.query);
+      const { tripId, category, startDate, endDate } = z
+        .object({
+          tripId: z.coerce.number().optional(),
+          category: z.string().optional(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        })
+        .parse(req.query);
 
       const where: any = {};
       if (tripId) where.tripId = tripId;
       if (category) where.category = category;
-      if (startDate && endDate) {
-        where.date = { gte: startDate, lte: endDate };
-      }
+
+      const start = parsePtBrOrIsoToDate(startDate || undefined);
+      const end = parsePtBrOrIsoToDate(endDate || undefined);
+      if (start && end) where.date = { gte: start, lte: end };
 
       const expenses = await prisma.tripExpense.findMany({
         where,
         include: {
-          trip: {
+          Trip: {
             select: {
               id: true,
               destination: true,
               driver: true,
               date: true,
-              truck: { select: { id: true, name: true, plate: true } }
-            }
-          }
+              Truck: { select: { id: true, name: true, plate: true } },
+            },
+          },
         },
-        orderBy: { date: "desc" }
+        orderBy: { date: "desc" },
       });
 
       return { expenses };
     } catch (error) {
-      console.error("Erro ao listar despesas:", error);
+      req.log.error(error);
       return rep.code(500).send({ message: "Erro ao listar despesas" });
     }
   });
@@ -61,19 +95,21 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   // Listar despesas de uma viagem específica
   app.get("/trips/:tripId/expenses", async (req, rep) => {
     try {
-      const { tripId } = tripIdSchema.parse(req.params);
+      const { tripId } = tripIdParam.parse(req.params);
 
-      const trip = await prisma.trip.findUnique({ where: { id: tripId } });
-      if (!trip) return rep.code(404).send({ message: "Viagem não encontrada" });
+      await prisma.trip.findUniqueOrThrow({ where: { id: tripId } });
 
       const expenses = await prisma.tripExpense.findMany({
         where: { tripId },
-        orderBy: { date: "desc" }
+        orderBy: { date: "desc" },
       });
 
       return { expenses };
-    } catch (error) {
-      console.error("Erro ao listar despesas da viagem:", error);
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return rep.code(404).send({ message: "Viagem não encontrada" });
+      }
+      req.log.error(error);
       return rep.code(500).send({ message: "Erro ao listar despesas da viagem" });
     }
   });
@@ -81,27 +117,27 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   // Buscar despesa por ID
   app.get("/expenses/:id", async (req, rep) => {
     try {
-      const { id } = paramsSchema.parse(req.params);
+      const { id } = idParam.parse(req.params);
       const expense = await prisma.tripExpense.findUniqueOrThrow({
         where: { id },
         include: {
-          trip: {
+          Trip: {
             select: {
               id: true,
               destination: true,
               driver: true,
               date: true,
-              truck: { select: { id: true, name: true, plate: true } }
-            }
-          }
-        }
+              Truck: { select: { id: true, name: true, plate: true } },
+            },
+          },
+        },
       });
       return expense;
     } catch (error: any) {
-      console.error("Erro ao buscar despesa:", error);
-      if (error.code === "P2025") {
+      if (error?.code === "P2025") {
         return rep.code(404).send({ message: "Despesa não encontrada" });
       }
+      req.log.error(error);
       return rep.code(500).send({ message: "Erro ao buscar despesa" });
     }
   });
@@ -111,27 +147,39 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
     try {
       const data = expenseBodySchema.parse(req.body);
 
-      const trip = await prisma.trip.findUnique({ where: { id: data.tripId } });
-      if (!trip) return rep.code(400).send({ message: "Viagem não encontrada" });
+      await prisma.trip.findUniqueOrThrow({ where: { id: data.tripId } });
 
       const expense = await prisma.tripExpense.create({
-        data,
+        data: {
+          description: data.description,
+          amount: data.amount,
+          date: data.date,
+          category: data.category,
+          notes: data.notes ?? null,
+          Trip: { connect: { id: data.tripId } },
+        },
         include: {
-          trip: {
+          Trip: {
             select: {
               id: true,
               destination: true,
               driver: true,
               date: true,
-              truck: { select: { id: true, name: true, plate: true } }
-            }
-          }
-        }
+              Truck: { select: { id: true, name: true, plate: true } },
+            },
+          },
+        },
       });
 
       return rep.code(201).send(expense);
-    } catch (error) {
-      console.error("Erro ao criar despesa:", error);
+    } catch (error: any) {
+      req.log.error(error);
+      if (error instanceof Error && /Data inválida/i.test(error.message)) {
+        return rep.code(400).send({ message: error.message });
+      }
+      if (error?.code === "P2025") {
+        return rep.code(400).send({ message: "Viagem não encontrada" });
+      }
       return rep.code(500).send({ message: "Erro ao criar despesa" });
     }
   });
@@ -139,36 +187,45 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   // Atualizar despesa
   app.put("/expenses/:id", async (req, rep) => {
     try {
-      const { id } = paramsSchema.parse(req.params);
+      const { id } = idParam.parse(req.params);
       const data = expenseBodySchema.parse(req.body);
 
-      const existingExpense = await prisma.tripExpense.findUnique({ where: { id } });
-      if (!existingExpense) return rep.code(404).send({ message: "Despesa não encontrada" });
+      const existing = await prisma.tripExpense.findUnique({ where: { id } });
+      if (!existing) return rep.code(404).send({ message: "Despesa não encontrada" });
 
-      if (data.tripId !== existingExpense.tripId) {
-        const trip = await prisma.trip.findUnique({ where: { id: data.tripId } });
-        if (!trip) return rep.code(400).send({ message: "Viagem não encontrada" });
+      if (data.tripId !== existing.tripId) {
+        await prisma.trip.findUniqueOrThrow({ where: { id: data.tripId } });
       }
 
       const expense = await prisma.tripExpense.update({
         where: { id },
-        data,
+        data: {
+          description: data.description,
+          amount: data.amount,
+          date: data.date,
+          category: data.category,
+          notes: data.notes ?? null,
+          Trip: { connect: { id: data.tripId } },
+        },
         include: {
-          trip: {
+          Trip: {
             select: {
               id: true,
               destination: true,
               driver: true,
               date: true,
-              truck: { select: { id: true, name: true, plate: true } }
-            }
-          }
-        }
+              Truck: { select: { id: true, name: true, plate: true } },
+            },
+          },
+        },
       });
 
       return expense;
-    } catch (error) {
-      console.error("Erro ao atualizar despesa:", error);
+    } catch (error: any) {
+      req.log.error(error);
+      if (error?.code === "P2025") {
+        return rep.code(400).send({ message: "Viagem não encontrada" });
+      }
       return rep.code(500).send({ message: "Erro ao atualizar despesa" });
     }
   });
@@ -176,7 +233,7 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   // Deletar despesa
   app.delete("/expenses/:id", async (req, rep) => {
     try {
-      const { id } = paramsSchema.parse(req.params);
+      const { id } = idParam.parse(req.params);
 
       const expense = await prisma.tripExpense.findUnique({ where: { id } });
       if (!expense) return rep.code(404).send({ message: "Despesa não encontrada" });
@@ -184,7 +241,7 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
       await prisma.tripExpense.delete({ where: { id } });
       return rep.code(204).send();
     } catch (error) {
-      console.error("Erro ao deletar despesa:", error);
+      req.log.error(error);
       return rep.code(500).send({ message: "Erro ao deletar despesa" });
     }
   });
@@ -192,28 +249,31 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   // Resumo de despesas
   app.get("/expenses/summary", async (req, rep) => {
     try {
-      const { tripId, category, startDate, endDate } = z.object({
-        tripId: z.coerce.number().optional(),
-        category: z.string().optional(),
-        startDate: z.string().optional().transform((str) => str ? new Date(str) : undefined),
-        endDate: z.string().optional().transform((str) => str ? new Date(str) : undefined),
-      }).parse(req.query);
+      const { tripId, category, startDate, endDate } = z
+        .object({
+          tripId: z.coerce.number().optional(),
+          category: z.string().optional(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        })
+        .parse(req.query);
 
       const where: any = {};
       if (tripId) where.tripId = tripId;
       if (category) where.category = category;
-      if (startDate && endDate) {
-        where.date = { gte: startDate, lte: endDate };
-      }
+
+      const start = parsePtBrOrIsoToDate(startDate || undefined);
+      const end = parsePtBrOrIsoToDate(endDate || undefined);
+      if (start && end) where.date = { gte: start, lte: end };
 
       const expenses = await prisma.tripExpense.findMany({ where });
 
       const totalExpenses = expenses.length;
-      const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+      const totalAmount = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
       const averageAmount = totalExpenses > 0 ? totalAmount / totalExpenses : 0;
 
-      const expensesByCategory = expenses.reduce((acc, expense) => {
-        acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+      const expensesByCategory = expenses.reduce((acc: Record<string, number>, expense) => {
+        acc[expense.category] = (acc[expense.category] || 0) + Number(expense.amount || 0);
         return acc;
       }, {} as Record<string, number>);
 
@@ -227,7 +287,7 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
         expenses: expenses.length,
       };
     } catch (error) {
-      console.error("Erro ao gerar resumo de despesas:", error);
+      req.log.error(error);
       return rep.code(500).send({ message: "Erro ao gerar resumo de despesas" });
     }
   });

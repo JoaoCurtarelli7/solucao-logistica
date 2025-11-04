@@ -1,13 +1,33 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model Closing {
+  id             Int              @id @default(autoincrement())
+  monthId        Int
+  companyId      Int?
+  name           String
+  startDate      DateTime?        @db.Timestamptz(6)
+  endDate        DateTime?        @db.Timestamptz(6)
+  status         String           @default("aberto")
+  totalEntries   Float            @default(0)
+  totalExpenses  Float            @default(0)
+  totalTaxes     Float            @default(0)
+  balance        Float            @default(0)
+  profitMargin   Float            @default(0)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @default(now()) @db.Timestamptz(6)
+  Company        Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_closing_company")
+  Month          Month            @relation(fields: [monthId], references: [id], onDelete: Cascade, map: "fk_closing_month")
+  FinancialEntry FinancialEntry[]
+
+  @@index([companyId], map: "idx_closing_companyId")
+  @@index([monthId], map: "idx_closing_monthId")
 }
 
 model Company {
@@ -15,55 +35,53 @@ model Company {
   name             String
   type             String
   cnpj             String           @unique
-  dateRegistration DateTime
+  dateRegistration DateTime         @db.Timestamptz(6)
   status           String
   responsible      String
   commission       Float
-  loads            Load[]
-  financialEntries FinancialEntry[]
-  closings         Closing[]
+  Closing          Closing[]
+  FinancialEntry   FinancialEntry[]
+  Load             Load[]
 }
 
 model Employee {
-  id           Int           @id @default(autoincrement())
-  name         String
-  role         String
-  baseSalary   Float
-  status       String // "Ativo" ou "Inativo"
-  cpf          String?
-  phone        String?
-  email        String?
-  address      String?
-  hireDate     DateTime      @default(now())
-  transactions Transaction[] // Relacionamento com créditos e débitos
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  @@map("Employee")
+  id          Int           @id @default(autoincrement())
+  name        String
+  role        String
+  baseSalary  Float
+  status      String
+  cpf         String?
+  phone       String?
+  email       String?
+  address     String?
+  hireDate    DateTime      @default(now()) @db.Timestamptz(6)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime      @default(now()) @db.Timestamptz(6)
+  Transaction Transaction[]
 }
 
-model Transaction {
-  id         Int      @id @default(autoincrement())
-  type       String // "Crédito" ou "Débito"
-  amount     Float
-  date       DateTime @default(now())
-  employeeId Int
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-}
+model FinancialEntry {
+  id           Int      @id @default(autoincrement())
+  description  String
+  amount       Float
+  category     String
+  date         DateTime @db.Timestamptz(6)
+  type         String
+  observations String?
+  closingId    Int?
+  companyId    Int?
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
+  Closing      Closing? @relation(fields: [closingId], references: [id], onDelete: Cascade, map: "fk_finEntry_closing")
+  Company      Company? @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_finEntry_company")
 
-model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  password  String
-  phone     String?
-  address   String?
-  createdAt DateTime @default(now())
+  @@index([closingId], map: "idx_finEntry_closingId")
+  @@index([companyId], map: "idx_finEntry_companyId")
 }
 
 model Load {
   id            Int      @id @default(autoincrement())
-  date          DateTime
+  date          DateTime @db.Timestamptz(6)
   loadingNumber String
   deliveries    Int
   cargoWeight   Float
@@ -73,114 +91,101 @@ model Load {
   closings      Float
   observations  String?
   companyId     Int
-  company       Company  @relation(fields: [companyId], references: [id])
-}
+  Company       Company  @relation(fields: [companyId], references: [id], map: "fk_load_company")
 
-model Truck {
-  id           Int           @id @default(autoincrement())
-  name         String
-  plate        String        @unique
-  brand        String
-  year         Int
-  docExpiry    DateTime
-  renavam      String
-  image        String?
-  maintenances Maintenance[]
-  trips        Trip[]
+  @@index([companyId], map: "idx_load_companyId")
 }
 
 model Maintenance {
   id        Int      @id @default(autoincrement())
-  date      DateTime
+  date      DateTime @db.Timestamptz(6)
   service   String
   km        Int
   value     Float
   notes     String?
   truckId   Int
-  truck     Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+  Truck     Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade, map: "fk_maintenance_truck")
+
+  @@index([truckId], map: "idx_maintenance_truckId")
+}
+
+model Month {
+  id        Int       @id @default(autoincrement())
+  year      Int
+  month     Int
+  name      String
+  status    String    @default("aberto")
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @db.Timestamptz(6)
+  Closing   Closing[]
+
+  @@unique([year, month], map: "uq_month_year_month")
+}
+
+model Transaction {
+  id         Int      @id @default(autoincrement())
+  type       String
+  amount     Float
+  date       DateTime @default(now()) @db.Timestamptz(6)
+  employeeId Int
+  Employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade, map: "fk_transaction_employee")
+
+  @@index([employeeId], map: "idx_transaction_employeeId")
 }
 
 model Trip {
   id           Int           @id @default(autoincrement())
   destination  String
   driver       String
-  date         DateTime
+  date         DateTime      @db.Timestamptz(6)
   freightValue Float
-  status       String        @default("em_andamento") // "em_andamento", "concluida", "cancelada"
+  status       String        @default("em_andamento")
   notes        String?
   truckId      Int?
-  truck        Truck?        @relation(fields: [truckId], references: [id])
-  expenses     TripExpense[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime      @default(now()) @db.Timestamptz(6)
+  Truck        Truck?        @relation(fields: [truckId], references: [id], onDelete: Restrict, map: "fk_trip_truck")
+  TripExpense  TripExpense[]
+
+  @@index([truckId], map: "idx_trip_truckId")
 }
 
 model TripExpense {
   id          Int      @id @default(autoincrement())
   description String
   amount      Float
-  date        DateTime
+  date        DateTime @db.Timestamptz(6)
   category    String
   notes       String?
   tripId      Int
-  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @db.Timestamptz(6)
+  Trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade, map: "fk_tripExpense_trip")
+
+  @@index([tripId], map: "idx_tripExpense_tripId")
 }
 
-// Modelos para Fechamento Financeiro
-model Month {
-  id        Int       @id @default(autoincrement())
-  year      Int
-  month     Int // 1-12
-  name      String // "Janeiro 2024", "Fevereiro 2024", etc.
-  status    String    @default("aberto") // "aberto", "fechado", "cancelado"
-  closings  Closing[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@unique([year, month])
-  @@map("Month")
+model Truck {
+  id          Int           @id @default(autoincrement())
+  name        String
+  plate       String        @unique
+  brand       String
+  year        Int
+  docExpiry   DateTime      @db.Timestamptz(6)
+  renavam     String
+  image       String?
+  Maintenance Maintenance[]
+  Trip        Trip[]
 }
 
-model Closing {
-  id            Int              @id @default(autoincrement())
-  monthId       Int
-  month         Month            @relation(fields: [monthId], references: [id], onDelete: Cascade)
-  companyId     Int?
-  company       Company?         @relation(fields: [companyId], references: [id])
-  name          String // "1ª Quinzena Jan", "2ª Quinzena Jan", "Mês Completo", etc.
-  startDate     DateTime?
-  endDate       DateTime?
-  status        String           @default("aberto") // "aberto", "fechado", "cancelado"
-  totalEntries  Float            @default(0)
-  totalExpenses Float            @default(0)
-  totalTaxes    Float            @default(0)
-  balance       Float            @default(0)
-  profitMargin  Float            @default(0)
-  entries       FinancialEntry[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
-  @@map("Closing")
-}
-
-model FinancialEntry {
-  id           Int      @id @default(autoincrement())
-  description  String
-  amount       Float
-  category     String
-  date         DateTime
-  type         String // "entrada", "saida", "imposto"
-  observations String?
-  closingId    Int?
-  closing      Closing? @relation(fields: [closingId], references: [id], onDelete: Cascade)
-  companyId    Int?
-  company      Company? @relation(fields: [companyId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@map("FinancialEntry")
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
 }

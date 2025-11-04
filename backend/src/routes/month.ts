@@ -35,10 +35,13 @@ export async function monthRoutes(app: FastifyInstance) {
         whereClause.status = status;
       }
 
-      const months = await prisma.$queryRaw`
-        SELECT * FROM Month 
-        ORDER BY year DESC, month DESC
-      `;
+      const months = await prisma.month.findMany({
+        where: whereClause,
+        orderBy: [
+          { year: 'desc' },
+          { month: 'desc' },
+        ],
+      });
 
       return rep.send(months || []);
     } catch (error) {
@@ -54,12 +57,12 @@ export async function monthRoutes(app: FastifyInstance) {
       const month = await prisma.month.findUnique({
         where: { id },
         include: {
-          closings: {
+          Closing: {
             include: {
-              company: {
+              Company: {
                 select: { id: true, name: true, cnpj: true },
               },
-              entries: true,
+              FinancialEntry: true,
             },
           },
         },
@@ -79,45 +82,37 @@ export async function monthRoutes(app: FastifyInstance) {
   app.post("/months", async (req, rep) => {
     try {
       const body = req.body;
-      const { year, month } = createMonthSchema.parse(body);
-
-      // Verificar se o mês já existe (temporariamente desabilitado)
-      // const existingMonth = await prisma.month.findMany({
-      //   where: {
-      //     year,
-      //     month,
-      //   },
-      //   take: 1,
-      // });
-
-      // if (existingMonth.length > 0) {
-      //   return rep.code(400).send({ message: "Este mês já existe" });
-      // }
+      const { year, month: monthNumber } = createMonthSchema.parse(body);
 
       const monthNames = [
         "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
         "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
       ];
 
-      const monthName = `${monthNames[month - 1]} ${year}`;
+      const monthName = `${monthNames[monthNumber - 1]} ${year}`;
 
-      const newMonth = await prisma.$queryRaw`
-        INSERT INTO Month (year, month, name, status, createdAt, updatedAt) 
-        VALUES (${year}, ${month}, ${monthName}, 'aberto', datetime('now'), datetime('now'))
-      `;
-      
-      const createdMonth = await prisma.$queryRaw`
-        SELECT * FROM Month 
-        WHERE year = ${year} AND month = ${month}
-        LIMIT 1
-      ` as any[];
+      const createdMonth = await prisma.month.create({
+        data: {
+          year,
+          month: monthNumber,
+          name: monthName,
+          status: 'aberto',
+        },
+      });
 
-      return rep.code(201).send(createdMonth[0] || {});
+      return rep.code(201).send(createdMonth);
     } catch (error: any) {
       if (error.name === 'ZodError') {
         return rep.code(400).send({ 
           message: "Dados inválidos", 
           errors: error.errors 
+        });
+      }
+      // Erro de duplicata (unique constraint)
+      if (error.code === 'P2002') {
+        return rep.code(409).send({ 
+          message: "Este mês já existe", 
+          error: "Já existe um mês com este ano e mês"
         });
       }
       if (error instanceof Error) {
@@ -143,9 +138,9 @@ export async function monthRoutes(app: FastifyInstance) {
         where: { id },
         data,
         include: {
-          closings: {
+          Closing: {
             include: {
-              company: {
+              Company: {
                 select: { id: true, name: true, cnpj: true },
               },
             },
@@ -166,14 +161,14 @@ export async function monthRoutes(app: FastifyInstance) {
 
       const month = await prisma.month.findUnique({
         where: { id },
-        include: { closings: true },
+        include: { Closing: true },
       });
 
       if (!month) {
         return rep.code(404).send({ message: "Mês não encontrado" });
       }
 
-      if (month.closings.length > 0) {
+      if (month.Closing.length > 0) {
         return rep.code(400).send({
           message: "Não é possível deletar um mês que possui fechamentos",
         });
@@ -195,8 +190,8 @@ export async function monthRoutes(app: FastifyInstance) {
       const month = await prisma.month.findUnique({
         where: { id },
         include: {
-          closings: {
-            include: { entries: true },
+          Closing: {
+            include: { FinancialEntry: true },
           },
         },
       });
@@ -205,10 +200,10 @@ export async function monthRoutes(app: FastifyInstance) {
         return rep.code(404).send({ message: "Mês não encontrado" });
       }
 
-      const totalClosings = month.closings.length;
-      const closedClosings = month.closings.filter(c => c.status === "fechado").length;
+      const totalClosings = month.Closing.length;
+      const closedClosings = month.Closing.filter(c => c.status === "fechado").length;
 
-      const allEntries = month.closings.flatMap(c => c.entries);
+      const allEntries = month.Closing.flatMap(c => c.FinancialEntry);
       const totalEntries = allEntries.filter(e => e.type === "entrada").reduce((sum, e) => sum + e.amount, 0);
       const totalExpenses = allEntries.filter(e => e.type === "saida").reduce((sum, e) => sum + e.amount, 0);
       const totalTaxes = allEntries.filter(e => e.type === "imposto").reduce((sum, e) => sum + e.amount, 0);

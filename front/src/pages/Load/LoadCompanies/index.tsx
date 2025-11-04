@@ -29,15 +29,17 @@ const { Option } = Select
 
 export default function LoadCompanies() {
   const navigate = useNavigate()
-  const [data, setData] = useState([])
+  const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingLoad, setEditingLoad] = useState(null)
-  const [companies, setCompanies] = useState([])
-  const [selectedCompany, setSelectedCompany] = useState(null)
-  const [dateRange, setDateRange] = useState(null)
+  const [editingLoad, setEditingLoad] = useState<any>(null)
+  const [companies, setCompanies] = useState<any[]>([])
+  const [selectedCompany, setSelectedCompany] = useState<number | null>(null)
+  const [dateRange, setDateRange] = useState<any>(null)
   const [searchText, setSearchText] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'recent' | 'old'>(
+    'all',
+  )
 
   useEffect(() => {
     fetchCompanies()
@@ -54,27 +56,29 @@ export default function LoadCompanies() {
     }
   }
 
+  const mapLoadRow = (load: any) => ({
+    key: load.id,
+    id: load.id,
+    data: dayjs(load.date).format('DD/MM/YYYY'),
+    numeroCarregamento: load.loadingNumber,
+    entregas: load.deliveries,
+    pesoCarga: load.cargoWeight,
+    valorTotal: load.totalValue,
+    frete4: load.freight4,
+    somaTotalFrete: load.totalFreight,
+    fechamentos: load.closings,
+    observacoes: load.observations || '',
+    companyId: load.companyId,
+    companyName: load.Company?.name || '', // <-- Company com C maiúsculo
+    companyCnpj: load.Company?.cnpj || '',
+    rawData: load, // mantém o objeto original (com .Company)
+  })
+
   const fetchAllLoads = async () => {
     setLoading(true)
     try {
       const response = await api.get('/loads')
-      const formattedData = response.data.map((load) => ({
-        key: load.id,
-        id: load.id,
-        data: dayjs(load.date).format('DD/MM/YYYY'),
-        numeroCarregamento: load.loadingNumber,
-        entregas: load.deliveries,
-        pesoCarga: load.cargoWeight,
-        valorTotal: load.totalValue,
-        frete4: load.freight4,
-        somaTotalFrete: load.totalFreight,
-        fechamentos: load.closings,
-        observacoes: load.observations || '',
-        companyId: load.companyId,
-        companyName: load.company?.name || '',
-        companyCnpj: load.company?.cnpj || '',
-        rawData: load,
-      }))
+      const formattedData = response.data.map(mapLoadRow)
       setData(formattedData)
     } catch (error) {
       console.error('Erro ao buscar cargas:', error)
@@ -84,46 +88,44 @@ export default function LoadCompanies() {
     }
   }
 
-  const handleAddLoad = async (newLoad) => {
+  const handleAddLoad = async (newLoad: any) => {
     try {
       const loadData = {
-        ...newLoad,
-        companyId: newLoad.companyId,
+        companyId: Number(newLoad.companyId), // garante número
         date: dayjs(newLoad.data, 'DD/MM/YYYY').toDate(),
         loadingNumber: newLoad.numeroCarregamento,
-        deliveries: newLoad.entregas,
-        cargoWeight: newLoad.pesoCarga,
-        totalValue: newLoad.valorTotal,
-        freight4: newLoad.frete4,
-        totalFreight: newLoad.somaTotalFrete,
-        closings: newLoad.fechamentos,
-        observations: newLoad.observacoes,
+        deliveries: Number(newLoad.entregas),
+        cargoWeight: Number(newLoad.pesoCarga),
+        totalValue: Number(newLoad.valorTotal),
+        freight4: Number(newLoad.frete4),
+        totalFreight: Number(newLoad.somaTotalFrete),
+        closings: Number(newLoad.fechamentos),
+        observations: newLoad.observacoes?.trim() || undefined,
       }
 
       await api.post('/loads', loadData)
       message.success('Carga criada com sucesso!')
       fetchAllLoads()
       setIsModalOpen(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao criar carga:', error)
       message.error(error.response?.data?.message || 'Erro ao criar carga')
     }
   }
 
-  const handleEditLoad = async (updatedLoad) => {
+  const handleEditLoad = async (updatedLoad: any) => {
     try {
       const loadData = {
-        ...updatedLoad,
-        companyId: updatedLoad.companyId,
+        companyId: Number(updatedLoad.companyId),
         date: dayjs(updatedLoad.data, 'DD/MM/YYYY').toDate(),
         loadingNumber: updatedLoad.numeroCarregamento,
-        deliveries: updatedLoad.entregas,
-        cargoWeight: updatedLoad.pesoCarga,
-        totalValue: updatedLoad.valorTotal,
-        freight4: updatedLoad.frete4,
-        totalFreight: updatedLoad.somaTotalFrete,
-        closings: updatedLoad.fechamentos,
-        observations: updatedLoad.observacoes,
+        deliveries: Number(updatedLoad.entregas),
+        cargoWeight: Number(updatedLoad.pesoCarga),
+        totalValue: Number(updatedLoad.valorTotal),
+        freight4: Number(updatedLoad.frete4),
+        totalFreight: Number(updatedLoad.somaTotalFrete),
+        closings: Number(updatedLoad.fechamentos),
+        observations: updatedLoad.observacoes?.trim() || undefined,
       }
 
       await api.put(`/loads/${editingLoad.id}`, loadData)
@@ -131,13 +133,13 @@ export default function LoadCompanies() {
       fetchAllLoads()
       setEditingLoad(null)
       setIsModalOpen(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao atualizar carga:', error)
       message.error(error.response?.data?.message || 'Erro ao atualizar carga')
     }
   }
 
-  const handleDeleteLoad = async (loadId) => {
+  const handleDeleteLoad = async (loadId: number) => {
     try {
       await api.delete(`/loads/${loadId}`)
       message.success('Carga excluída com sucesso!')
@@ -148,7 +150,7 @@ export default function LoadCompanies() {
     }
   }
 
-  const handleEdit = (record) => {
+  const handleEdit = (record: any) => {
     setEditingLoad(record)
     setIsModalOpen(true)
   }
@@ -163,15 +165,16 @@ export default function LoadCompanies() {
     setIsModalOpen(false)
   }
 
-  const handleViewCompany = (companyId) => {
+  const handleViewCompany = (companyId: number) => {
+    // ajuste a rota conforme seu router
     navigate(`/load/${companyId}`)
   }
 
-  const handleCompanyChange = (value) => {
+  const handleCompanyChange = (value: number | null) => {
     setSelectedCompany(value)
   }
 
-  const handleDateRangeChange = (dates) => {
+  const handleDateRangeChange = (dates: any) => {
     setDateRange(dates)
   }
 
@@ -184,36 +187,13 @@ export default function LoadCompanies() {
     const startDate = dateRange[0].toDate()
     const endDate = dateRange[1].toDate()
 
-    const url = '/loads/period'
-    const params: any = {
-      startDate,
-      endDate,
-    }
-
-    if (selectedCompany) {
-      params.companyId = selectedCompany
-    }
+    const params: any = { startDate, endDate }
+    if (selectedCompany) params.companyId = selectedCompany
 
     api
-      .get(url, { params })
+      .get('/loads/period', { params })
       .then((response) => {
-        const formattedData = response.data.map((load) => ({
-          key: load.id,
-          id: load.id,
-          data: dayjs(load.date).format('DD/MM/YYYY'),
-          numeroCarregamento: load.loadingNumber,
-          entregas: load.deliveries,
-          pesoCarga: load.cargoWeight,
-          valorTotal: load.totalValue,
-          frete4: load.freight4,
-          somaTotalFrete: load.totalFreight,
-          fechamentos: load.closings,
-          observacoes: load.observations || '',
-          companyId: load.companyId,
-          companyName: load.company?.name || '',
-          companyCnpj: load.company?.cnpj || '',
-          rawData: load,
-        }))
+        const formattedData = response.data.map(mapLoadRow)
         setData(formattedData)
         message.success(
           `${formattedData.length} cargas encontradas no período selecionado`,
@@ -225,7 +205,7 @@ export default function LoadCompanies() {
       })
   }
 
-  const handleStatusFilterChange = (value) => {
+  const handleStatusFilterChange = (value: 'all' | 'recent' | 'old') => {
     setStatusFilter(value)
   }
 
@@ -250,34 +230,43 @@ export default function LoadCompanies() {
     return matchesSearch && matchesCompany && matchesStatus
   })
 
-  const columns = [
+  const companyFilterOptions = Array.from(
+    new Map(
+      data
+        .map((i) => [i.companyId, { text: i.companyName, value: i.companyId }])
+        .filter(([_, obj]) => (obj as any).text), // remove vazios
+    ).values(),
+  ) as { text: string; value: number }[]
+
+  const columns: any[] = [
     {
       title: 'Data',
       dataIndex: 'data',
       key: 'data',
       align: 'center',
       width: 100,
-      sorter: (a, b) =>
+      sorter: (a: any, b: any) =>
         dayjs(a.data, 'DD/MM/YYYY').unix() - dayjs(b.data, 'DD/MM/YYYY').unix(),
     },
     {
       title: 'Empresa',
       key: 'company',
       align: 'left',
-      width: 200,
-      render: (_, record) => (
-        <div>
-          <div style={{ fontWeight: 'bold' }}>{record.companyName}</div>
-          <div style={{ fontSize: '12px', color: '#666' }}>
-            {record.companyCnpj}
+      width: 220,
+      render: (_: any, record: any) => {
+        return (
+          <div>
+            <div style={{ fontWeight: 'bold' }}>
+              {record.rawData.Company?.name || '-'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              {record.rawData.Company?.cnpj || ''}
+            </div>
           </div>
-        </div>
-      ),
-      filters: companies.map((company) => ({
-        text: company.name,
-        value: company.id,
-      })),
-      onFilter: (value, record) => record.companyId === value,
+        )
+      },
+      filters: companyFilterOptions,
+      onFilter: (value: any, record: any) => record.companyId === value,
     },
     {
       title: 'Número do Carregamento',
@@ -299,7 +288,7 @@ export default function LoadCompanies() {
       key: 'pesoCarga',
       align: 'center',
       width: 100,
-      render: (value) =>
+      render: (value: number) =>
         value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
     },
     {
@@ -308,8 +297,8 @@ export default function LoadCompanies() {
       key: 'valorTotal',
       align: 'right',
       width: 120,
-      render: (value) => `R$ ${value.toFixed(2).replace('.', ',')}`,
-      sorter: (a, b) => a.valorTotal - b.valorTotal,
+      render: (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`,
+      sorter: (a: any, b: any) => a.valorTotal - b.valorTotal,
     },
     {
       title: 'Frete 4%',
@@ -317,7 +306,7 @@ export default function LoadCompanies() {
       key: 'frete4',
       align: 'right',
       width: 100,
-      render: (value) => `R$ ${value.toFixed(2).replace('.', ',')}`,
+      render: (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`,
     },
     {
       title: 'Total Frete',
@@ -325,8 +314,8 @@ export default function LoadCompanies() {
       key: 'somaTotalFrete',
       align: 'right',
       width: 120,
-      render: (value) => `R$ ${value.toFixed(2).replace('.', ',')}`,
-      sorter: (a, b) => a.somaTotalFrete - b.somaTotalFrete,
+      render: (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`,
+      sorter: (a: any, b: any) => a.somaTotalFrete - b.somaTotalFrete,
     },
     {
       title: 'Fechamentos',
@@ -334,7 +323,7 @@ export default function LoadCompanies() {
       key: 'fechamentos',
       align: 'right',
       width: 120,
-      render: (value) => `R$ ${value.toFixed(2).replace('.', ',')}`,
+      render: (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`,
     },
     {
       title: 'Observações',
@@ -343,7 +332,7 @@ export default function LoadCompanies() {
       align: 'left',
       width: 200,
       ellipsis: true,
-      render: (text) => (
+      render: (text: string) => (
         <Tooltip title={text}>
           <span>{text || '-'}</span>
         </Tooltip>
@@ -355,7 +344,7 @@ export default function LoadCompanies() {
       align: 'center',
       width: 200,
       fixed: 'right',
-      render: (_, record) => (
+      render: (_: any, record: any) => (
         <Space>
           <Button
             type="primary"
@@ -404,7 +393,7 @@ export default function LoadCompanies() {
       ? `Cargas_${companies.find((c) => c.id === selectedCompany)?.name}_${dayjs().format('DD-MM-YYYY')}.xlsx`
       : `Todas_Cargas_${dayjs().format('DD-MM-YYYY')}.xlsx`
 
-    const headerData = [['RELATÓRIO DE CARGAS'], []]
+    const headerData: any[] = [['RELATÓRIO DE CARGAS'], []]
 
     if (selectedCompany) {
       headerData[0].push(
@@ -429,10 +418,13 @@ export default function LoadCompanies() {
       return columns
         .filter((col) => col.key !== 'actions')
         .map((col) => {
-          if (col.render) {
-            return col.render(item[col.dataIndex], item)
+          if (col.dataIndex) return item[col.dataIndex] ?? ''
+          if (col.key === 'company') {
+            const name = item.rawData.Company?.name || ''
+            const cnpj = item.rawData.Company?.cnpj || ''
+            return `${name}${name && cnpj ? ' - ' : ''}${cnpj}`
           }
-          return item[col.dataIndex] || ''
+          return ''
         })
     })
 
@@ -440,9 +432,6 @@ export default function LoadCompanies() {
 
     const ws = XLSX.utils.aoa_to_sheet(finalData)
     XLSX.utils.book_append_sheet(wb, ws, 'Cargas')
-
-    ws.A1.s = { font: { bold: true, sz: 16 } }
-
     XLSX.writeFile(wb, fileName)
   }
 
@@ -486,7 +475,9 @@ export default function LoadCompanies() {
             allowClear
             showSearch
             filterOption={(input, option) =>
-              option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+              (option?.children as string)
+                .toLowerCase()
+                .includes(input.toLowerCase())
             }
           >
             {companies.map((company) => (
@@ -550,7 +541,7 @@ export default function LoadCompanies() {
           </Button>
         </div>
 
-        {/* Resumo estatístico */}
+        {/* Resumo */}
         <div
           style={{
             display: 'grid',

@@ -1,7 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
 
 export async function financialRoutes(app: FastifyInstance) {
   // Autenticação desativada temporariamente para facilitar testes de integração do financeiro
@@ -93,7 +92,7 @@ export async function financialRoutes(app: FastifyInstance) {
           observations: data.observations,
         },
         include: {
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -151,7 +150,7 @@ export async function financialRoutes(app: FastifyInstance) {
       const entries = await prisma.financialEntry.findMany({
         where,
         include: {
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -182,7 +181,7 @@ export async function financialRoutes(app: FastifyInstance) {
       const entry = await prisma.financialEntry.findUnique({
         where: { id },
         include: {
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -225,7 +224,7 @@ export async function financialRoutes(app: FastifyInstance) {
           observations: data.observations,
         },
         include: {
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -339,7 +338,7 @@ export async function financialRoutes(app: FastifyInstance) {
           companyId: data.companyId,
         },
         include: {
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -372,7 +371,7 @@ export async function financialRoutes(app: FastifyInstance) {
       const periods = await prisma.financialPeriod.findMany({
         where,
         include: {
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -403,7 +402,7 @@ export async function financialRoutes(app: FastifyInstance) {
       const period = await prisma.financialPeriod.findUnique({
         where: { id },
         include: {
-          company: true,
+          Company: true,
         },
       });
 
@@ -437,8 +436,7 @@ export async function financialRoutes(app: FastifyInstance) {
       const balance = totalEntries - totalExpenses - totalTaxes;
       const profitMargin = totalEntries > 0 ? (balance / totalEntries) * 100 : 0;
 
-      // Atualizar período com totais
-      const updatedPeriod = await prisma.financialPeriod.update({
+      const updatedPeriod = await prisma.financialperiod.update({
         where: { id },
         data: {
           status: "fechado",
@@ -449,7 +447,7 @@ export async function financialRoutes(app: FastifyInstance) {
           profitMargin,
         },
         include: {
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,

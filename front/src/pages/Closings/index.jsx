@@ -1,33 +1,34 @@
 import React, { useState, useEffect } from 'react'
 import {
-    Table,
-    Row,
-    Col,
-    Card,
-    Typography,
-    Button,
-    Space,
-    Tag,
-    message,
-    Popconfirm,
-    Modal,
-    Form,
-    Input,
-    InputNumber,
-    Select,
-    DatePicker,
-    Statistic, Alert,
-    Tabs
+  Table,
+  Row,
+  Col,
+  Card,
+  Typography,
+  Button,
+  Space,
+  Tag,
+  message,
+  Popconfirm,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  DatePicker,
+  Statistic, Alert,
+  Tabs
 } from 'antd'
 import {
-    PlusOutlined,
-    EditOutlined,
-    DeleteOutlined,
-    EyeOutlined, CalculatorOutlined,
-    LockOutlined,
-    UnlockOutlined,
-    CalendarOutlined
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  EyeOutlined, CalculatorOutlined,
+  LockOutlined,
+  UnlockOutlined,
+  CalendarOutlined
 } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import 'dayjs/locale/pt-br'
 import api from '../../lib/api'
@@ -41,6 +42,7 @@ const { Option } = Select
 const { RangePicker } = DatePicker
 
 export default function Closings() {
+  const navigate = useNavigate()
   const [closings, setClosings] = useState([])
   const [months, setMonths] = useState([])
   const [companies, setCompanies] = useState([])
@@ -395,7 +397,7 @@ export default function Closings() {
           <Text strong>{text}</Text>
           <br />
           <Text type="secondary">
-            {record.company?.name || 'Todas as empresas'}
+            {record.companyName || record.Company?.name || 'Todas as empresas'}
           </Text>
         </div>
       )
@@ -424,6 +426,39 @@ export default function Closings() {
       )
     },
     {
+      title: 'Entradas',
+      dataIndex: 'totalEntries',
+      key: 'totalEntries',
+      align: 'right',
+      render: (value) => (
+        <Text style={{ color: '#52c41a' }}>
+          {formatCurrency(value || 0)}
+        </Text>
+      )
+    },
+    {
+      title: 'Saídas',
+      dataIndex: 'totalExpenses',
+      key: 'totalExpenses',
+      align: 'right',
+      render: (value) => (
+        <Text style={{ color: '#ff4d4f' }}>
+          {formatCurrency(value || 0)}
+        </Text>
+      )
+    },
+    {
+      title: 'Impostos',
+      dataIndex: 'totalTaxes',
+      key: 'totalTaxes',
+      align: 'right',
+      render: (value) => (
+        <Text style={{ color: '#faad14' }}>
+          {formatCurrency(value || 0)}
+        </Text>
+      )
+    },
+    {
       title: 'Saldo',
       dataIndex: 'balance',
       key: 'balance',
@@ -432,7 +467,7 @@ export default function Closings() {
         <Text strong style={{ 
           color: value >= 0 ? '#52c41a' : '#ff4d4f' 
         }}>
-          {formatCurrency(value)}
+          {formatCurrency(value || 0)}
         </Text>
       )
     },
@@ -445,7 +480,7 @@ export default function Closings() {
             type="text"
             icon={<EyeOutlined />}
             size="small"
-            onClick={() => window.location.href = `/closing?closingId=${record.id}`}
+            onClick={() => navigate(`/closing?closingId=${record.id}`)}
             title="Ver entradas financeiras"
           />
 
@@ -577,15 +612,7 @@ export default function Closings() {
                     </Option>
                   ))}
                 </Select>
-                {selectedMonth && (
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={openModal}
-                  >
-                    Novo Fechamento
-                  </Button>
-                )}
+              
               </Space>
             </Col>
           </Row>
