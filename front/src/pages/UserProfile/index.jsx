@@ -34,7 +34,7 @@ import dayjs from 'dayjs'
 const { Title, Text, Paragraph } = Typography
 
 export default function UserProfile() {
-  const { user, setUser } = useUserContext()
+  const { user, setUser, loading: userLoading, refreshUser } = useUserContext()
   const [form] = Form.useForm()
   const [passwordForm] = Form.useForm()
   const [isEditing, setIsEditing] = useState(false)
@@ -42,6 +42,13 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(false)
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [userStats, setUserStats] = useState(null)
+
+  // Carregar dados do usuário se não estiver carregado
+  useEffect(() => {
+    if (!user && !userLoading) {
+      refreshUser()
+    }
+  }, [user, userLoading, refreshUser])
 
   // Carregar dados do usuário
   useEffect(() => {
@@ -57,8 +64,10 @@ export default function UserProfile() {
 
   // Carregar estatísticas do usuário
   useEffect(() => {
-    loadUserStats()
-  }, [])
+    if (user) {
+      loadUserStats()
+    }
+  }, [user])
 
   const loadUserStats = async () => {
     try {
@@ -134,7 +143,7 @@ export default function UserProfile() {
     return dayjs(dateString).format('DD/MM/YYYY HH:mm')
   }
 
-  if (!user) {
+  if (userLoading || !user) {
     return (
       <div style={{ textAlign: 'center', padding: '50px' }}>
         <Spin size="large" />

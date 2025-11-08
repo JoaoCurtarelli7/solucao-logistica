@@ -1,16 +1,19 @@
-import { FastifyInstance } from 'fastify'
 import { prisma } from '../lib/prisma'
 import { hash, compare } from 'bcryptjs'
 import { z } from 'zod'
 import { authenticate } from '../middlewares/authMiddleware'
+import { FastifyRequest } from 'fastify'
 
-export async function userRoutes(app: FastifyInstance) {
+export async function userRoutes(app: any) {
   // Aplicar autenticação em todas as rotas
   app.addHook('preHandler', authenticate)
 
   // Obter dados do usuário logado
-  app.get('/me', async (request, reply) => {
+  app.get('/me', async (request: FastifyRequest, reply: any) => {
     try {
+      if (!request.user) {
+        return reply.status(401).send({ message: 'Usuário não autenticado' })
+      }
       const userId = request.user.id
       const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -36,7 +39,7 @@ export async function userRoutes(app: FastifyInstance) {
   })
 
   // Editar dados do perfil do usuário logado
-  app.put('/me', async (request, reply) => {
+  app.put('/me', async (request: FastifyRequest, reply: any) => {
     const updateUserSchema = z.object({
       name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
       email: z.string().email('Email inválido'),
@@ -45,8 +48,11 @@ export async function userRoutes(app: FastifyInstance) {
     })
 
     try {
+      if (!request.user) {
+        return reply.status(401).send({ message: 'Usuário não autenticado' })
+      }
       const userId = request.user.id
-      const data = updateUserSchema.parse(request.body)
+      const data = updateUserSchema.parse(request.body as unknown as z.infer<typeof updateUserSchema>)
 
       // Verificar se o email já está em uso por outro usuário
       if (data.email) {
@@ -98,13 +104,16 @@ export async function userRoutes(app: FastifyInstance) {
   })
 
   // Alterar senha do usuário logado
-  app.patch('/me/password', async (request, reply) => {
+  app.patch('/me/password', async (request: FastifyRequest, reply: any) => {
     const changePasswordSchema = z.object({
       currentPassword: z.string().min(1, 'Senha atual é obrigatória'),
       newPassword: z.string().min(6, 'Nova senha deve ter pelo menos 6 caracteres')
     })
 
     try {
+      if (!request.user) {
+        return reply.status(401).send({ message: 'Usuário não autenticado' })
+      }
       const userId = request.user.id
       const { currentPassword, newPassword } = changePasswordSchema.parse(request.body)
 
@@ -153,8 +162,11 @@ export async function userRoutes(app: FastifyInstance) {
   })
 
   // Obter estatísticas do usuário (opcional)
-  app.get('/me/stats', async (request, reply) => {
+  app.get('/me/stats', async (request: FastifyRequest, reply: any) => {
     try {
+      if (!request.user) {
+        return reply.status(401).send({ message: 'Usuário não autenticado' })
+      }
       const userId = request.user.id
 
       // Aqui você pode adicionar estatísticas específicas do usuário
