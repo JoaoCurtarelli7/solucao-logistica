@@ -3,6 +3,33 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authenticate } from "../middlewares/authMiddleware";
 
+// Função auxiliar para converter datas (aceita DD/MM/YYYY ou YYYY-MM-DD)
+function parseDateToDate(input?: string | Date | null): Date {
+  if (!input) throw new Error("Data é obrigatória");
+  if (input instanceof Date) return input;
+
+  const str = String(input).trim();
+  if (!str) throw new Error("Data é obrigatória");
+
+  // DD/MM/YYYY
+  if (str.includes("/")) {
+    const [day, month, year] = str.split("/");
+    const d = Number(day), m = Number(month), y = Number(year);
+    if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+      const date = new Date(y, m - 1, d);
+      if (date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d) {
+        return date;
+      }
+    }
+  }
+
+  // YYYY-MM-DD ou ISO
+  const maybe = new Date(str);
+  if (!isNaN(maybe.getTime())) return maybe;
+
+  throw new Error(`Formato de data inválido: ${str}. Use DD/MM/YYYY ou YYYY-MM-DD`);
+}
+
 export async function truckRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({
     id: z.coerce.number(),
@@ -13,7 +40,10 @@ export async function truckRoutes(app: FastifyInstance) {
     plate: z.string().min(1, "Placa é obrigatória"),
     brand: z.string().min(1, "Marca é obrigatória"),
     year: z.coerce.number().min(1900, "Ano deve ser válido"),
-    docExpiry: z.string().transform((str) => new Date(str)),
+    docExpiry: z.union([z.string(), z.date()]).transform((val) => {
+      if (val instanceof Date) return val;
+      return parseDateToDate(val);
+    }),
     renavam: z.string().min(1, "Renavam é obrigatório"),
     image: z.string().optional(),
   });
@@ -180,7 +210,25 @@ export async function truckRoutes(app: FastifyInstance) {
       return rep.code(201).send(truck);
     } catch (error) {
       console.error("Erro ao criar caminhão:", error);
-      return rep.code(500).send({ message: "Erro ao criar caminhão" });
+      
+      // Tratar erros de validação do Zod
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
+        return rep.code(400).send({ 
+          message: "Erro de validação", 
+          errors: error.errors,
+          details: errorMessages
+        });
+      }
+      
+      // Tratar erros do Prisma
+      if (error && typeof error === 'object' && 'code' in error) {
+        if (error.code === 'P2002') {
+          return rep.code(400).send({ message: "Já existe um caminhão com esta placa ou renavam" });
+        }
+      }
+      
+      return rep.code(500).send({ message: "Erro ao criar caminhão", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -206,7 +254,28 @@ export async function truckRoutes(app: FastifyInstance) {
       return truck;
     } catch (error) {
       console.error("Erro ao atualizar caminhão:", error);
-      return rep.code(500).send({ message: "Erro ao atualizar caminhão" });
+      
+      // Tratar erros de validação do Zod
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
+        return rep.code(400).send({ 
+          message: "Erro de validação", 
+          errors: error.errors,
+          details: errorMessages
+        });
+      }
+      
+      // Tratar erros do Prisma
+      if (error && typeof error === 'object' && 'code' in error) {
+        if (error.code === 'P2025') {
+          return rep.code(404).send({ message: "Caminhão não encontrado" });
+        }
+        if (error.code === 'P2002') {
+          return rep.code(400).send({ message: "Já existe um caminhão com esta placa ou renavam" });
+        }
+      }
+      
+      return rep.code(500).send({ message: "Erro ao atualizar caminhão", error: error instanceof Error ? error.message : String(error) });
     }
   });
 

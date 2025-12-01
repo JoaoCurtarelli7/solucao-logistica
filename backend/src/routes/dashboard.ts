@@ -36,7 +36,6 @@ export async function dashboardRoutes(app: FastifyInstance) {
       // Contar caminhões
       const totalTrucks = await prisma.truck.count();
 
-      // Dados para gráficos
       const employeeStatusData = [
         { name: 'Ativos', value: activeEmployees, color: '#52c41a' },
         { name: 'Inativos', value: inactiveEmployees, color: '#ff4d4f' }

@@ -21,7 +21,7 @@ export default function AddVehicleModal({ visible, onCancel, onSave, vehicle }) 
       .then((values) => {
         const formattedValues = {
           ...values,
-          docExpiry: values.docExpiry ? values.docExpiry.format('DD/MM/YYYY') : null,
+          docExpiry: values.docExpiry ? values.docExpiry.format('YYYY-MM-DD') : null,
         };
         onSave(formattedValues);
         form.resetFields();
