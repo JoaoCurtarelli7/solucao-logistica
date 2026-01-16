@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "node --loader tsx src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:deploy": "prisma migrate deploy",
     "test": "echo \"Error: no test specified\" && exit 1",
     "prisma:md": "prisma migrate dev --name init --create-only",
     "prisma:mm": "prisma migrate dev",
