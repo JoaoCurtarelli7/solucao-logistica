@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "prisma generate && tsc",
+    "start": "node --loader tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
     "postinstall": "npm run build",
-    "start": "node dist/server.js",
     "prisma:md": "prisma migrate dev --name init --create-only",
     "prisma:mm": "prisma migrate dev",
     "prisma:mr": "prisma migrate reset",
