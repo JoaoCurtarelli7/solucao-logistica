@@ -374,7 +374,12 @@ export default function Reports() {
 
   const loadsColumns = [
     { title: 'Número da Carga', dataIndex: 'loadingNumber', key: 'loadingNumber' },
-    { title: 'Empresa', dataIndex: ['company', 'name'], key: 'company' },
+    { 
+      title: 'Empresa', 
+      dataIndex: ['Company', 'name'], 
+      key: 'company',
+      render: (name, record) => record.Company?.name || 'N/A'
+    },
     { title: 'Entregas', dataIndex: 'deliveries', key: 'deliveries' },
     {
       title: 'Peso (kg)', dataIndex: 'cargoWeight', key: 'cargoWeight',
@@ -392,7 +397,12 @@ export default function Reports() {
 
   const maintenanceColumns = [
     { title: 'Serviço', dataIndex: 'service', key: 'service' },
-    { title: 'Caminhão', dataIndex: ['truck', 'plate'], key: 'truck' },
+    { 
+      title: 'Caminhão', 
+      dataIndex: ['Truck', 'plate'], 
+      key: 'truck',
+      render: (plate, record) => record.Truck?.plate || 'N/A'
+    },
     {
       title: 'Data', dataIndex: 'date', key: 'date',
       render: (date) => formatDate(date)
@@ -417,14 +427,23 @@ export default function Reports() {
       title: 'Valor', dataIndex: 'amount', key: 'amount',
       render: (value) => formatCurrency(value)
     },
-    { title: 'Funcionário', dataIndex: ['employee', 'name'], key: 'employee' },
-    { title: 'Descrição', dataIndex: 'description', key: 'description' }
+    { 
+      title: 'Funcionário', 
+      dataIndex: ['Employee', 'name'], 
+      key: 'employee',
+      render: (name, record) => record.Employee?.name || 'N/A'
+    }
   ]
 
   const tripsColumns = [
     { title: 'Destino', dataIndex: 'destination', key: 'destination' },
     { title: 'Motorista', dataIndex: 'driver', key: 'driver' },
-    { title: 'Caminhão', dataIndex: ['truck', 'plate'], key: 'truck' },
+    { 
+      title: 'Caminhão', 
+      dataIndex: ['Truck', 'plate'], 
+      key: 'truck',
+      render: (plate, record) => record.Truck?.plate || 'N/A'
+    },
     {
       title: 'Status', dataIndex: 'status', key: 'status',
       render: (status) => <Tag color={status === 'Concluída' ? 'green' : 'orange'}>{status}</Tag>

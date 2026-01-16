@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, Tabs, Button, Input, Form, Typography, message } from "antd";
 import {
   UserOutlined,
@@ -25,8 +25,6 @@ export default function LoginAndRegister() {
   const [activeTab, setActiveTab] = useState("1");
   const [passwordStrength, setPasswordStrength] = useState(0);
   const navigate = useNavigate();
-
-  const tabsRef = useRef(null);
 
   useEffect(() => {
     const elements = document.querySelectorAll('.fade-in');
@@ -109,11 +107,7 @@ export default function LoginAndRegister() {
       });
       registerForm.resetFields();
       setPasswordStrength(0);
-      
-      if (tabsRef.current) {
-        tabsRef.current.setActiveKey("1");
-        setActiveTab("1");
-      }
+      setActiveTab("1");
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Erro ao cadastrar.';
       if (err.response?.data?.errors) {
@@ -185,7 +179,6 @@ export default function LoginAndRegister() {
           <Tabs 
             defaultActiveKey="1" 
             centered 
-            ref={tabsRef}
             activeKey={activeTab}
             onChange={handleTabChange}
             className="custom-tabs"

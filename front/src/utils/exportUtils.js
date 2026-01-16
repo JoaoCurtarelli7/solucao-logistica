@@ -312,7 +312,11 @@ export const exportCompanyReport = (data, format) => {
 export const exportLoadsReport = (data, format) => {
   const columns = [
     { title: 'Número da Carga', dataIndex: 'loadingNumber' },
-    { title: 'Empresa', dataIndex: ['company', 'name'] },
+    { 
+      title: 'Empresa', 
+      dataIndex: ['Company', 'name'],
+      render: (name, record) => record.Company?.name || 'N/A'
+    },
     { title: 'Entregas', dataIndex: 'deliveries' },
     { title: 'Peso (kg)', dataIndex: 'cargoWeight' },
     { title: 'Valor Total', dataIndex: 'totalValue' },
@@ -330,7 +334,11 @@ export const exportLoadsReport = (data, format) => {
 export const exportMaintenanceReport = (data, format) => {
   const columns = [
     { title: 'Serviço', dataIndex: 'service' },
-    { title: 'Caminhão', dataIndex: ['truck', 'plate'] },
+    { 
+      title: 'Caminhão', 
+      dataIndex: ['Truck', 'plate'],
+      render: (plate, record) => record.Truck?.plate || 'N/A'
+    },
     { title: 'Data', dataIndex: 'date' },
     { title: 'Valor', dataIndex: 'value' },
     { title: 'KM', dataIndex: 'km' }
@@ -349,8 +357,11 @@ export const exportFinancialReport = (data, format) => {
     { title: 'Data', dataIndex: 'date' },
     { title: 'Tipo', dataIndex: 'type' },
     { title: 'Valor', dataIndex: 'amount' },
-    { title: 'Funcionário', dataIndex: ['employee', 'name'] },
-    { title: 'Descrição', dataIndex: 'description' }
+    { 
+      title: 'Funcionário', 
+      dataIndex: ['Employee', 'name'],
+      render: (name, record) => record.Employee?.name || 'N/A'
+    }
   ]
 
   if (format === 'pdf') {
@@ -365,7 +376,11 @@ export const exportTripsReport = (data, format) => {
   const columns = [
     { title: 'Destino', dataIndex: 'destination' },
     { title: 'Motorista', dataIndex: 'driver' },
-    { title: 'Caminhão', dataIndex: ['truck', 'plate'] },
+    { 
+      title: 'Caminhão', 
+      dataIndex: ['Truck', 'plate'],
+      render: (plate, record) => record.Truck?.plate || 'N/A'
+    },
     { title: 'Status', dataIndex: 'status' },
     { title: 'Data', dataIndex: 'date' }
   ]
