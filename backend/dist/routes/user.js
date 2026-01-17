@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.userRoutes = void 0;
+exports.userRoutes = userRoutes;
 const prisma_1 = require("../lib/prisma");
 const bcryptjs_1 = require("bcryptjs");
 const zod_1 = require("zod");
@@ -166,4 +166,3 @@ async function userRoutes(app) {
         }
     });
 }
-exports.userRoutes = userRoutes;
