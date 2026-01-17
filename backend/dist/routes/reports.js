@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reportRoutes = reportRoutes;
+exports.reportRoutes = void 0;
 const prisma_1 = require("../lib/prisma");
 const zod_1 = require("zod");
 async function reportRoutes(app) {
@@ -425,6 +425,7 @@ async function reportRoutes(app) {
         }
     });
 }
+exports.reportRoutes = reportRoutes;
 // Funções auxiliares para relatórios
 async function generateEmployeeReport(filters, startDate, endDate, groupBy, sortBy, limit) {
     let whereClause = {};

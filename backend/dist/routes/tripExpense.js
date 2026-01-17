@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tripExpenseRoutes = tripExpenseRoutes;
+exports.tripExpenseRoutes = void 0;
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
@@ -276,3 +276,4 @@ async function tripExpenseRoutes(app) {
         }
     });
 }
+exports.tripExpenseRoutes = tripExpenseRoutes;

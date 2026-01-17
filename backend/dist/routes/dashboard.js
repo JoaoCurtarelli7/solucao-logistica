@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dashboardRoutes = dashboardRoutes;
+exports.dashboardRoutes = void 0;
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 async function dashboardRoutes(app) {
@@ -58,9 +58,9 @@ async function dashboardRoutes(app) {
                     activeCompanies,
                     totalLoads,
                     totalTrucks,
-                    maintenanceCost: 0, // Valor fixo para evitar problemas
-                    totalCredits: 0, // Valor fixo para evitar problemas
-                    totalDebits: 0, // Valor fixo para evitar problemas
+                    maintenanceCost: 0,
+                    totalCredits: 0,
+                    totalDebits: 0,
                     balance: 0 // Valor fixo para evitar problemas
                 },
                 charts: {
@@ -99,3 +99,4 @@ async function dashboardRoutes(app) {
         }
     });
 }
+exports.dashboardRoutes = dashboardRoutes;

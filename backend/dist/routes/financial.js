@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.financialRoutes = financialRoutes;
+exports.financialRoutes = void 0;
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 async function financialRoutes(app) {
@@ -421,3 +421,4 @@ async function financialRoutes(app) {
         }
     });
 }
+exports.financialRoutes = financialRoutes;
