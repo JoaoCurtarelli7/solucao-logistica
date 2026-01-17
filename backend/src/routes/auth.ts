@@ -1,4 +1,4 @@
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import { hashPassword } from "../lib/auth";

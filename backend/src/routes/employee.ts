@@ -1,5 +1,5 @@
 // src/routes/employee.ts
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authenticate } from "../middlewares/authMiddleware";
