@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.financialRoutes = void 0;
+exports.financialRoutes = financialRoutes;
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 async function financialRoutes(app) {
@@ -390,7 +390,7 @@ async function financialRoutes(app) {
                 .reduce((sum, e) => sum + e.amount, 0);
             const balance = totalEntries - totalExpenses - totalTaxes;
             const profitMargin = totalEntries > 0 ? (balance / totalEntries) * 100 : 0;
-            const updatedPeriod = await prisma_1.prisma.financialperiod.update({
+            const updatedPeriod = await prisma_1.prisma.financialPeriod.update({
                 where: { id },
                 data: {
                     status: "fechado",
@@ -421,4 +421,3 @@ async function financialRoutes(app) {
         }
     });
 }
-exports.financialRoutes = financialRoutes;

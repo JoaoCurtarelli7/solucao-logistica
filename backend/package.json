@@ -30,7 +30,7 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "@fastify/cors": "^8.4.1",
+    "@fastify/cors": "^8.5.0",
     "@prisma/client": "^5.22.0",
     "@types/jsonwebtoken": "^9.0.8",
     "bcrypt": "^5.1.1",

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authRoutes = void 0;
+exports.authRoutes = authRoutes;
 const prisma_1 = require("../lib/prisma");
 const zod_1 = require("zod");
 const auth_1 = require("../lib/auth");
@@ -119,4 +119,3 @@ async function authRoutes(app) {
         }
     });
 }
-exports.authRoutes = authRoutes;

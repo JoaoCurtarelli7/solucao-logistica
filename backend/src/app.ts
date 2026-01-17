@@ -1,5 +1,5 @@
 import fastifyCors from "@fastify/cors";
-import fastify from 'fastify'
+import fastify from 'fastify';
 
 import { companyRoutes } from "./routes/company";
 import { employeeRoutes } from "./routes/employee";

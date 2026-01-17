@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authenticate = void 0;
+exports.authenticate = authenticate;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 async function authenticate(req, rep) {
     try {
@@ -43,4 +43,3 @@ async function authenticate(req, rep) {
         return rep.code(401).send({ message: "Erro na autenticação" });
     }
 }
-exports.authenticate = authenticate;

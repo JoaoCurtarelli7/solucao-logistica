@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.userRoutes = void 0;
+exports.userRoutes = userRoutes;
 const prisma_1 = require("../lib/prisma");
 const bcryptjs_1 = require("bcryptjs");
 const zod_1 = require("zod");
@@ -12,7 +12,7 @@ async function userRoutes(app) {
     app.get('/me', async (request, reply) => {
         try {
             if (!request.user) {
-                return reply.status(401).send({ message: 'Usuário não autenticado' });
+                return reply.code(401).send({ message: 'Usuário não autenticado' });
             }
             const userId = request.user.id;
             const user = await prisma_1.prisma.user.findUnique({
@@ -27,13 +27,13 @@ async function userRoutes(app) {
                 }
             });
             if (!user) {
-                return reply.status(404).send({ message: 'Usuário não encontrado' });
+                return reply.code(404).send({ message: 'Usuário não encontrado' });
             }
             return reply.send(user);
         }
         catch (error) {
             console.error('Erro ao buscar usuário:', error);
-            return reply.status(500).send({ message: 'Erro interno do servidor' });
+            return reply.code(500).send({ message: 'Erro interno do servidor' });
         }
     });
     // Editar dados do perfil do usuário logado
@@ -46,7 +46,7 @@ async function userRoutes(app) {
         });
         try {
             if (!request.user) {
-                return reply.status(401).send({ message: 'Usuário não autenticado' });
+                return reply.code(401).send({ message: 'Usuário não autenticado' });
             }
             const userId = request.user.id;
             const data = updateUserSchema.parse(request.body);
@@ -59,7 +59,7 @@ async function userRoutes(app) {
                     }
                 });
                 if (existingUser) {
-                    return reply.status(400).send({ message: 'Este email já está em uso por outro usuário' });
+                    return reply.code(400).send({ message: 'Este email já está em uso por outro usuário' });
                 }
             }
             const updatedUser = await prisma_1.prisma.user.update({
@@ -86,13 +86,13 @@ async function userRoutes(app) {
         }
         catch (error) {
             if (error instanceof zod_1.z.ZodError) {
-                return reply.status(400).send({
+                return reply.code(400).send({
                     message: 'Dados inválidos',
                     errors: error.errors
                 });
             }
             console.error('Erro ao atualizar usuário:', error);
-            return reply.status(500).send({ message: 'Erro interno do servidor' });
+            return reply.code(500).send({ message: 'Erro interno do servidor' });
         }
     });
     // Alterar senha do usuário logado
@@ -103,7 +103,7 @@ async function userRoutes(app) {
         });
         try {
             if (!request.user) {
-                return reply.status(401).send({ message: 'Usuário não autenticado' });
+                return reply.code(401).send({ message: 'Usuário não autenticado' });
             }
             const userId = request.user.id;
             const { currentPassword, newPassword } = changePasswordSchema.parse(request.body);
@@ -112,17 +112,17 @@ async function userRoutes(app) {
                 where: { id: userId }
             });
             if (!user) {
-                return reply.status(404).send({ message: 'Usuário não encontrado' });
+                return reply.code(404).send({ message: 'Usuário não encontrado' });
             }
             // Verificar senha atual
             const passwordMatch = await (0, bcryptjs_1.compare)(currentPassword, user.password);
             if (!passwordMatch) {
-                return reply.status(401).send({ message: 'Senha atual incorreta' });
+                return reply.code(401).send({ message: 'Senha atual incorreta' });
             }
             // Verificar se a nova senha é diferente da atual
             const newPasswordMatch = await (0, bcryptjs_1.compare)(newPassword, user.password);
             if (newPasswordMatch) {
-                return reply.status(400).send({ message: 'A nova senha deve ser diferente da senha atual' });
+                return reply.code(400).send({ message: 'A nova senha deve ser diferente da senha atual' });
             }
             // Criptografar nova senha
             const hashedNewPassword = await (0, bcryptjs_1.hash)(newPassword, 10);
@@ -135,20 +135,20 @@ async function userRoutes(app) {
         }
         catch (error) {
             if (error instanceof zod_1.z.ZodError) {
-                return reply.status(400).send({
+                return reply.code(400).send({
                     message: 'Dados inválidos',
                     errors: error.errors
                 });
             }
             console.error('Erro ao alterar senha:', error);
-            return reply.status(500).send({ message: 'Erro interno do servidor' });
+            return reply.code(500).send({ message: 'Erro interno do servidor' });
         }
     });
     // Obter estatísticas do usuário (opcional)
     app.get('/me/stats', async (request, reply) => {
         try {
             if (!request.user) {
-                return reply.status(401).send({ message: 'Usuário não autenticado' });
+                return reply.code(401).send({ message: 'Usuário não autenticado' });
             }
             const userId = request.user.id;
             // Aqui você pode adicionar estatísticas específicas do usuário
@@ -162,8 +162,7 @@ async function userRoutes(app) {
         }
         catch (error) {
             console.error('Erro ao buscar estatísticas:', error);
-            return reply.status(500).send({ message: 'Erro interno do servidor' });
+            return reply.code(500).send({ message: 'Erro interno do servidor' });
         }
     });
 }
-exports.userRoutes = userRoutes;
