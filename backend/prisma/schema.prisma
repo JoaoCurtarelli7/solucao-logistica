@@ -41,6 +41,7 @@ model Company {
   commission       Float
   Closing          Closing[]
   FinancialEntry   FinancialEntry[]
+  FinancialPeriod  FinancialPeriod[]
   Load             Load[]
 }
 
@@ -77,6 +78,25 @@ model FinancialEntry {
 
   @@index([closingId], map: "idx_finEntry_closingId")
   @@index([companyId], map: "idx_finEntry_companyId")
+}
+
+model FinancialPeriod {
+  id           Int       @id @default(autoincrement())
+  name         String
+  startDate    DateTime  @db.Timestamptz(6)
+  endDate      DateTime  @db.Timestamptz(6)
+  companyId    Int?
+  status       String    @default("aberto")
+  totalEntries Float     @default(0)
+  totalExpenses Float    @default(0)
+  totalTaxes   Float     @default(0)
+  balance      Float     @default(0)
+  profitMargin Float     @default(0)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
+  Company      Company?  @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_finPeriod_company")
+
+  @@index([companyId], map: "idx_finPeriod_companyId")
 }
 
 model Load {

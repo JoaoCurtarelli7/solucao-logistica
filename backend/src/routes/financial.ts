@@ -436,7 +436,7 @@ export async function financialRoutes(app: FastifyInstance) {
       const balance = totalEntries - totalExpenses - totalTaxes;
       const profitMargin = totalEntries > 0 ? (balance / totalEntries) * 100 : 0;
 
-      const updatedPeriod = await prisma.financialperiod.update({
+      const updatedPeriod = await prisma.financialPeriod.update({
         where: { id },
         data: {
           status: "fechado",

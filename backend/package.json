@@ -19,6 +19,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": "18.x"
+  },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^20.8.10",

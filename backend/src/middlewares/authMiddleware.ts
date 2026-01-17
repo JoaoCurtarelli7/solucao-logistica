@@ -1,11 +1,7 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { FastifyReply, FastifyRequest } from 'fastify'
 import jwt from "jsonwebtoken";
 
-interface AuthenticatedRequest extends FastifyRequest {
-  user?: { id: number };
-}
-
-async function authenticate(req: AuthenticatedRequest, rep: FastifyReply) {
+async function authenticate(req: FastifyRequest, rep: FastifyReply) {
   try {
     const authHeader = req.headers.authorization;
 

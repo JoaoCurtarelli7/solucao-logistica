@@ -2,17 +2,17 @@ import { prisma } from '../lib/prisma'
 import { hash, compare } from 'bcryptjs'
 import { z } from 'zod'
 import { authenticate } from '../middlewares/authMiddleware'
-import { FastifyRequest } from 'fastify'
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 
-export async function userRoutes(app: any) {
+export async function userRoutes(app: FastifyInstance) {
   // Aplicar autenticação em todas as rotas
   app.addHook('preHandler', authenticate)
 
   // Obter dados do usuário logado
-  app.get('/me', async (request: FastifyRequest, reply: any) => {
+  app.get('/me', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       if (!request.user) {
-        return reply.status(401).send({ message: 'Usuário não autenticado' })
+        return reply.code(401).send({ message: 'Usuário não autenticado' })
       }
       const userId = request.user.id
       const user = await prisma.user.findUnique({
@@ -28,18 +28,18 @@ export async function userRoutes(app: any) {
       })
 
       if (!user) {
-        return reply.status(404).send({ message: 'Usuário não encontrado' })
+        return reply.code(404).send({ message: 'Usuário não encontrado' })
       }
 
       return reply.send(user)
     } catch (error) {
       console.error('Erro ao buscar usuário:', error)
-      return reply.status(500).send({ message: 'Erro interno do servidor' })
+      return reply.code(500).send({ message: 'Erro interno do servidor' })
     }
   })
 
   // Editar dados do perfil do usuário logado
-  app.put('/me', async (request: FastifyRequest, reply: any) => {
+  app.put('/me', async (request: FastifyRequest, reply: FastifyReply) => {
     const updateUserSchema = z.object({
       name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
       email: z.string().email('Email inválido'),
@@ -49,7 +49,7 @@ export async function userRoutes(app: any) {
 
     try {
       if (!request.user) {
-        return reply.status(401).send({ message: 'Usuário não autenticado' })
+        return reply.code(401).send({ message: 'Usuário não autenticado' })
       }
       const userId = request.user.id
       const data = updateUserSchema.parse(request.body as unknown as z.infer<typeof updateUserSchema>)
@@ -64,7 +64,7 @@ export async function userRoutes(app: any) {
         })
 
         if (existingUser) {
-          return reply.status(400).send({ message: 'Este email já está em uso por outro usuário' })
+          return reply.code(400).send({ message: 'Este email já está em uso por outro usuário' })
         }
       }
 
@@ -92,19 +92,19 @@ export async function userRoutes(app: any) {
       })
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return reply.status(400).send({ 
+        return reply.code(400).send({ 
           message: 'Dados inválidos', 
           errors: error.errors 
         })
       }
 
       console.error('Erro ao atualizar usuário:', error)
-      return reply.status(500).send({ message: 'Erro interno do servidor' })
+      return reply.code(500).send({ message: 'Erro interno do servidor' })
     }
   })
 
   // Alterar senha do usuário logado
-  app.patch('/me/password', async (request: FastifyRequest, reply: any) => {
+  app.patch('/me/password', async (request: FastifyRequest, reply: FastifyReply) => {
     const changePasswordSchema = z.object({
       currentPassword: z.string().min(1, 'Senha atual é obrigatória'),
       newPassword: z.string().min(6, 'Nova senha deve ter pelo menos 6 caracteres')
@@ -112,7 +112,7 @@ export async function userRoutes(app: any) {
 
     try {
       if (!request.user) {
-        return reply.status(401).send({ message: 'Usuário não autenticado' })
+        return reply.code(401).send({ message: 'Usuário não autenticado' })
       }
       const userId = request.user.id
       const { currentPassword, newPassword } = changePasswordSchema.parse(request.body)
@@ -123,19 +123,19 @@ export async function userRoutes(app: any) {
       })
 
       if (!user) {
-        return reply.status(404).send({ message: 'Usuário não encontrado' })
+        return reply.code(404).send({ message: 'Usuário não encontrado' })
       }
 
       // Verificar senha atual
       const passwordMatch = await compare(currentPassword, user.password)
       if (!passwordMatch) {
-        return reply.status(401).send({ message: 'Senha atual incorreta' })
+        return reply.code(401).send({ message: 'Senha atual incorreta' })
       }
 
       // Verificar se a nova senha é diferente da atual
       const newPasswordMatch = await compare(newPassword, user.password)
       if (newPasswordMatch) {
-        return reply.status(400).send({ message: 'A nova senha deve ser diferente da senha atual' })
+        return reply.code(400).send({ message: 'A nova senha deve ser diferente da senha atual' })
       }
 
       // Criptografar nova senha
@@ -150,22 +150,22 @@ export async function userRoutes(app: any) {
       return reply.send({ message: 'Senha alterada com sucesso!' })
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return reply.status(400).send({ 
+        return reply.code(400).send({ 
           message: 'Dados inválidos', 
           errors: error.errors 
         })
       }
 
       console.error('Erro ao alterar senha:', error)
-      return reply.status(500).send({ message: 'Erro interno do servidor' })
+      return reply.code(500).send({ message: 'Erro interno do servidor' })
     }
   })
 
   // Obter estatísticas do usuário (opcional)
-  app.get('/me/stats', async (request: FastifyRequest, reply: any) => {
+  app.get('/me/stats', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       if (!request.user) {
-        return reply.status(401).send({ message: 'Usuário não autenticado' })
+        return reply.code(401).send({ message: 'Usuário não autenticado' })
       }
       const userId = request.user.id
 
@@ -180,7 +180,7 @@ export async function userRoutes(app: any) {
       return reply.send(stats)
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error)
-      return reply.status(500).send({ message: 'Erro interno do servidor' })
+      return reply.code(500).send({ message: 'Erro interno do servidor' })
     }
   })
 }
