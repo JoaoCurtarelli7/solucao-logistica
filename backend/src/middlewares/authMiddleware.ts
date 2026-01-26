@@ -1,30 +1,30 @@
-import { FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import jwt from "jsonwebtoken";
 
-async function authenticate(req: FastifyRequest, rep: FastifyReply) {
+export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader) {
-      return rep.code(401).send({ message: "Token não fornecido" });
+    const auth = req.headers?.authorization;
+    
+    if (!auth) {
+      return rep.status(401).send({ message: 'Token ausente' });
     }
 
-    const parts = authHeader.split(" ");
+    const parts = auth.split(" ");
     if (parts.length !== 2 || parts[0] !== "Bearer") {
-      return rep.code(401).send({ message: "Formato de token inválido. Use: Bearer <token>" });
+      return rep.status(401).send({ message: "Formato de token inválido. Use: Bearer <token>" });
     }
 
     const token = parts[1];
     
     if (!token) {
-      return rep.code(401).send({ message: "Token não fornecido" });
+      return rep.status(401).send({ message: "Token ausente" });
     }
 
     try {
       const decoded: any = jwt.verify(token, "secreta-chave");
       
       if (!decoded.userId) {
-        return rep.code(401).send({ message: "Token inválido - userId não encontrado" });
+        return rep.status(401).send({ message: "Token inválido - userId não encontrado" });
       }
 
       req.user = { id: decoded.userId };
@@ -33,19 +33,17 @@ async function authenticate(req: FastifyRequest, rep: FastifyReply) {
       console.error("Erro ao verificar token:", jwtError.message);
       
       if (jwtError.name === 'TokenExpiredError') {
-        return rep.code(401).send({ message: "Token expirado" });
+        return rep.status(401).send({ message: "Token expirado" });
       }
       
       if (jwtError.name === 'JsonWebTokenError') {
-        return rep.code(401).send({ message: "Token inválido" });
+        return rep.status(401).send({ message: "Token inválido" });
       }
 
-      return rep.code(401).send({ message: "Token inválido ou expirado" });
+      return rep.status(401).send({ message: "Token inválido ou expirado" });
     }
   } catch (error: any) {
     console.error("Erro no middleware de autenticação:", error.message);
-    return rep.code(401).send({ message: "Erro na autenticação" });
+    return rep.status(401).send({ message: "Erro na autenticação" });
   }
 }
-
-export { authenticate };

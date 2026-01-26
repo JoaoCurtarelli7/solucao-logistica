@@ -2,7 +2,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 function parseMaybeBrDate(str?: string | null) {
   if (!str) return null;
@@ -33,10 +33,10 @@ export async function employeeRoutes(app: FastifyInstance) {
     hireDate: z.string().optional().transform(parseMaybeBrDate),
   });
 
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // LISTAR
-  app.get("/employees", async (_req, rep) => {
+  app.get("/employees", async (_req: FastifyRequest, rep: FastifyReply) => {
     try {
       const employees = await prisma.employee.findMany({
         select: {
@@ -63,7 +63,7 @@ export async function employeeRoutes(app: FastifyInstance) {
   });
 
   // OBTER POR ID
-  app.get("/employees/:id", async (req, rep) => {
+  app.get("/employees/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
 
@@ -85,7 +85,7 @@ export async function employeeRoutes(app: FastifyInstance) {
   });
 
   // CRIAR
-  app.post("/employees", async (req, rep) => {
+  app.post("/employees", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = bodySchema.parse(req.body);
 
@@ -139,7 +139,7 @@ export async function employeeRoutes(app: FastifyInstance) {
   });
 
   // ATUALIZAR
-  app.put("/employees/:id", async (req, rep) => {
+  app.put("/employees/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const data = bodySchema.parse(req.body);
@@ -198,7 +198,7 @@ export async function employeeRoutes(app: FastifyInstance) {
   });
 
   // DELETAR
-  app.delete("/employees/:id", async (req, rep) => {
+  app.delete("/employees/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
 
@@ -216,7 +216,7 @@ export async function employeeRoutes(app: FastifyInstance) {
   });
 
   // LISTAR TRANSAÇÕES DO FUNCIONÁRIO
-  app.post("/employees/:id/transactions", async (req, rep) => {
+  app.post("/employees/:id/transactions", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
   
@@ -254,7 +254,7 @@ export async function employeeRoutes(app: FastifyInstance) {
   });
   
   // Listar transações do funcionário (opção 1: via relação)
-  app.get("/employees/:id/transactions", async (req, rep) => {
+  app.get("/employees/:id/transactions", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
   
@@ -279,7 +279,7 @@ export async function employeeRoutes(app: FastifyInstance) {
     }
   });
   // BUSCA COM FILTROS
-  app.get("/employees/search", async (req, rep) => {
+  app.get("/employees/search", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const querySchema = z.object({
         name: z.string().optional(),

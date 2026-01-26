@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 // Função auxiliar para converter datas (aceita DD/MM/YYYY ou YYYY-MM-DD)
 function parseDateToDate(input?: string | Date | null): Date {
@@ -56,10 +56,10 @@ export async function truckRoutes(app: FastifyInstance) {
     notes: z.string().optional(),
   });
 
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // Listar todos os caminhões
-  app.get("/trucks", async (req, rep) => {
+  app.get("/trucks", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const trucks = await prisma.truck.findMany({
         include: { 
@@ -83,7 +83,7 @@ export async function truckRoutes(app: FastifyInstance) {
   });
 
   // Buscar caminhão por id
-  app.get("/trucks/:id", async (req, rep) => {
+  app.get("/trucks/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const truck = await prisma.truck.findUniqueOrThrow({
@@ -109,7 +109,7 @@ export async function truckRoutes(app: FastifyInstance) {
   });
 
   // Listar manutenções de um caminhão específico
-  app.get("/trucks/:id/maintenances", async (req, rep) => {
+  app.get("/trucks/:id/maintenances", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const maintenances = await prisma.maintenance.findMany({
@@ -124,7 +124,7 @@ export async function truckRoutes(app: FastifyInstance) {
   });
 
   // Criar manutenção para um caminhão específico
-  app.post("/trucks/:id/maintenances", async (req, rep) => {
+  app.post("/trucks/:id/maintenances", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const maintenanceData = maintenanceBodySchema.parse(req.body);
@@ -157,7 +157,7 @@ export async function truckRoutes(app: FastifyInstance) {
   });
 
   // Atualizar manutenção
-  app.put("/maintenances/:id", async (req, rep) => {
+  app.put("/maintenances/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const maintenanceData = maintenanceBodySchema.parse(req.body);
@@ -181,7 +181,7 @@ export async function truckRoutes(app: FastifyInstance) {
   });
 
   // Deletar manutenção
-  app.delete("/maintenances/:id", async (req, rep) => {
+  app.delete("/maintenances/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       await prisma.maintenance.delete({ where: { id } });
@@ -193,7 +193,7 @@ export async function truckRoutes(app: FastifyInstance) {
   });
 
   // Criar caminhão
-  app.post("/trucks", async (req, rep) => {
+  app.post("/trucks", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = truckBodySchema.parse(req.body);
       
@@ -233,7 +233,7 @@ export async function truckRoutes(app: FastifyInstance) {
   });
 
   // Atualizar caminhão
-  app.put("/trucks/:id", async (req, rep) => {
+  app.put("/trucks/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const data = truckBodySchema.parse(req.body);
@@ -280,7 +280,7 @@ export async function truckRoutes(app: FastifyInstance) {
   });
 
   // Deletar caminhão
-  app.delete("/trucks/:id", async (req, rep) => {
+  app.delete("/trucks/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
 
@@ -312,7 +312,7 @@ export async function truckRoutes(app: FastifyInstance) {
   });
 
   // Buscar manutenção por ID
-  app.get("/maintenances/:id", async (req, rep) => {
+  app.get("/maintenances/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const maintenance = await prisma.maintenance.findUniqueOrThrow({

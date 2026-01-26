@@ -1,12 +1,12 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 export async function dashboardRoutes(app: FastifyInstance) {
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // Dashboard geral com estatísticas do sistema
-  app.get("/dashboard", async (req, rep) => {
+  app.get("/dashboard", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       // Contar funcionários
       const totalEmployees = await prisma.employee.count();
@@ -84,7 +84,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
   });
 
   // Estatísticas rápidas
-  app.get("/dashboard/quick-stats", async (req, rep) => {
+  app.get("/dashboard/quick-stats", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const [
         totalEmployees,

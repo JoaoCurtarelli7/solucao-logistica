@@ -76,7 +76,7 @@ export async function financialRoutes(app: FastifyInstance) {
   });
 
   // Criar nova entrada financeira
-  app.post("/financial/entries", async (req, rep) => {
+  app.post("/financial/entries", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = createEntrySchema.parse(req.body);
       
@@ -122,7 +122,7 @@ export async function financialRoutes(app: FastifyInstance) {
   });
 
   // Listar entradas financeiras com filtros
-  app.get("/financial/entries", async (req, rep) => {
+  app.get("/financial/entries", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { startDate, endDate, companyId, type, category } = filterSchema.parse(req.query);
       
@@ -174,7 +174,7 @@ export async function financialRoutes(app: FastifyInstance) {
   });
 
   // Buscar entrada financeira por ID
-  app.get("/financial/entries/:id", async (req, rep) => {
+  app.get("/financial/entries/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       
@@ -206,7 +206,7 @@ export async function financialRoutes(app: FastifyInstance) {
   });
 
   // Atualizar entrada financeira
-  app.put("/financial/entries/:id", async (req, rep) => {
+  app.put("/financial/entries/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       const data = createEntrySchema.parse(req.body);
@@ -245,7 +245,7 @@ export async function financialRoutes(app: FastifyInstance) {
   });
 
   // Deletar entrada financeira
-  app.delete("/financial/entries/:id", async (req, rep) => {
+  app.delete("/financial/entries/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       
@@ -264,7 +264,7 @@ export async function financialRoutes(app: FastifyInstance) {
   });
 
   // Resumo financeiro por período
-  app.get("/financial/summary", async (req, rep) => {
+  app.get("/financial/summary", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { startDate, endDate, companyId } = filterSchema.parse(req.query);
       
@@ -326,7 +326,7 @@ export async function financialRoutes(app: FastifyInstance) {
   });
 
   // Criar período financeiro
-  app.post("/financial/periods", async (req, rep) => {
+  app.post("/financial/periods", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = createPeriodSchema.parse(req.body);
       
@@ -359,7 +359,7 @@ export async function financialRoutes(app: FastifyInstance) {
   });
 
   // Listar períodos financeiros
-  app.get("/financial/periods", async (req, rep) => {
+  app.get("/financial/periods", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { companyId } = filterSchema.parse(req.query);
       
@@ -395,7 +395,7 @@ export async function financialRoutes(app: FastifyInstance) {
   });
 
   // Fechar período financeiro
-  app.post("/financial/periods/:id/close", async (req, rep) => {
+  app.post("/financial/periods/:id/close", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       

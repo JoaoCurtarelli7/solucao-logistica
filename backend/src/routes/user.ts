@@ -1,12 +1,12 @@
 import { prisma } from '../lib/prisma'
 import { hash, compare } from 'bcryptjs'
 import { z } from 'zod'
-import { authenticate } from '../middlewares/authMiddleware'
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import { authMiddleware } from '../middlewares/authMiddleware'
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 
 export async function userRoutes(app: FastifyInstance) {
   // Aplicar autenticação em todas as rotas
-  app.addHook('preHandler', authenticate)
+  app.addHook('preHandler', authMiddleware)
 
   // Obter dados do usuário logado
   app.get('/me', async (request: FastifyRequest, reply: FastifyReply) => {

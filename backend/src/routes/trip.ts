@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 export async function tripRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({ id: z.coerce.number() });
@@ -16,10 +16,10 @@ export async function tripRoutes(app: FastifyInstance) {
     notes: z.string().optional(),
   });
 
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // Listar todas as viagens
-  app.get("/trips", async (req, rep) => {
+  app.get("/trips", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const trips = await prisma.trip.findMany({
         include: { 
@@ -44,7 +44,7 @@ export async function tripRoutes(app: FastifyInstance) {
   });
 
   // Buscar viagem por ID
-  app.get("/trips/:id", async (req, rep) => {
+  app.get("/trips/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const trip = await prisma.trip.findUniqueOrThrow({
@@ -71,7 +71,7 @@ export async function tripRoutes(app: FastifyInstance) {
   });
 
   // Listar viagens de um caminhão específico
-  app.get("/trucks/:truckId/trips", async (req, rep) => {
+  app.get("/trucks/:truckId/trips", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { truckId } = z.object({ truckId: z.coerce.number() }).parse(req.params);
       const trips = await prisma.trip.findMany({
@@ -98,7 +98,7 @@ export async function tripRoutes(app: FastifyInstance) {
   });
 
   // Criar viagem
-  app.post("/trips", async (req, rep) => {
+  app.post("/trips", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = tripBodySchema.parse(req.body);
       
@@ -142,7 +142,7 @@ export async function tripRoutes(app: FastifyInstance) {
   });
 
   // Atualizar viagem
-  app.put("/trips/:id", async (req, rep) => {
+  app.put("/trips/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const data = tripBodySchema.parse(req.body);
@@ -197,7 +197,7 @@ export async function tripRoutes(app: FastifyInstance) {
   });
 
   // Deletar viagem
-  app.delete("/trips/:id", async (req, rep) => {
+  app.delete("/trips/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       
@@ -229,7 +229,7 @@ export async function tripRoutes(app: FastifyInstance) {
   });
 
   // Atualizar status da viagem
-  app.patch("/trips/:id/status", async (req, rep) => {
+  app.patch("/trips/:id/status", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
       const { status } = z.object({
@@ -258,7 +258,7 @@ export async function tripRoutes(app: FastifyInstance) {
   });
 
   // Resumo de viagens
-  app.get("/trips/summary", async (req, rep) => {
+  app.get("/trips/summary", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { startDate, endDate, truckId, status } = z.object({
         startDate: z.string().optional().transform((str) => str ? new Date(str) : undefined),

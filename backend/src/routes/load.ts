@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 function parseMaybeBrDateToDate(d: unknown): Date {
   if (d instanceof Date) return d;
@@ -45,10 +45,10 @@ export async function loadRoutes(app: FastifyInstance) {
   });
 
   // protege todas as rotas deste módulo
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // LISTAR
-  app.get("/loads", async (_req, rep) => {
+  app.get("/loads", async (_req: FastifyRequest, rep: FastifyReply) => {
     try {
       const loads = await prisma.load.findMany({
         include: { Company: { select: { id: true, name: true, cnpj: true } } },
@@ -62,7 +62,7 @@ export async function loadRoutes(app: FastifyInstance) {
   });
 
   // LISTAR POR EMPRESA
-  app.get("/loads/company/:companyId", async (req, rep) => {
+  app.get("/loads/company/:companyId", async (req: FastifyRequest, rep: FastifyReply) => {
     const { companyId } = companyParamsSchema.parse(req.params);
 
     try {
@@ -85,7 +85,7 @@ export async function loadRoutes(app: FastifyInstance) {
   });
 
   // POR ID
-  app.get("/loads/:id", async (req, rep) => {
+  app.get("/loads/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
 
     try {
@@ -103,7 +103,7 @@ export async function loadRoutes(app: FastifyInstance) {
   });
 
   // CRIAR
-  app.post("/loads", async (req, rep) => {
+  app.post("/loads", async (req: FastifyRequest, rep: FastifyReply) => {
     const {
       date,
       loadingNumber,
@@ -155,7 +155,7 @@ export async function loadRoutes(app: FastifyInstance) {
   });
 
   // ATUALIZAR
-  app.put("/loads/:id", async (req, rep) => {
+  app.put("/loads/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
     const updateData = updateBodySchema.parse(req.body);
 
@@ -217,7 +217,7 @@ export async function loadRoutes(app: FastifyInstance) {
   });
 
   // DELETAR
-  app.delete("/loads/:id", async (req, rep) => {
+  app.delete("/loads/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
 
     try {
@@ -233,7 +233,7 @@ export async function loadRoutes(app: FastifyInstance) {
   });
 
   // POR PERÍODO
-  app.get("/loads/period", async (req, rep) => {
+  app.get("/loads/period", async (req: FastifyRequest, rep: FastifyReply) => {
     const querySchema = z.object({
       startDate: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate),
       endDate: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate),

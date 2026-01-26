@@ -7,7 +7,7 @@ export async function reportRoutes(app: FastifyInstance) {
   // app.addHook("preHandler", authenticate);
 
   // Relatório geral do sistema
-  app.get("/reports/system-overview", async (req, rep) => {
+  app.get("/reports/system-overview", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const [
         totalEmployees,
@@ -51,7 +51,7 @@ export async function reportRoutes(app: FastifyInstance) {
   });
 
   // Relatório de funcionários
-  app.get("/reports/employees", async (req, rep) => {
+  app.get("/reports/employees", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { status, startDate, endDate } = z.object({
         status: z.enum(["Ativo", "Inativo"]).optional(),
@@ -105,7 +105,7 @@ export async function reportRoutes(app: FastifyInstance) {
   });
 
   // Relatório de empresas
-  app.get("/reports/companies", async (req, rep) => {
+  app.get("/reports/companies", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { status, startDate, endDate } = z.object({
         status: z.enum(["Ativo", "Inativo"]).optional(),
@@ -154,7 +154,7 @@ export async function reportRoutes(app: FastifyInstance) {
   });
 
   // Relatório de cargas
-  app.get("/reports/loads", async (req, rep) => {
+  app.get("/reports/loads", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { status, startDate, endDate, companyId } = z.object({
         status: z.enum(["Ativo", "Inativo"]).optional(),
@@ -213,7 +213,7 @@ export async function reportRoutes(app: FastifyInstance) {
   });
 
   // Relatório de manutenções
-  app.get("/reports/maintenance", async (req, rep) => {
+  app.get("/reports/maintenance", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { startDate, endDate, truckId } = z.object({
         startDate: z.coerce.date().optional(),
@@ -267,7 +267,7 @@ export async function reportRoutes(app: FastifyInstance) {
   });
 
   // Relatório financeiro
-  app.get("/reports/financial", async (req, rep) => {
+  app.get("/reports/financial", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { startDate, endDate, type } = z.object({
         startDate: z.coerce.date().optional(),
@@ -328,7 +328,7 @@ export async function reportRoutes(app: FastifyInstance) {
   });
 
   // Relatório de viagens
-  app.get("/reports/trips", async (req, rep) => {
+  app.get("/reports/trips", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { startDate, endDate, truckId, status } = z.object({
         startDate: z.coerce.date().optional(),
@@ -395,7 +395,7 @@ export async function reportRoutes(app: FastifyInstance) {
   });
 
   // Relatório personalizado com múltiplos filtros
-  app.post("/reports/custom", async (req, rep) => {
+  app.post("/reports/custom", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { 
         reportType, 
@@ -443,7 +443,7 @@ export async function reportRoutes(app: FastifyInstance) {
   });
 
   // Exportar relatório em diferentes formatos
-  app.get("/reports/export/:format", async (req, rep) => {
+  app.get("/reports/export/:format", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { format } = z.object({
         format: z.enum(["csv", "pdf", "excel"]),

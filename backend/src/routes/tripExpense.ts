@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 // Converte "DD/MM/YYYY" -> Date, ou ISO -> Date, ou retorna null se vazio
 function parsePtBrOrIsoToDate(input?: string | Date | null): Date | null {
@@ -47,10 +47,10 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
     tripId: z.coerce.number(),
   });
 
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // Listar todas as despesas (com filtros opcionais)
-  app.get("/expenses", async (req, rep) => {
+  app.get("/expenses", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { tripId, category, startDate, endDate } = z
         .object({
@@ -93,7 +93,7 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   });
 
   // Listar despesas de uma viagem específica
-  app.get("/trips/:tripId/expenses", async (req, rep) => {
+  app.get("/trips/:tripId/expenses", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { tripId } = tripIdParam.parse(req.params);
 
@@ -115,7 +115,7 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   });
 
   // Buscar despesa por ID
-  app.get("/expenses/:id", async (req, rep) => {
+  app.get("/expenses/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = idParam.parse(req.params);
       const expense = await prisma.tripExpense.findUniqueOrThrow({
@@ -143,7 +143,7 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   });
 
   // Criar despesa
-  app.post("/expenses", async (req, rep) => {
+  app.post("/expenses", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = expenseBodySchema.parse(req.body);
 
@@ -185,7 +185,7 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   });
 
   // Atualizar despesa
-  app.put("/expenses/:id", async (req, rep) => {
+  app.put("/expenses/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = idParam.parse(req.params);
       const data = expenseBodySchema.parse(req.body);
@@ -231,7 +231,7 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   });
 
   // Deletar despesa
-  app.delete("/expenses/:id", async (req, rep) => {
+  app.delete("/expenses/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = idParam.parse(req.params);
 
@@ -247,7 +247,7 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   });
 
   // Resumo de despesas
-  app.get("/expenses/summary", async (req, rep) => {
+  app.get("/expenses/summary", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { tripId, category, startDate, endDate } = z
         .object({

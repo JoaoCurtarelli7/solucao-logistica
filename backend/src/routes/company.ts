@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 export async function companyRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({
@@ -19,7 +19,7 @@ export async function companyRoutes(app: FastifyInstance) {
   });
 
   // Listar todas as empresas (rota pública para permitir seleção)
-  app.get("/companies", async (req, rep) => {
+  app.get("/companies", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const companies = await prisma.company.findMany({
         select: {
@@ -53,10 +53,10 @@ export async function companyRoutes(app: FastifyInstance) {
   });
 
   // 🔒 Protege as rotas restantes da empresa
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // Obter uma empresa pelo ID
-  app.get("/company/:id", async (req, rep) => {
+  app.get("/company/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
 
@@ -78,7 +78,7 @@ export async function companyRoutes(app: FastifyInstance) {
   });
 
   // Criar uma nova empresa
-  app.post("/company", async (req, rep) => {
+  app.post("/company", async (req: FastifyRequest, rep: FastifyReply) => {
     const { name, type, cnpj, dateRegistration, status, responsible, commission } =
       bodySchema.parse(req.body);
 
@@ -98,7 +98,7 @@ export async function companyRoutes(app: FastifyInstance) {
   });
 
   // Atualizar uma empresa existente
-  app.put("/company/:id", async (req, rep) => {
+  app.put("/company/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
     const { name, type, cnpj, dateRegistration, status, responsible, commission } =
       bodySchema.parse(req.body);
@@ -122,7 +122,7 @@ export async function companyRoutes(app: FastifyInstance) {
   });
 
   // Deletar uma empresa
-  app.delete("/company/:id", async (req, rep) => {
+  app.delete("/company/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
 
     try {

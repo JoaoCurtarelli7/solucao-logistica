@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 export async function maintenanceRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({ id: z.coerce.number(), truckId: z.coerce.number() });
@@ -14,10 +14,10 @@ export async function maintenanceRoutes(app: FastifyInstance) {
     truckId: z.coerce.number(),
   });
 
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // Listar manutenção de um caminhão
-  app.get("/maintenance/:truckId", async (req, rep) => {
+  app.get("/maintenance/:truckId", async (req: FastifyRequest, rep: FastifyReply) => {
     const { truckId } = paramsSchema.parse(req.params);
     try {
       const maintenances = await prisma.maintenance.findMany({ where: { truckId } });
@@ -29,7 +29,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   });
 
   // Criar manutenção
-  app.post("/maintenance", async (req, rep) => {
+  app.post("/maintenance", async (req: FastifyRequest, rep: FastifyReply) => {
     const data = bodySchema.parse(req.body);
     try {
       const maintenance = await prisma.maintenance.create({ data });
@@ -41,7 +41,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   });
 
   // Atualizar manutenção
-  app.put("/maintenance/:id", async (req, rep) => {
+  app.put("/maintenance/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
     const data = bodySchema.parse(req.body);
 
@@ -55,7 +55,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   });
 
   // Deletar manutenção
-  app.delete("/maintenance/:id", async (req, rep) => {
+  app.delete("/maintenance/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
     try {
       await prisma.maintenance.delete({ where: { id } });

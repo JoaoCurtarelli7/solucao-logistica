@@ -1,10 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 export async function monthRoutes(app: FastifyInstance) {
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   const createMonthSchema = z.object({
     year: z.coerce.number().min(2020).max(2030),
@@ -16,7 +16,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Listar meses
-  app.get("/months", async (req, rep) => {
+  app.get("/months", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const querySchema = z.object({
         year: z.string().optional(),
@@ -50,7 +50,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Obter mês por ID
-  app.get("/months/:id", async (req, rep) => {
+  app.get("/months/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -79,7 +79,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Criar novo mês
-  app.post("/months", async (req, rep) => {
+  app.post("/months", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const body = req.body;
       const { year, month: monthNumber } = createMonthSchema.parse(body);
@@ -129,7 +129,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Atualizar mês
-  app.put("/months/:id", async (req, rep) => {
+  app.put("/months/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       const data = updateMonthSchema.parse(req.body);
@@ -155,7 +155,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Deletar mês
-  app.delete("/months/:id", async (req, rep) => {
+  app.delete("/months/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -183,7 +183,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Estatísticas do mês
-  app.get("/months/:id/stats", async (req, rep) => {
+  app.get("/months/:id/stats", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 

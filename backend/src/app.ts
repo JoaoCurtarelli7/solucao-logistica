@@ -1,5 +1,5 @@
 import fastifyCors from "@fastify/cors";
-import fastify from 'fastify';
+import Fastify from 'fastify';
 
 import { companyRoutes } from "./routes/company";
 import { employeeRoutes } from "./routes/employee";
@@ -17,7 +17,7 @@ import { tripRoutes } from "./routes/trip";
 import { tripExpenseRoutes } from "./routes/tripExpense";
 import { maintenanceRoutes } from "./routes/maintenance";
 
-export const app = fastify({
+export const app = Fastify({
   logger: true,
 });
 

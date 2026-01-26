@@ -1,10 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authenticate } from "../middlewares/authMiddleware";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 export async function closingRoutes(app: FastifyInstance) {
-  app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // Schema para validação de fechamento
   const createClosingSchema = z.object({
@@ -43,7 +43,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Listar fechamentos
-  app.get("/closings", async (req, rep) => {
+  app.get("/closings", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { monthId, companyId, status } = req.query as { 
         monthId?: string; 
@@ -109,7 +109,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Obter fechamento específico
-  app.get("/closings/:id", async (req, rep) => {
+  app.get("/closings/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -148,7 +148,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Criar novo fechamento
-  app.post("/closings", async (req, rep) => {
+  app.post("/closings", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = createClosingSchema.parse(req.body);
 
@@ -214,7 +214,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Atualizar fechamento
-  app.put("/closings/:id", async (req, rep) => {
+  app.put("/closings/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       const data = updateClosingSchema.parse(req.body);
@@ -258,7 +258,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Deletar fechamento
-  app.delete("/closings/:id", async (req, rep) => {
+  app.delete("/closings/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -288,7 +288,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Fechar fechamento (calcular totais)
-  app.post("/closings/:id/close", async (req, rep) => {
+  app.post("/closings/:id/close", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -361,7 +361,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Reabrir fechamento
-  app.post("/closings/:id/reopen", async (req, rep) => {
+  app.post("/closings/:id/reopen", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -418,7 +418,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Obter entradas financeiras de um fechamento
-  app.get("/closings/:id/entries", async (req, rep) => {
+  app.get("/closings/:id/entries", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -466,7 +466,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Obter estatísticas do fechamento
-  app.get("/closings/:id/stats", async (req, rep) => {
+  app.get("/closings/:id/stats", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 

@@ -11,7 +11,7 @@ export async function authRoutes(app: FastifyInstance) {
     password: z.string(),
   });
 
-  app.post("/register", async (req, rep) => {
+  app.post("/register", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const bodySchema = z.object({
         name: z.string().min(1, "Nome é obrigatório"),
@@ -83,7 +83,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/login", async (req, rep) => {
+  app.post("/login", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { email, password } = loginSchema.parse(req.body);
       
