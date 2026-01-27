@@ -32,7 +32,7 @@ async function employeeRoutes(app) {
         address: zod_1.z.string().optional(),
         hireDate: zod_1.z.string().optional().transform(parseMaybeBrDate),
     });
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // LISTAR
     app.get("/employees", async (_req, rep) => {
         try {

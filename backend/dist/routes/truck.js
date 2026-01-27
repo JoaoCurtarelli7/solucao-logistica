@@ -54,7 +54,7 @@ async function truckRoutes(app) {
         value: zod_1.z.coerce.number().min(0, "Valor deve ser válido"),
         notes: zod_1.z.string().optional(),
     });
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // Listar todos os caminhões
     app.get("/trucks", async (req, rep) => {
         try {

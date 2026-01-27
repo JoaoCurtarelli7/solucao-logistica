@@ -44,7 +44,7 @@ async function loadRoutes(app) {
         companyId: zod_1.z.coerce.number().optional(),
     });
     // protege todas as rotas deste módulo
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // LISTAR
     app.get("/loads", async (_req, rep) => {
         try {

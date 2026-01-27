@@ -5,7 +5,7 @@ const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 async function monthRoutes(app) {
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     const createMonthSchema = zod_1.z.object({
         year: zod_1.z.coerce.number().min(2020).max(2030),
         month: zod_1.z.coerce.number().min(1).max(12),

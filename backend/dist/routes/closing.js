@@ -5,7 +5,7 @@ const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 async function closingRoutes(app) {
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // Schema para validação de fechamento
     const createClosingSchema = zod_1.z.object({
         monthId: zod_1.z.number(),

@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma'
 import { hash, compare } from 'bcryptjs'
 import { z } from 'zod'
 import { authMiddleware } from '../middlewares/authMiddleware'
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import type { FastifyInstance, FastifyRequest, FastifyReply } from '../types/fastify'
 
 export async function userRoutes(app: FastifyInstance) {
   // Aplicar autenticação em todas as rotas

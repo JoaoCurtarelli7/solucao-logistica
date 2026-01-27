@@ -51,7 +51,7 @@ async function companyRoutes(app) {
         }
     });
     // 🔒 Protege as rotas restantes da empresa
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // Obter uma empresa pelo ID
     app.get("/company/:id", async (req, rep) => {
         try {

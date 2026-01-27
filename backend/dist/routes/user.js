@@ -7,7 +7,7 @@ const zod_1 = require("zod");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 async function userRoutes(app) {
     // Aplicar autenticação em todas as rotas
-    app.addHook('preHandler', authMiddleware_1.authenticate);
+    app.addHook('preHandler', authMiddleware_1.authMiddleware);
     // Obter dados do usuário logado
     app.get('/me', async (request, reply) => {
         try {

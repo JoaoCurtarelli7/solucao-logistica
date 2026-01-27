@@ -15,7 +15,7 @@ async function tripRoutes(app) {
         status: zod_1.z.enum(["em_andamento", "concluida", "cancelada"]).default("em_andamento"),
         notes: zod_1.z.string().optional(),
     });
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // Listar todas as viagens
     app.get("/trips", async (req, rep) => {
         try {

@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middlewares/authMiddleware";

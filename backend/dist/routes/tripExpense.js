@@ -45,7 +45,7 @@ async function tripExpenseRoutes(app) {
         notes: zod_1.z.string().optional(),
         tripId: zod_1.z.coerce.number(),
     });
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // Listar todas as despesas (com filtros opcionais)
     app.get("/expenses", async (req, rep) => {
         try {

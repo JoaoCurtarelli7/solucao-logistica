@@ -14,7 +14,7 @@ async function maintenanceRoutes(app) {
         notes: zod_1.z.string().optional(),
         truckId: zod_1.z.coerce.number(),
     });
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // Listar manutenção de um caminhão
     app.get("/maintenance/:truckId", async (req, rep) => {
         const { truckId } = paramsSchema.parse(req.params);

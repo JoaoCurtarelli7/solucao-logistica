@@ -4,7 +4,7 @@ exports.dashboardRoutes = dashboardRoutes;
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 async function dashboardRoutes(app) {
-    app.addHook("preHandler", authMiddleware_1.authenticate);
+    app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // Dashboard geral com estatísticas do sistema
     app.get("/dashboard", async (req, rep) => {
         try {

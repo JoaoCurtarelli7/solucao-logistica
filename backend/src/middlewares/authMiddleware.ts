@@ -1,4 +1,4 @@
-import type { FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyReply, FastifyRequest } from '../types/fastify'
 import jwt from "jsonwebtoken";
 
 export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
