@@ -20,7 +20,7 @@ declare module 'fastify/types/request' {
   }
 }
 
-// Declare module for fastify default export
+// Declare module for fastify default export to work with export =
 declare module 'fastify' {
   import type { FastifyInstance, FastifyServerOptions } from 'fastify/types/instance';
   import type { FastifyBaseLogger } from 'fastify/types/logger';
