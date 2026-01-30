@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma'
-import { hash, compare } from 'bcryptjs'
+import bcrypt from 'bcrypt'
 import { z } from 'zod'
 import { authMiddleware } from '../middlewares/authMiddleware'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from '../types/fastify'
@@ -127,19 +127,19 @@ export async function userRoutes(app: FastifyInstance) {
       }
 
       // Verificar senha atual
-      const passwordMatch = await compare(currentPassword, user.password)
+      const passwordMatch = await bcrypt.compare(currentPassword, user.password)
       if (!passwordMatch) {
         return reply.code(401).send({ message: 'Senha atual incorreta' })
       }
 
       // Verificar se a nova senha é diferente da atual
-      const newPasswordMatch = await compare(newPassword, user.password)
+      const newPasswordMatch = await bcrypt.compare(newPassword, user.password)
       if (newPasswordMatch) {
         return reply.code(400).send({ message: 'A nova senha deve ser diferente da senha atual' })
       }
 
       // Criptografar nova senha
-      const hashedNewPassword = await hash(newPassword, 10)
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10)
 
       // Atualizar senha
       await prisma.user.update({

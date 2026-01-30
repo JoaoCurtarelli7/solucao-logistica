@@ -1,8 +1,11 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.userRoutes = userRoutes;
 const prisma_1 = require("../lib/prisma");
-const bcryptjs_1 = require("bcryptjs");
+const bcrypt_1 = __importDefault(require("bcrypt"));
 const zod_1 = require("zod");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 async function userRoutes(app) {
@@ -115,17 +118,17 @@ async function userRoutes(app) {
                 return reply.code(404).send({ message: 'Usuário não encontrado' });
             }
             // Verificar senha atual
-            const passwordMatch = await (0, bcryptjs_1.compare)(currentPassword, user.password);
+            const passwordMatch = await bcrypt_1.default.compare(currentPassword, user.password);
             if (!passwordMatch) {
                 return reply.code(401).send({ message: 'Senha atual incorreta' });
             }
             // Verificar se a nova senha é diferente da atual
-            const newPasswordMatch = await (0, bcryptjs_1.compare)(newPassword, user.password);
+            const newPasswordMatch = await bcrypt_1.default.compare(newPassword, user.password);
             if (newPasswordMatch) {
                 return reply.code(400).send({ message: 'A nova senha deve ser diferente da senha atual' });
             }
             // Criptografar nova senha
-            const hashedNewPassword = await (0, bcryptjs_1.hash)(newPassword, 10);
+            const hashedNewPassword = await bcrypt_1.default.hash(newPassword, 10);
             // Atualizar senha
             await prisma_1.prisma.user.update({
                 where: { id: userId },
