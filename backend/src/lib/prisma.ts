@@ -6,7 +6,7 @@ export const prisma = new PrismaClient({
   errorFormat: 'pretty',
 });
 
-// Testar conexão ao inicializar
+// Testar conexão ao inicializar (em produção falha o processo para o deploy mostrar o erro)
 prisma.$connect()
   .then(() => {
     console.log("✅ Prisma Client conectado ao PostgreSQL");
@@ -14,6 +14,7 @@ prisma.$connect()
   .catch((error) => {
     console.error("❌ Erro ao conectar Prisma Client:", error.message);
     console.error("   Verifique se o PostgreSQL está rodando e a DATABASE_URL está correta");
+    process.exit(1);
   });
 
 // Graceful shutdown

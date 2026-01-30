@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "prisma generate && tsc",
-    "start": "node --loader tsx src/server.ts",
+    "start": "node dist/server.js",
+    "start:dev": "node --loader tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
     "postinstall": "npm run build",
     "prisma:md": "prisma migrate dev --name init --create-only",
