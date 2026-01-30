@@ -1,7 +1,7 @@
 import app from "./app";
 
 const initializeServer = async () => {
-  const port = Number(process.env.PORT) || 3333
+  const port = Number(process.env.PORT) || 3000
 
   await app.listen({
         host: "0.0.0.0",
