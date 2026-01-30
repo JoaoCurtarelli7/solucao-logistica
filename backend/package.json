@@ -8,7 +8,7 @@
     "start": "node dist/server.js",
     "start:dev": "node --loader tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
-    "postinstall": "npm run build",
+    "postinstall": "node -e \"try { require.resolve('typescript'); } catch(e) { process.exit(0); } require('child_process').execSync('npm run build', {stdio:'inherit'});\"",
     "prisma:md": "prisma migrate dev --name init --create-only",
     "prisma:mm": "prisma migrate dev",
     "prisma:mr": "prisma migrate reset",
