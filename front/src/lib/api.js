@@ -1,8 +1,9 @@
 import axios from 'axios'
 import { message } from 'antd'
 
+// Usa URL da API vinda de env em produção e localhost no desenvolvimento
 const api = axios.create({
-  baseURL: 'http://localhost:3333',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3333',
 })
 
 api.interceptors.request.use(
@@ -30,7 +31,7 @@ api.interceptors.response.use(
       // Token expirado ou inválido
       localStorage.removeItem('token') // Remove o token do localStorage
       message.error('Sua sessão expirou. Faça login novamente.')
-      
+
       // Redireciona para login usando window.location
       window.location.href = '/login'
     }
