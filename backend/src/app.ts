@@ -21,13 +21,20 @@ export const app = fastify({
   logger: true,
 });
 
+// CORS: em produção use a variável CORS_ORIGIN com a URL do front (ex.: https://solucao-logistica-front-qoja4.ondigitalocean.app)
+const corsOrigin = process.env.CORS_ORIGIN;
+const origin = corsOrigin
+  ? corsOrigin.split(",").map((s) => s.trim())
+  : true;
+
 app.register(fastifyCors, {
-  origin: true,
+  origin,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   exposedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
   maxAge: 86400,
+  preflight: true,
 });
 
 app.register(companyRoutes);
