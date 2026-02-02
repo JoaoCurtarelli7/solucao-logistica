@@ -23,13 +23,46 @@ const maintenance_1 = require("./routes/maintenance");
 exports.app = (0, fastify_1.default)({
     logger: true,
 });
+// CORS: lista de origens permitidas (variável CORS_ORIGIN no DigitalOcean)
+const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
+    : ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"];
+function isOriginAllowed(origin) {
+    if (!origin)
+        return false;
+    return ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes("*");
+}
+// Responde ao preflight (OPTIONS) manualmente para garantir CORS atrás de proxy
+exports.app.addHook("onRequest", async (request, reply) => {
+    const origin = request.headers.origin;
+    if (!isOriginAllowed(origin))
+        return;
+    reply.header("Access-Control-Allow-Origin", origin);
+    reply.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    reply.header("Access-Control-Allow-Credentials", "true");
+    reply.header("Access-Control-Max-Age", "86400");
+    if (request.method === "OPTIONS") {
+        return reply.code(204).send();
+    }
+});
 exports.app.register(cors_1.default, {
-    origin: true,
+    origin: (origin, cb) => {
+        if (origin && isOriginAllowed(origin)) {
+            cb(null, origin);
+        }
+        else if (!origin && ALLOWED_ORIGINS.length > 0) {
+            cb(null, ALLOWED_ORIGINS[0]);
+        }
+        else {
+            cb(null, false);
+        }
+    },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    exposedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
     maxAge: 86400,
+    preflight: true,
 });
 exports.app.register(company_1.companyRoutes);
 exports.app.register(employee_1.employeeRoutes);
