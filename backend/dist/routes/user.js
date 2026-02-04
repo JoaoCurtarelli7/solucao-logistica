@@ -26,13 +26,30 @@ async function userRoutes(app) {
                     email: true,
                     phone: true,
                     address: true,
-                    createdAt: true
+                    status: true,
+                    role: {
+                        select: {
+                            id: true,
+                            name: true,
+                            permissions: {
+                                select: {
+                                    permission: { select: { key: true } },
+                                },
+                            },
+                        },
+                    },
+                    createdAt: true,
                 }
             });
             if (!user) {
                 return reply.code(404).send({ message: 'Usuário não encontrado' });
             }
-            return reply.send(user);
+            const permissions = user.role?.permissions?.map((rp) => rp.permission.key) ?? [];
+            return reply.send({
+                ...user,
+                role: user.role ? { id: user.role.id, name: user.role.name } : null,
+                permissions,
+            });
         }
         catch (error) {
             console.error('Erro ao buscar usuário:', error);

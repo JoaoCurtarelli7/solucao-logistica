@@ -20,6 +20,7 @@ const truck_1 = require("./routes/truck");
 const trip_1 = require("./routes/trip");
 const tripExpense_1 = require("./routes/tripExpense");
 const maintenance_1 = require("./routes/maintenance");
+const rbac_1 = require("./routes/rbac");
 exports.app = (0, fastify_1.default)({
     logger: true,
 });
@@ -78,4 +79,5 @@ exports.app.register(truck_1.truckRoutes);
 exports.app.register(maintenance_1.maintenanceRoutes);
 exports.app.register(trip_1.tripRoutes);
 exports.app.register(tripExpense_1.tripExpenseRoutes);
+exports.app.register(rbac_1.rbacRoutes);
 exports.default = exports.app;

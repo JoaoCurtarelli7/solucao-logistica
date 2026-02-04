@@ -1,179 +1,214 @@
-const { PrismaClient } = require('@prisma/client')
+const { PrismaClient } = require("@prisma/client");
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🚀 Iniciando população do banco de dados (schema atual)...')
+  console.log("🚀 Iniciando população do banco de dados (schema atual)...");
 
   try {
+    // RBAC - permissões base
+    const basePermissions = [
+      "dashboard.view",
+      "orders.view",
+      "orders.create",
+      "routes.manage",
+      "users.manage",
+      "reports.export",
+    ];
+
+    await prisma.permission.createMany({
+      data: basePermissions.map((key) => ({ key })),
+      skipDuplicates: true,
+    });
+
+    const adminRole = await prisma.role.upsert({
+      where: { name: "Admin" },
+      update: {},
+      create: { name: "Admin", description: "Acesso total ao sistema" },
+    });
+
+    const perms = await prisma.permission.findMany({
+      where: { key: { in: basePermissions } },
+      select: { id: true },
+    });
+
+    await prisma.rolePermission.deleteMany({ where: { roleId: adminRole.id } });
+    await prisma.rolePermission.createMany({
+      data: perms.map((p) => ({ roleId: adminRole.id, permissionId: p.id })),
+      skipDuplicates: true,
+    });
+
     // Empresas
     const company1 = await prisma.company.upsert({
       where: { id: 1 },
       update: {},
       create: {
-        name: 'Transportadora ABC Ltda',
-        type: 'Transportadora',
-        cnpj: '12.345.678/0001-90',
-        dateRegistration: new Date('2020-01-15'),
-        status: 'Ativo',
-        responsible: 'João Silva',
-        commission: 5.5
-      }
-    })
+        name: "Transportadora ABC Ltda",
+        type: "Transportadora",
+        cnpj: "12.345.678/0001-90",
+        dateRegistration: new Date("2020-01-15"),
+        status: "Ativo",
+        responsible: "João Silva",
+        commission: 5.5,
+      },
+    });
 
     // Usuário admin básico
     await prisma.user.upsert({
       where: { id: 1 },
       update: {},
       create: {
-        name: 'Admin',
-        email: 'admin@example.com',
-        password: '$2a$10$dfcE5w0bD5hMmcD1xQmI4uG1tq9H2Yy0bZlq0N1bXn7m6o1n2uG2u', // bcrypt de "admin123"
-        phone: '(11) 99999-0000',
-        address: 'São Paulo/SP'
-      }
-    })
+        name: "Admin",
+        email: "admin@example.com",
+        password:
+          "$2a$10$dfcE5w0bD5hMmcD1xQmI4uG1tq9H2Yy0bZlq0N1bXn7m6o1n2uG2u", // bcrypt de "admin123"
+        phone: "(11) 99999-0000",
+        address: "São Paulo/SP",
+        status: "active",
+        roleId: adminRole.id,
+      },
+    });
 
     // Caminhões
     const truck1 = await prisma.truck.upsert({
-      where: { plate: 'ABC-1A23' },
+      where: { plate: "ABC-1A23" },
       update: {},
       create: {
-        name: 'Caminhão 1',
-        plate: 'ABC-1A23',
-        brand: 'Volvo',
+        name: "Caminhão 1",
+        plate: "ABC-1A23",
+        brand: "Volvo",
         year: 2020,
-        docExpiry: new Date('2026-01-01'),
-        renavam: '12345678901',
-        image: null
-      }
-    })
+        docExpiry: new Date("2026-01-01"),
+        renavam: "12345678901",
+        image: null,
+      },
+    });
 
     const truck2 = await prisma.truck.upsert({
-      where: { plate: 'XYZ-4B56' },
+      where: { plate: "XYZ-4B56" },
       update: {},
       create: {
-        name: 'Caminhão 2',
-        plate: 'XYZ-4B56',
-        brand: 'Scania',
+        name: "Caminhão 2",
+        plate: "XYZ-4B56",
+        brand: "Scania",
         year: 2019,
-        docExpiry: new Date('2025-06-01'),
-        renavam: '10987654321',
-        image: null
-      }
-    })
+        docExpiry: new Date("2025-06-01"),
+        renavam: "10987654321",
+        image: null,
+      },
+    });
 
     // Manutenções
     await prisma.maintenance.create({
       data: {
-        date: new Date('2024-01-10'),
-        service: 'Troca de óleo e filtros',
+        date: new Date("2024-01-10"),
+        service: "Troca de óleo e filtros",
         km: 120000,
         value: 450.0,
-        notes: 'Usar óleo sintético',
-        truckId: truck1.id
-      }
-    })
+        notes: "Usar óleo sintético",
+        truckId: truck1.id,
+      },
+    });
     await prisma.maintenance.create({
       data: {
-        date: new Date('2024-02-15'),
-        service: 'Revisão de freios',
+        date: new Date("2024-02-15"),
+        service: "Revisão de freios",
         km: 122500,
         value: 1200.0,
         notes: null,
-        truckId: truck2.id
-      }
-    })
+        truckId: truck2.id,
+      },
+    });
 
     // Viagens
     const trip1 = await prisma.trip.create({
       data: {
-        destination: 'Rio de Janeiro/RJ',
-        driver: 'Carlos Silva',
-        date: new Date('2024-03-10'),
+        destination: "Rio de Janeiro/RJ",
+        driver: "Carlos Silva",
+        date: new Date("2024-03-10"),
         freightValue: 3200.0,
-        status: 'concluida',
-        notes: 'Viagem tranquila',
-        truckId: truck1.id
-      }
-    })
+        status: "concluida",
+        notes: "Viagem tranquila",
+        truckId: truck1.id,
+      },
+    });
 
     const trip2 = await prisma.trip.create({
       data: {
-        destination: 'Belo Horizonte/MG',
-        driver: 'Roberto Santos',
-        date: new Date('2024-03-15'),
+        destination: "Belo Horizonte/MG",
+        driver: "Roberto Santos",
+        date: new Date("2024-03-15"),
         freightValue: 2800.0,
-        status: 'em_andamento',
+        status: "em_andamento",
         notes: null,
-        truckId: truck2.id
-      }
-    })
+        truckId: truck2.id,
+      },
+    });
 
     // Entradas/Saídas/Impostos (FinancialEntry)
     await prisma.financialEntry.create({
       data: {
-        description: 'Recebimento Frete RJ',
+        description: "Recebimento Frete RJ",
         amount: 3200.0,
-        category: 'Fretes',
-        date: new Date('2024-03-12'),
-        type: 'entrada',
-        observations: 'Cliente ABC',
-        companyId: company1.id
-      }
-    })
+        category: "Fretes",
+        date: new Date("2024-03-12"),
+        type: "entrada",
+        observations: "Cliente ABC",
+        companyId: company1.id,
+      },
+    });
     await prisma.financialEntry.create({
       data: {
-        description: 'Combustível - Caminhão 1',
+        description: "Combustível - Caminhão 1",
         amount: 600.0,
-        category: 'Operacional',
-        date: new Date('2024-03-12'),
-        type: 'saida',
-        observations: 'Posto Shell',
-        companyId: company1.id
-      }
-    })
+        category: "Operacional",
+        date: new Date("2024-03-12"),
+        type: "saida",
+        observations: "Posto Shell",
+        companyId: company1.id,
+      },
+    });
     await prisma.financialEntry.create({
       data: {
-        description: 'ISS - Março',
+        description: "ISS - Março",
         amount: 150.0,
-        category: 'Tributos',
-        date: new Date('2024-03-15'),
-        type: 'imposto',
+        category: "Tributos",
+        date: new Date("2024-03-15"),
+        type: "imposto",
         observations: null,
-        companyId: company1.id
-      }
-    })
+        companyId: company1.id,
+      },
+    });
 
     // Despesas das viagens
     await prisma.tripExpense.create({
       data: {
-        description: 'Combustível',
+        description: "Combustível",
         amount: 500.0,
-        date: new Date('2024-03-10'),
-        category: 'Combustível',
-        notes: 'Posto BR',
-        tripId: trip1.id
-      }
-    })
+        date: new Date("2024-03-10"),
+        category: "Combustível",
+        notes: "Posto BR",
+        tripId: trip1.id,
+      },
+    });
     await prisma.tripExpense.create({
       data: {
-        description: 'Pedágio',
+        description: "Pedágio",
         amount: 120.0,
-        date: new Date('2024-03-10'),
-        category: 'Pedágio',
+        date: new Date("2024-03-10"),
+        category: "Pedágio",
         notes: null,
-        tripId: trip1.id
-      }
-    })
+        tripId: trip1.id,
+      },
+    });
 
-    console.log('✅ Banco de dados populado com sucesso!')
+    console.log("✅ Banco de dados populado com sucesso!");
   } catch (error) {
-    console.error('❌ Erro ao popular banco de dados:', error)
-    process.exit(1)
+    console.error("❌ Erro ao popular banco de dados:", error);
+    process.exit(1);
   } finally {
-    await prisma.$disconnect()
+    await prisma.$disconnect();
   }
 }
 
-main()
+main();

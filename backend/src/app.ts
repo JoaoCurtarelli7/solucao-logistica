@@ -1,5 +1,5 @@
 import fastifyCors from "@fastify/cors";
-import fastify from 'fastify';
+import fastify from "fastify";
 
 import { companyRoutes } from "./routes/company";
 import { employeeRoutes } from "./routes/employee";
@@ -16,6 +16,7 @@ import { truckRoutes } from "./routes/truck";
 import { tripRoutes } from "./routes/trip";
 import { tripExpenseRoutes } from "./routes/tripExpense";
 import { maintenanceRoutes } from "./routes/maintenance";
+import { rbacRoutes } from "./routes/rbac";
 
 export const app = fastify({
   logger: true,
@@ -24,7 +25,12 @@ export const app = fastify({
 // CORS: lista de origens permitidas (variável CORS_ORIGIN no DigitalOcean)
 const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
-  : ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"];
+  : [
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:5173",
+    ];
 
 function isOriginAllowed(origin: string | undefined): boolean {
   if (!origin) return false;
@@ -37,7 +43,10 @@ app.addHook("onRequest", async (request, reply) => {
   if (!isOriginAllowed(origin)) return;
 
   reply.header("Access-Control-Allow-Origin", origin);
-  reply.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  reply.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  );
   reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   reply.header("Access-Control-Allow-Credentials", "true");
   reply.header("Access-Control-Max-Age", "86400");
@@ -48,7 +57,10 @@ app.addHook("onRequest", async (request, reply) => {
 });
 
 app.register(fastifyCors, {
-  origin: (origin: string | undefined, cb: (err: Error | null, allow?: string | boolean) => void) => {
+  origin: (
+    origin: string | undefined,
+    cb: (err: Error | null, allow?: string | boolean) => void,
+  ) => {
     if (origin && isOriginAllowed(origin)) {
       cb(null, origin);
     } else if (!origin && ALLOWED_ORIGINS.length > 0) {
@@ -78,5 +90,6 @@ app.register(truckRoutes);
 app.register(maintenanceRoutes);
 app.register(tripRoutes);
 app.register(tripExpenseRoutes);
+app.register(rbacRoutes);
 
 export default app;

@@ -1,10 +1,8 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authMiddleware = authMiddleware;
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const prisma_1 = require("../lib/prisma");
+const auth_1 = require("../lib/auth");
 async function authMiddleware(req, rep) {
     try {
         const auth = req.headers?.authorization;
@@ -20,11 +18,56 @@ async function authMiddleware(req, rep) {
             return rep.status(401).send({ message: "Token ausente" });
         }
         try {
-            const decoded = jsonwebtoken_1.default.verify(token, "secreta-chave");
+            const decoded = (0, auth_1.verifyToken)(token);
             if (!decoded.userId) {
                 return rep.status(401).send({ message: "Token inválido - userId não encontrado" });
             }
-            req.user = { id: decoded.userId };
+            const userId = Number(decoded.userId);
+            const tokenPermissions = Array.isArray(decoded.permissions) ? decoded.permissions : undefined;
+            const tokenRoleId = decoded.roleId ?? undefined;
+            const tokenRole = decoded.role ?? undefined;
+            // Se o token já vier com permissões, usa; senão busca no banco (bom para compatibilidade)
+            if (tokenPermissions) {
+                req.user = {
+                    id: userId,
+                    roleId: tokenRoleId ?? null,
+                    role: tokenRole ?? null,
+                    permissions: tokenPermissions,
+                };
+                return;
+            }
+            const dbUser = await prisma_1.prisma.user.findUnique({
+                where: { id: userId },
+                select: {
+                    id: true,
+                    status: true,
+                    role: {
+                        select: {
+                            id: true,
+                            name: true,
+                            permissions: {
+                                select: {
+                                    permission: { select: { key: true } },
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            if (!dbUser) {
+                return rep.status(401).send({ message: "Usuário não encontrado" });
+            }
+            if (dbUser.status && dbUser.status !== "active") {
+                return rep.status(403).send({ message: "Usuário inativo" });
+            }
+            const permissions = dbUser.role?.permissions?.map((rp) => rp.permission.key) ?? [];
+            req.user = {
+                id: dbUser.id,
+                status: dbUser.status,
+                roleId: dbUser.role?.id ?? null,
+                role: dbUser.role?.name ?? null,
+                permissions,
+            };
             // Não retorna nada, continua para o próximo handler
         }
         catch (jwtError) {

@@ -1,101 +1,115 @@
-import React from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { Menu } from 'antd'
+import React from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Menu } from "antd";
 import {
-    HomeOutlined,
-    ShoppingCartOutlined,
-    TruckOutlined,
-    UserOutlined,
-    ShopOutlined,
-    PrinterOutlined, CalculatorOutlined
-} from '@ant-design/icons'
-import { useUserContext } from '../../context/userContext'
-import './styles.css'
+  HomeOutlined,
+  ShoppingCartOutlined,
+  TruckOutlined,
+  UserOutlined,
+  ShopOutlined,
+  PrinterOutlined,
+  CalculatorOutlined,
+  SafetyOutlined,
+} from "@ant-design/icons";
+import { useUserContext } from "../../context/userContext";
+import { usePermission } from "../../hooks/usePermission";
+import "./styles.css";
 
 export default function AppSidebar() {
-  const { user: userContext, logout } = useUserContext()
-  const location = useLocation()
+  const { user: userContext, logout } = useUserContext();
+  const { hasPermission } = usePermission();
+  const location = useLocation();
 
   const handleLogout = () => {
-    logout()
-  }
+    logout();
+  };
 
   const menuItems = [
     {
-      key: '/',
+      key: "/",
       icon: <HomeOutlined />,
-      label: <Link to="/">Dashboard</Link>
+      label: <Link to="/">Dashboard</Link>,
     },
     {
-      key: 'gestao',
+      key: "gestao",
       icon: <UserOutlined />,
-      label: 'Gestão',
+      label: "Gestão",
       children: [
+        ...(hasPermission("users.manage")
+          ? [
+              {
+                key: "/users-permissions",
+                icon: <SafetyOutlined />,
+                label: (
+                  <Link to="/users-permissions">Usuários & Permissões</Link>
+                ),
+              },
+            ]
+          : []),
         {
-          key: '/closings',
+          key: "/closings",
           icon: <CalculatorOutlined />,
-          label: <Link to="/closings">Fechamentos</Link>
+          label: <Link to="/closings">Fechamentos</Link>,
         },
         {
-          key: '/employee',
+          key: "/employee",
           icon: <UserOutlined />,
-          label: <Link to="/employee">Funcionários</Link>
+          label: <Link to="/employee">Funcionários</Link>,
         },
         {
-          key: '/companies',
+          key: "/companies",
           icon: <ShopOutlined />,
-          label: <Link to="/companies">Empresas</Link>
-        }
-      ]
+          label: <Link to="/companies">Empresas</Link>,
+        },
+      ],
     },
     {
-      key: 'operacoes',
+      key: "operacoes",
       icon: <TruckOutlined />,
-      label: 'Operações',
+      label: "Operações",
       children: [
         {
-          key: '/load',
+          key: "/load",
           icon: <ShoppingCartOutlined />,
-          label: <Link to="/load">Cargas/Pedidos</Link>
+          label: <Link to="/load">Cargas/Pedidos</Link>,
         },
         {
-          key: '/vehicle-maintenance',
+          key: "/vehicle-maintenance",
           icon: <TruckOutlined />,
-          label: <Link to="/vehicle-maintenance">Frota</Link>
-        }
-      ]
+          label: <Link to="/vehicle-maintenance">Frota</Link>,
+        },
+      ],
     },
     {
-      key: '/reports',
+      key: "/reports",
       icon: <PrinterOutlined />,
-      label: <Link to="/reports">Relatórios</Link>
-    }
-  ]
-
+      label: <Link to="/reports">Relatórios</Link>,
+    },
+  ];
 
   return (
     <div className="sidebar">
       <div className="sidebar-header">
         <h2>🚛 Solução Logística</h2>
-        <p>Olá, {userContext?.name || 'Usuário'}</p>
+        <p>Olá, {userContext?.name || "Usuário"}</p>
       </div>
 
-        <Menu
+      <Menu
         mode="inline"
         selectedKeys={[location.pathname]}
-        defaultOpenKeys={['gestao', 'operacoes']}
+        defaultOpenKeys={["gestao", "operacoes"]}
         items={menuItems}
         className="sidebar-menu"
       />
-      
+
       <div className="sidebar-footer">
         <Link to="/user-profile" className="footer-link">
           <UserOutlined /> Perfil
-            </Link>
+        </Link>
         <button onClick={handleLogout} className="logout-btn">
           Sair
         </button>
       </div>
     </div>
-  )
+  );
 }

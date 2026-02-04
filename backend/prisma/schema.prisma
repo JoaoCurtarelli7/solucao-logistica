@@ -31,11 +31,11 @@ model Closing {
 }
 
 model Company {
-  id               Int              @id @default(autoincrement())
+  id               Int               @id @default(autoincrement())
   name             String
   type             String
-  cnpj             String           @unique
-  dateRegistration DateTime         @db.Timestamptz(6)
+  cnpj             String            @unique
+  dateRegistration DateTime          @db.Timestamptz(6)
   status           String
   responsible      String
   commission       Float
@@ -81,20 +81,20 @@ model FinancialEntry {
 }
 
 model FinancialPeriod {
-  id           Int       @id @default(autoincrement())
-  name         String
-  startDate    DateTime  @db.Timestamptz(6)
-  endDate      DateTime  @db.Timestamptz(6)
-  companyId    Int?
-  status       String    @default("aberto")
-  totalEntries Float     @default(0)
+  id            Int      @id @default(autoincrement())
+  name          String
+  startDate     DateTime @db.Timestamptz(6)
+  endDate       DateTime @db.Timestamptz(6)
+  companyId     Int?
+  status        String   @default("aberto")
+  totalEntries  Float    @default(0)
   totalExpenses Float    @default(0)
-  totalTaxes   Float     @default(0)
-  balance      Float     @default(0)
-  profitMargin Float     @default(0)
-  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
-  Company      Company?  @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_finPeriod_company")
+  totalTaxes    Float    @default(0)
+  balance       Float    @default(0)
+  profitMargin  Float    @default(0)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @db.Timestamptz(6)
+  Company       Company? @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_finPeriod_company")
 
   @@index([companyId], map: "idx_finPeriod_companyId")
 }
@@ -201,11 +201,52 @@ model Truck {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   name      String
-  email     String   @unique
+  email     String     @unique
   password  String
   phone     String?
   address   String?
+  status    String     @default("active")
+  roleId    Int?
+  role      Role?      @relation(fields: [roleId], references: [id])
+  createdAt DateTime   @default(now()) @db.Timestamptz(6)
+  AuditLog  AuditLog[]
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String?
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime         @default(now()) @db.Timestamptz(6)
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime         @default(now()) @db.Timestamptz(6)
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  details   String?
   createdAt DateTime @default(now()) @db.Timestamptz(6)
 }

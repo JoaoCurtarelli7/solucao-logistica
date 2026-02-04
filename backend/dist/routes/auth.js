@@ -7,7 +7,6 @@ exports.authRoutes = authRoutes;
 const prisma_1 = require("../lib/prisma");
 const zod_1 = require("zod");
 const auth_1 = require("../lib/auth");
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 async function authRoutes(app) {
     const loginSchema = zod_1.z.object({
@@ -80,21 +79,51 @@ async function authRoutes(app) {
     app.post("/login", async (req, rep) => {
         try {
             const { email, password } = loginSchema.parse(req.body);
-            const user = await prisma_1.prisma.user.findUnique({ where: { email } });
+            const user = await prisma_1.prisma.user.findUnique({
+                where: { email },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    password: true,
+                    status: true,
+                    role: {
+                        select: {
+                            id: true,
+                            name: true,
+                            permissions: {
+                                select: { permission: { select: { key: true } } },
+                            },
+                        },
+                    },
+                },
+            });
             if (!user) {
                 return rep.code(401).send({ message: "Email ou senha inválidos" });
+            }
+            if (user.status && user.status !== "active") {
+                return rep.code(403).send({ message: "Usuário inativo" });
             }
             const isPasswordValid = await bcrypt_1.default.compare(password, user.password);
             if (!isPasswordValid) {
                 return rep.code(401).send({ message: "Email ou senha inválidos" });
             }
-            const token = jsonwebtoken_1.default.sign({ userId: user.id }, "secreta-chave", { expiresIn: "1h" });
+            const permissions = user.role?.permissions?.map((rp) => rp.permission.key) ?? [];
+            const token = (0, auth_1.generateToken)({
+                userId: user.id,
+                roleId: user.role?.id ?? null,
+                role: user.role?.name ?? null,
+                permissions,
+            });
             return rep.send({
                 token,
                 user: {
                     id: user.id,
                     name: user.name,
-                    email: user.email
+                    email: user.email,
+                    status: user.status,
+                    role: user.role?.name ?? null,
+                    permissions,
                 }
             });
         }
