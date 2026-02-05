@@ -26,9 +26,69 @@ async function rbacRoutes(app) {
     app.get("/permissions", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (_req, rep) => {
         const permissions = await prisma_1.prisma.permission.findMany({
             orderBy: { key: "asc" },
-            select: { id: true, key: true, description: true },
+            select: { id: true, key: true, description: true, createdAt: true },
         });
         return rep.send(permissions);
+    });
+    app.post("/permissions", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
+        const schema = zod_1.z.object({
+            key: zod_1.z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao"),
+            description: zod_1.z.string().optional(),
+        });
+        const data = schema.parse(req.body);
+        const permission = await prisma_1.prisma.permission.create({
+            data: {
+                key: data.key,
+                description: data.description,
+            },
+            select: { id: true, key: true, description: true, createdAt: true },
+        });
+        await logAudit(req.user?.id, "permissions.create", {
+            permissionId: permission.id,
+            key: permission.key,
+        });
+        return rep.code(201).send(permission);
+    });
+    app.put("/permissions/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
+        const paramsSchema = zod_1.z.object({ id: zod_1.z.coerce.number() });
+        const bodySchema = zod_1.z.object({
+            key: zod_1.z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao").optional(),
+            description: zod_1.z.string().nullable().optional(),
+        });
+        const { id } = paramsSchema.parse(req.params);
+        const body = bodySchema.parse(req.body);
+        const permission = await prisma_1.prisma.permission.update({
+            where: { id },
+            data: {
+                ...(body.key && { key: body.key }),
+                ...(body.description !== undefined && { description: body.description ?? null }),
+            },
+            select: { id: true, key: true, description: true, createdAt: true },
+        });
+        await logAudit(req.user?.id, "permissions.update", {
+            permissionId: permission.id,
+        });
+        return rep.send(permission);
+    });
+    app.delete("/permissions/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
+        const paramsSchema = zod_1.z.object({ id: zod_1.z.coerce.number() });
+        const { id } = paramsSchema.parse(req.params);
+        // Verificar se a permissão está sendo usada
+        const rolePermissions = await prisma_1.prisma.rolePermission.findFirst({
+            where: { permissionId: id },
+        });
+        if (rolePermissions) {
+            return rep.code(400).send({
+                message: "Não é possível deletar permissão que está em uso por algum perfil",
+            });
+        }
+        await prisma_1.prisma.permission.delete({
+            where: { id },
+        });
+        await logAudit(req.user?.id, "permissions.delete", {
+            permissionId: id,
+        });
+        return rep.code(204).send();
     });
     // ---- Roles ----
     app.get("/roles", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (_req, rep) => {
@@ -61,7 +121,10 @@ async function rbacRoutes(app) {
             },
             select: { id: true, name: true, description: true },
         });
-        await logAudit(req.user?.id, "roles.create", { roleId: role.id, name: role.name });
+        await logAudit(req.user?.id, "roles.create", {
+            roleId: role.id,
+            name: role.name,
+        });
         return rep.code(201).send(role);
     });
     app.put("/roles/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
@@ -120,7 +183,10 @@ async function rbacRoutes(app) {
                 permissions: { select: { permission: { select: { key: true } } } },
             },
         });
-        await logAudit(req.user?.id, "roles.permissions.set", { roleId, permissions: keys });
+        await logAudit(req.user?.id, "roles.permissions.set", {
+            roleId,
+            permissions: keys,
+        });
         return rep.send({
             id: role?.id,
             name: role?.name,
@@ -189,8 +255,14 @@ async function rbacRoutes(app) {
                 createdAt: true,
             },
         });
-        await logAudit(req.user?.id, "users.create", { userId: user.id, email: user.email, roleId: body.roleId });
-        return rep.code(201).send({ user, tempPassword: body.password ? undefined : tempPassword });
+        await logAudit(req.user?.id, "users.create", {
+            userId: user.id,
+            email: user.email,
+            roleId: body.roleId,
+        });
+        return rep
+            .code(201)
+            .send({ user, tempPassword: body.password ? undefined : tempPassword });
     });
     app.put("/admin/users/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
         const paramsSchema = zod_1.z.object({ id: zod_1.z.coerce.number() });
@@ -210,7 +282,14 @@ async function rbacRoutes(app) {
                 roleId: body.roleId,
                 status: body.status,
             },
-            select: { id: true, name: true, email: true, status: true, role: { select: { id: true, name: true } }, createdAt: true },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                status: true,
+                role: { select: { id: true, name: true } },
+                createdAt: true,
+            },
         });
         await logAudit(req.user?.id, "users.update", { userId: id });
         return rep.send(user);
@@ -223,9 +302,19 @@ async function rbacRoutes(app) {
         const user = await prisma_1.prisma.user.update({
             where: { id },
             data: { status },
-            select: { id: true, name: true, email: true, status: true, role: { select: { id: true, name: true } }, createdAt: true },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                status: true,
+                role: { select: { id: true, name: true } },
+                createdAt: true,
+            },
         });
-        await logAudit(req.user?.id, "users.status.update", { userId: id, status });
+        await logAudit(req.user?.id, "users.status.update", {
+            userId: id,
+            status,
+        });
         return rep.send(user);
     });
     // ---- Logs de auditoria ----

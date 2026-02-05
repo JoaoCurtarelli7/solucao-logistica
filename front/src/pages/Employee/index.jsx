@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Card, Table, Button, Tag, Typography, message, Input, Select, Row, Col, Space, Tooltip, Popconfirm } from 'antd'
+import { Card, Table, Button, Tag, Typography, message, Input, Select, Row, Col, Space, Tooltip, Popconfirm, Result } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import AddEmployeeModal from '../../components/Modal/Employee'
 import api from '../../lib/api'
 import { FaEdit, FaTrash, FaSearch, FaEye, FaPlus } from 'react-icons/fa'
 import dayjs from 'dayjs'
+import { usePermission } from '../../hooks/usePermission'
 
 const { Title } = Typography
 const { Search } = Input
@@ -12,12 +13,28 @@ const { Option } = Select
 
 export default function EmployeeList() {
   const navigate = useNavigate()
+  const { hasPermission } = usePermission()
   const [data, setData] = useState([])
   const [filteredData, setFilteredData] = useState([])
   const [editingEmployee, setEditingEmployee] = useState(null)
   const [loading, setLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+
+  const canView = hasPermission('employees.view')
+  const canCreate = hasPermission('employees.create')
+  const canUpdate = hasPermission('employees.update')
+  const canDelete = hasPermission('employees.delete')
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar funcionários."
+      />
+    )
+  }
 
   // Carrega a lista de funcionários
   const loadEmployees = useCallback(async () => {
@@ -188,34 +205,38 @@ export default function EmployeeList() {
             </Button>
           </Tooltip>
 
-          <Tooltip title="Editar">
-            <Button
-              type="link"
-              icon={<FaEdit />}
-              onClick={() => setEditingEmployee(record)}
-            >
-              Editar
-            </Button>
-          </Tooltip>
-
-          <Tooltip title="Excluir">
-            <Popconfirm
-              title="Tem certeza que deseja excluir este funcionário?"
-              description="Esta ação não pode ser desfeita."
-              onConfirm={() => handleRemove(record.id)}
-              okText="Sim"
-              cancelText="Não"
-              okType="danger"
-            >
+          {canUpdate && (
+            <Tooltip title="Editar">
               <Button
                 type="link"
-                danger
-                icon={<FaTrash />}
+                icon={<FaEdit />}
+                onClick={() => setEditingEmployee(record)}
               >
-                Excluir
+                Editar
               </Button>
-            </Popconfirm>
-          </Tooltip>
+            </Tooltip>
+          )}
+
+          {canDelete && (
+            <Tooltip title="Excluir">
+              <Popconfirm
+                title="Tem certeza que deseja excluir este funcionário?"
+                description="Esta ação não pode ser desfeita."
+                onConfirm={() => handleRemove(record.id)}
+                okText="Sim"
+                cancelText="Não"
+                okType="danger"
+              >
+                <Button
+                  type="link"
+                  danger
+                  icon={<FaTrash />}
+                >
+                  Excluir
+                </Button>
+              </Popconfirm>
+            </Tooltip>
+          )}
         </Space>
       ),
     },
@@ -235,11 +256,13 @@ export default function EmployeeList() {
         <Title level={3} style={{ color: '#333', margin: 0 }}>
           Gestão de Funcionários
         </Title>
-        <AddEmployeeModal
-          addEmployee={addEmployee}
-          editingEmployee={editingEmployee}
-          setEditingEmployee={setEditingEmployee}
-        />
+        {canCreate && (
+          <AddEmployeeModal
+            addEmployee={addEmployee}
+            editingEmployee={editingEmployee}
+            setEditingEmployee={setEditingEmployee}
+          />
+        )}
       </div>
 
       <Row gutter={16} style={{ marginBottom: '20px' }}>

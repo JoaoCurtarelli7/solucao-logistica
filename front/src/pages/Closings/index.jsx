@@ -17,7 +17,8 @@ import {
   Select,
   DatePicker,
   Statistic, Alert,
-  Tabs
+  Tabs,
+  Result
 } from 'antd'
 import {
   PlusOutlined,
@@ -32,6 +33,7 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import 'dayjs/locale/pt-br'
 import api from '../../lib/api'
+import { usePermission } from '../../hooks/usePermission'
 import './styles.css'
 
 // Configurar dayjs para português
@@ -43,6 +45,7 @@ const { RangePicker } = DatePicker
 
 export default function Closings() {
   const navigate = useNavigate()
+  const { hasPermission } = usePermission()
   const [closings, setClosings] = useState([])
   const [months, setMonths] = useState([])
   const [companies, setCompanies] = useState([])
@@ -57,6 +60,25 @@ export default function Closings() {
   const [editingMonth, setEditingMonth] = useState(null)
   const [monthForm] = Form.useForm()
   const [activeTab, setActiveTab] = useState('months')
+
+  const canViewClosings = hasPermission('closings.view')
+  const canCreateClosings = hasPermission('closings.create')
+  const canUpdateClosings = hasPermission('closings.update')
+  const canDeleteClosings = hasPermission('closings.delete')
+  const canViewMonths = hasPermission('months.view')
+  const canCreateMonths = hasPermission('months.create')
+  const canUpdateMonths = hasPermission('months.update')
+  const canDeleteMonths = hasPermission('months.delete')
+
+  if (!canViewClosings && !canViewMonths) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para acessar esta página."
+      />
+    )
+  }
 
   useEffect(() => {
     loadMonths()
@@ -358,30 +380,34 @@ export default function Closings() {
             }}
             title="Ver fechamentos"
           />
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => handleEditMonth(record)}
-            title="Editar"
-          />
-          <Popconfirm
-            title="Tem certeza que deseja deletar este mês?"
-            description="Esta ação não pode ser desfeita."
-            onConfirm={() => handleDeleteMonth(record.id)}
-            okText="Sim"
-            cancelText="Não"
-            disabled={record.closings?.length > 0}
-          >
+          {canUpdateMonths && (
             <Button
               type="text"
-              danger
-              icon={<DeleteOutlined />}
+              icon={<EditOutlined />}
               size="small"
-              disabled={record.closings?.length > 0}
-              title={record.closings?.length > 0 ? "Não é possível deletar mês com fechamentos" : "Deletar"}
+              onClick={() => handleEditMonth(record)}
+              title="Editar"
             />
-          </Popconfirm>
+          )}
+          {canDeleteMonths && (
+            <Popconfirm
+              title="Tem certeza que deseja deletar este mês?"
+              description="Esta ação não pode ser desfeita."
+              onConfirm={() => handleDeleteMonth(record.id)}
+              okText="Sim"
+              cancelText="Não"
+              disabled={record.closings?.length > 0}
+            >
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                size="small"
+                disabled={record.closings?.length > 0}
+                title={record.closings?.length > 0 ? "Não é possível deletar mês com fechamentos" : "Deletar"}
+              />
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -484,15 +510,17 @@ export default function Closings() {
             title="Ver entradas financeiras"
           />
 
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => handleEdit(record)}
-            disabled={record.status === 'fechado'}
-            title="Editar"
-          />
-          {record.status === 'aberto' ? (
+          {canUpdateClosings && (
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              size="small"
+              onClick={() => handleEdit(record)}
+              disabled={record.status === 'fechado'}
+              title="Editar"
+            />
+          )}
+          {canUpdateClosings && record.status === 'aberto' && (
             <Button
               type="text"
               icon={<LockOutlined />}
@@ -500,7 +528,8 @@ export default function Closings() {
               onClick={() => handleCloseClosing(record.id)}
               title="Fechar fechamento"
             />
-          ) : record.status === 'fechado' ? (
+          )}
+          {canUpdateClosings && record.status === 'fechado' && (
             <Button
               type="text"
               icon={<UnlockOutlined />}
@@ -508,24 +537,26 @@ export default function Closings() {
               onClick={() => handleReopenClosing(record.id)}
               title="Reabrir fechamento"
             />
-          ) : null}
-          <Popconfirm
-            title="Tem certeza que deseja deletar este fechamento?"
-            description="Esta ação não pode ser desfeita."
-            onConfirm={() => handleDeleteClosing(record.id)}
-            okText="Sim"
-            cancelText="Não"
-            disabled={record.status === 'fechado'}
-          >
-            <Button
-              type="text"
-              danger
-              icon={<DeleteOutlined />}
-              size="small"
+          )}
+          {canDeleteClosings && (
+            <Popconfirm
+              title="Tem certeza que deseja deletar este fechamento?"
+              description="Esta ação não pode ser desfeita."
+              onConfirm={() => handleDeleteClosing(record.id)}
+              okText="Sim"
+              cancelText="Não"
               disabled={record.status === 'fechado'}
-              title={record.status === 'fechado' ? "Não é possível deletar fechamento fechado" : "Deletar"}
-            />
-          </Popconfirm>
+            >
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                size="small"
+                disabled={record.status === 'fechado'}
+                title={record.status === 'fechado' ? "Não é possível deletar fechamento fechado" : "Deletar"}
+              />
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -554,13 +585,15 @@ export default function Closings() {
               </Text>
             </Col>
             <Col>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={openMonthModal}
-              >
-                Novo Mês
-              </Button>
+              {canCreateMonths && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={openMonthModal}
+                >
+                  Novo Mês
+                </Button>
+              )}
             </Col>
           </Row>
 
@@ -709,17 +742,18 @@ export default function Closings() {
         />
       </Card>
 
-      <Modal
-        title={editingClosing ? 'Editar Fechamento' : 'Novo Fechamento'}
-        open={isModalOpen}
-        onCancel={() => {
-          setIsModalOpen(false)
-          setEditingClosing(null)
-          form.resetFields()
-        }}
-        footer={null}
-        width={600}
-      >
+      {(canCreateClosings || canUpdateClosings) && (
+        <Modal
+          title={editingClosing ? 'Editar Fechamento' : 'Novo Fechamento'}
+          open={isModalOpen}
+          onCancel={() => {
+            setIsModalOpen(false)
+            setEditingClosing(null)
+            form.resetFields()
+          }}
+          footer={null}
+          width={600}
+        >
         <Form
           form={form}
           layout="vertical"
@@ -903,12 +937,14 @@ export default function Closings() {
             </Space>
           </Form.Item>
         </Form>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Modal para gerenciar meses */}
-      <Modal
-        title={editingMonth ? 'Editar Mês' : 'Novo Mês'}
-        open={isMonthModalOpen}
+      {(canCreateMonths || canUpdateMonths) && (
+        <Modal
+          title={editingMonth ? 'Editar Mês' : 'Novo Mês'}
+          open={isMonthModalOpen}
         onCancel={() => {
           setIsMonthModalOpen(false)
           setEditingMonth(null)
@@ -989,7 +1025,8 @@ export default function Closings() {
             </Space>
           </Form.Item>
         </Form>
-      </Modal>
+        </Modal>
+      )}
     </div>
   )
 }

@@ -10,6 +10,7 @@ import {
   Select,
   Input,
   Tooltip,
+  Result,
 } from 'antd'
 import * as XLSX from 'xlsx'
 import {
@@ -23,12 +24,14 @@ import CustomModalLoad from '../../../components/Modal/Load'
 import api from '../../../lib/api'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
+import { usePermission } from '../../../hooks/usePermission'
 
 const { RangePicker } = DatePicker
 const { Option } = Select
 
 export default function LoadCompanies() {
   const navigate = useNavigate()
+  const { hasPermission } = usePermission()
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -40,6 +43,21 @@ export default function LoadCompanies() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'recent' | 'old'>(
     'all',
   )
+
+  const canView = hasPermission('loads.view')
+  const canCreate = hasPermission('loads.create')
+  const canUpdate = hasPermission('loads.update')
+  const canDelete = hasPermission('loads.delete')
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar cargas."
+      />
+    )
+  }
 
   useEffect(() => {
     fetchCompanies()
@@ -354,29 +372,33 @@ export default function LoadCompanies() {
           >
             Ver Empresa
           </Button>
-          <Button
-            type="default"
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => handleEdit(record)}
-          >
-            Editar
-          </Button>
-          <Popconfirm
-            title="Tem certeza que deseja excluir esta carga?"
-            onConfirm={() => handleDeleteLoad(record.id)}
-            okText="Sim"
-            cancelText="Não"
-          >
+          {canUpdate && (
             <Button
-              type="primary"
-              danger
-              icon={<DeleteOutlined />}
+              type="default"
+              icon={<EditOutlined />}
               size="small"
+              onClick={() => handleEdit(record)}
             >
-              Excluir
+              Editar
             </Button>
-          </Popconfirm>
+          )}
+          {canDelete && (
+            <Popconfirm
+              title="Tem certeza que deseja excluir esta carga?"
+              onConfirm={() => handleDeleteLoad(record.id)}
+              okText="Sim"
+              cancelText="Não"
+            >
+              <Button
+                type="primary"
+                danger
+                icon={<DeleteOutlined />}
+                size="small"
+              >
+                Excluir
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -528,7 +550,8 @@ export default function LoadCompanies() {
             allowClear
           />
 
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+          {canCreate && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
             Adicionar Carga
           </Button>
 

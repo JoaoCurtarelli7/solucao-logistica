@@ -12,7 +12,8 @@ import {
     Popconfirm,
     Tooltip,
     Statistic,
-    Progress
+    Progress,
+    Result
 } from "antd";
 import {
     PlusOutlined,
@@ -28,15 +29,32 @@ import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import AddVehicleModal from "../../components/Modal/Vehicle";
 import { api } from "../../lib";
+import { usePermission } from "../../hooks/usePermission";
 
 const { Title, Text } = Typography;
 
 export default function VehicleList() {
   const navigate = useNavigate();
+  const { hasPermission } = usePermission();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [currentVehicle, setCurrentVehicle] = useState(null);
+
+  const canView = hasPermission('trucks.view');
+  const canCreate = hasPermission('trucks.create');
+  const canUpdate = hasPermission('trucks.update');
+  const canDelete = hasPermission('trucks.delete');
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar caminhões."
+      />
+    );
+  }
 
   // Carregar caminhões
   const loadTrucks = async () => {
@@ -206,30 +224,34 @@ export default function VehicleList() {
               onClick={() => navigate(`/vehicle-trip/${record.id}`)}
             />
           </Tooltip>
-          <Tooltip title="Editar">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
-              onClick={() => {
-                setCurrentVehicle(record);
-                setIsModalVisible(true);
-              }}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="Tem certeza que deseja deletar este caminhão?"
-            onConfirm={() => handleDeleteVehicle(record.id)}
-            okText="Sim"
-            cancelText="Não"
-          >
-            <Tooltip title="Deletar">
+          {canUpdate && (
+            <Tooltip title="Editar">
               <Button 
                 type="text" 
-                danger
-                icon={<DeleteOutlined />} 
+                icon={<EditOutlined />} 
+                onClick={() => {
+                  setCurrentVehicle(record);
+                  setIsModalVisible(true);
+                }}
               />
             </Tooltip>
-          </Popconfirm>
+          )}
+          {canDelete && (
+            <Popconfirm
+              title="Tem certeza que deseja deletar este caminhão?"
+              onConfirm={() => handleDeleteVehicle(record.id)}
+              okText="Sim"
+              cancelText="Não"
+            >
+              <Tooltip title="Deletar">
+                <Button 
+                  type="text" 
+                  danger
+                  icon={<DeleteOutlined />} 
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -291,16 +313,18 @@ export default function VehicleList() {
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <Title level={3} style={{ margin: 0 }}>Lista de Caminhões</Title>
-      <Button
-        type="primary"
-            icon={<PlusOutlined />}
-        onClick={() => {
-          setCurrentVehicle(null);
-          setIsModalVisible(true);
-        }}
-      >
-        Adicionar Caminhão
-      </Button>
+          {canCreate && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setCurrentVehicle(null);
+                setIsModalVisible(true);
+              }}
+            >
+              Adicionar Caminhão
+            </Button>
+          )}
         </div>
 
         <Table
@@ -318,15 +342,17 @@ export default function VehicleList() {
             </Card>
 
       {/* Modal */}
-      <AddVehicleModal
-        visible={isModalVisible}
-        onCancel={() => {
-          setIsModalVisible(false);
-          setCurrentVehicle(null);
-        }}
-        onSave={handleSaveVehicle}
-        vehicle={currentVehicle}
-      />
+      {(canCreate || canUpdate) && (
+        <AddVehicleModal
+          visible={isModalVisible}
+          onCancel={() => {
+            setIsModalVisible(false);
+            setCurrentVehicle(null);
+          }}
+          onSave={handleSaveVehicle}
+          vehicle={currentVehicle}
+        />
+      )}
     </div>
   );
 }

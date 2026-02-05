@@ -30,16 +30,32 @@ export async function authRoutes(app: FastifyInstance) {
         return rep.code(400).send({ message: "E-mail já está em uso" });
       }
 
+      // Buscar ou criar role padrão "User"
+      let defaultRole = await prisma.role.findFirst({
+        where: { name: "User" },
+      });
+
+      if (!defaultRole) {
+        // Se não existir, criar role padrão "User"
+        defaultRole = await prisma.role.create({
+          data: {
+            name: "User",
+            description: "Usuário padrão do sistema",
+          },
+        });
+      }
+
       // Hash da senha
       const hashedPassword = await hashPassword(password);
 
-      // Criar usuário - o Prisma cuida automaticamente do createdAt
+      // Criar usuário com role padrão
       const newUser = await prisma.user.create({
         data: {
           name,
           email,
           password: hashedPassword,
-          // createdAt será gerado automaticamente pelo Prisma
+          roleId: defaultRole.id,
+          status: "active",
         },
       });
 
@@ -96,18 +112,17 @@ export async function authRoutes(app: FastifyInstance) {
 
       const user = await prisma.user.findUnique({
         where: { email },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          password: true,
-          status: true,
+        include: {
           role: {
-            select: {
-              id: true,
-              name: true,
+            include: {
               permissions: {
-                select: { permission: { select: { key: true } } },
+                include: {
+                  permission: {
+                    select: {
+                      key: true,
+                    },
+                  },
+                },
               },
             },
           },

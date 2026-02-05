@@ -6,14 +6,91 @@ async function main() {
   console.log("🚀 Iniciando população do banco de dados (schema atual)...");
 
   try {
-    // RBAC - permissões base
+    // RBAC - permissões base do sistema
     const basePermissions = [
+      // Dashboard
       "dashboard.view",
-      "orders.view",
-      "orders.create",
-      "routes.manage",
+      
+      // Usuários e Permissões
+      "users.view",
+      "users.create",
+      "users.update",
+      "users.delete",
       "users.manage",
+      
+      // Empresas
+      "companies.view",
+      "companies.create",
+      "companies.update",
+      "companies.delete",
+      
+      // Funcionários
+      "employees.view",
+      "employees.create",
+      "employees.update",
+      "employees.delete",
+      
+      // Caminhões
+      "trucks.view",
+      "trucks.create",
+      "trucks.update",
+      "trucks.delete",
+      
+      // Viagens
+      "trips.view",
+      "trips.create",
+      "trips.update",
+      "trips.delete",
+      
+      // Despesas de Viagem
+      "tripExpenses.view",
+      "tripExpenses.create",
+      "tripExpenses.update",
+      "tripExpenses.delete",
+      
+      // Manutenções
+      "maintenance.view",
+      "maintenance.create",
+      "maintenance.update",
+      "maintenance.delete",
+      
+      // Cargas
+      "loads.view",
+      "loads.create",
+      "loads.update",
+      "loads.delete",
+      
+      // Financeiro
+      "financial.view",
+      "financial.create",
+      "financial.update",
+      "financial.delete",
+      
+      // Fechamentos
+      "closings.view",
+      "closings.create",
+      "closings.update",
+      "closings.delete",
+      
+      // Meses
+      "months.view",
+      "months.create",
+      "months.update",
+      "months.delete",
+      
+      // Relatórios
+      "reports.view",
       "reports.export",
+      
+      // Perfis e Permissões
+      "roles.view",
+      "roles.create",
+      "roles.update",
+      "roles.delete",
+      "permissions.view",
+      "permissions.create",
+      "permissions.update",
+      "permissions.delete",
     ];
 
     await prisma.permission.createMany({
@@ -27,16 +104,53 @@ async function main() {
       create: { name: "Admin", description: "Acesso total ao sistema" },
     });
 
+    // Criar role padrão "User" para novos usuários
+    const userRole = await prisma.role.upsert({
+      where: { name: "User" },
+      update: {},
+      create: { name: "User", description: "Usuário padrão do sistema" },
+    });
+
     const perms = await prisma.permission.findMany({
       where: { key: { in: basePermissions } },
       select: { id: true },
     });
 
+    // Atribuir todas as permissões ao Admin
     await prisma.rolePermission.deleteMany({ where: { roleId: adminRole.id } });
     await prisma.rolePermission.createMany({
       data: perms.map((p) => ({ roleId: adminRole.id, permissionId: p.id })),
       skipDuplicates: true,
     });
+
+    // Atribuir permissões básicas ao User (apenas visualização)
+    const userPermissions = [
+      "dashboard.view",
+      "companies.view",
+      "employees.view",
+      "trucks.view",
+      "trips.view",
+      "tripExpenses.view",
+      "maintenance.view",
+      "loads.view",
+      "financial.view",
+      "closings.view",
+      "months.view",
+      "reports.view",
+    ];
+    
+    const userPerms = await prisma.permission.findMany({
+      where: { key: { in: userPermissions } },
+      select: { id: true },
+    });
+
+    await prisma.rolePermission.deleteMany({ where: { roleId: userRole.id } });
+    if (userPerms.length > 0) {
+      await prisma.rolePermission.createMany({
+        data: userPerms.map((p) => ({ roleId: userRole.id, permissionId: p.id })),
+        skipDuplicates: true,
+      });
+    }
 
     // Empresas
     const company1 = await prisma.company.upsert({
@@ -53,10 +167,18 @@ async function main() {
       },
     });
 
+    // Atualizar usuários existentes sem role para ter o role "User"
+    await prisma.user.updateMany({
+      where: { roleId: null },
+      data: { roleId: userRole.id },
+    });
+
     // Usuário admin básico
     await prisma.user.upsert({
       where: { id: 1 },
-      update: {},
+      update: {
+        roleId: adminRole.id, // Garantir que o admin tenha o role Admin
+      },
       create: {
         name: "Admin",
         email: "admin@example.com",

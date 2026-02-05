@@ -1,34 +1,63 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Button,
-  Card,
-  Checkbox,
-  Col,
-  Descriptions,
-  Form,
-  Input,
-  List,
-  Modal,
-  Result,
-  Row,
-  Select,
-  Space,
-  Table,
-  Tabs,
-  Tag,
-  Typography,
-  message,
+    Button,
+    Card,
+    Checkbox,
+    Col,
+    Descriptions,
+    Form,
+    Input,
+    List,
+    Modal,
+    Result,
+    Row,
+    Select,
+    Space,
+    Table,
+    Tabs,
+    Tag,
+    Typography,
+    message,
 } from "antd";
 import {
-  PlusOutlined,
-  EditOutlined,
-  StopOutlined,
-  ReloadOutlined,
+    PlusOutlined,
+    EditOutlined,
+    StopOutlined,
+    ReloadOutlined,
 } from "@ant-design/icons";
 import api from "../../lib/api";
 import { usePermission } from "../../hooks/usePermission";
 
 const { Title, Text } = Typography;
+
+// Mapeamento de módulos para português
+const moduleLabels = {
+  dashboard: "Dashboard",
+  users: "Usuários",
+  roles: "Perfis",
+  permissions: "Permissões",
+  companies: "Empresas",
+  employees: "Funcionários",
+  trucks: "Caminhões",
+  trips: "Viagens",
+  tripExpenses: "Despesas de Viagem",
+  maintenance: "Manutenções",
+  loads: "Cargas",
+  financial: "Financeiro",
+  closings: "Fechamentos",
+  months: "Meses",
+  reports: "Relatórios",
+};
+
+// Mapeamento de ações para português
+const actionLabels = {
+  view: "Visualizar",
+  create: "Criar",
+  update: "Editar",
+  delete: "Deletar",
+  manage: "Gerenciar",
+  export: "Exportar",
+};
 
 function groupPermissions(keys) {
   const groups = {};
@@ -38,9 +67,14 @@ function groupPermissions(keys) {
     groups[module].push(k);
   });
   return Object.entries(groups)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => {
+      const labelA = moduleLabels[a] || a;
+      const labelB = moduleLabels[b] || b;
+      return labelA.localeCompare(labelB);
+    })
     .map(([module, perms]) => ({
       module,
+      moduleLabel: moduleLabels[module] || module,
       perms: perms.sort((a, b) => a.localeCompare(b)),
     }));
 }
@@ -79,6 +113,11 @@ export default function UsersPermissions() {
   const [logsPageSize, setLogsPageSize] = useState(20);
   const [logsTotal, setLogsTotal] = useState(0);
   const [logsAction, setLogsAction] = useState("");
+
+  // Permissions management
+  const [permissionModalOpen, setPermissionModalOpen] = useState(false);
+  const [editingPermission, setEditingPermission] = useState(null);
+  const [permissionForm] = Form.useForm();
 
   const canManageUsers = hasPermission("users.manage");
 
@@ -434,6 +473,129 @@ export default function UsersPermissions() {
         onChange={setActiveTab}
         items={[
           {
+            key: "permissions",
+            label: "Permissões",
+            children: (
+              <>
+                <Row gutter={12} style={{ marginBottom: 12 }}>
+                  <Col span={24}>
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => {
+                        setEditingPermission(null);
+                        permissionForm.resetFields();
+                        setPermissionModalOpen(true);
+                      }}
+                    >
+                      Nova Permissão
+                    </Button>
+                  </Col>
+                </Row>
+                <Table
+                  rowKey="id"
+                  columns={[
+                    {
+                      title: "Módulo",
+                      key: "module",
+                      width: 150,
+                      render: (_, record) => {
+                        const [module] = record.key.split(".");
+                        const moduleLabel = moduleLabels[module] || module;
+                        return (
+                          <Tag color="blue">
+                            {moduleLabel}
+                          </Tag>
+                        );
+                      },
+                    },
+                    {
+                      title: "Ação",
+                      key: "action",
+                      width: 150,
+                      render: (_, record) => {
+                        const [, action] = record.key.split(".");
+                        const actionLabel = actionLabels[action] || action;
+                        return (
+                          <Tag color="green">
+                            {actionLabel}
+                          </Tag>
+                        );
+                      },
+                    },
+                    {
+                      title: "Chave Completa",
+                      dataIndex: "key",
+                      key: "key",
+                      render: (key) => <Text code>{key}</Text>,
+                    },
+                    {
+                      title: "Descrição",
+                      dataIndex: "description",
+                      key: "description",
+                      render: (v) => v || <Text type="secondary">Sem descrição</Text>,
+                    },
+                    {
+                      title: "Ações",
+                      key: "actions",
+                      width: 150,
+                      render: (_, record) => (
+                        <Space>
+                          <Button
+                            size="small"
+                            icon={<EditOutlined />}
+                            onClick={() => {
+                              setEditingPermission(record);
+                              const [module, action] = record.key.split(".");
+                              permissionForm.setFieldsValue({
+                                module,
+                                action,
+                                key: record.key,
+                                description: record.description || "",
+                              });
+                              setPermissionModalOpen(true);
+                            }}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            size="small"
+                            danger
+                            onClick={async () => {
+                              Modal.confirm({
+                                title: "Deletar permissão?",
+                                content: `A permissão "${record.key}" será removida permanentemente.`,
+                                okText: "Deletar",
+                                okButtonProps: { danger: true },
+                                cancelText: "Cancelar",
+                                onOk: async () => {
+                                  try {
+                                    await api.delete(`/permissions/${record.id}`);
+                                    message.success("Permissão deletada");
+                                    await loadPermissions();
+                                  } catch (e) {
+                                    message.error(
+                                      e?.response?.data?.message ||
+                                        "Erro ao deletar permissão"
+                                    );
+                                  }
+                                },
+                              });
+                            }}
+                          >
+                            Deletar
+                          </Button>
+                        </Space>
+                      ),
+                    },
+                  ]}
+                  dataSource={permissions}
+                  pagination={{ pageSize: 10 }}
+                />
+              </>
+            ),
+          },
+          {
             key: "users",
             label: "Usuários",
             children: (
@@ -550,29 +712,36 @@ export default function UsersPermissions() {
                       />
                     ) : (
                       <>
-                        {groupedPerms.map((g) => (
-                          <Card
-                            key={g.module}
-                            size="small"
-                            style={{ marginBottom: 12 }}
-                          >
-                            <Title level={5} style={{ marginTop: 0 }}>
-                              {g.module}
-                            </Title>
-                            <Checkbox.Group
-                              value={rolePerms}
-                              onChange={(vals) => setRolePerms(vals)}
+                        <Checkbox.Group
+                          value={rolePerms}
+                          onChange={(vals) => setRolePerms(vals)}
+                          style={{ width: "100%" }}
+                        >
+                          {groupedPerms.map((g) => (
+                            <Card
+                              key={g.module}
+                              size="small"
+                              style={{ marginBottom: 12 }}
                             >
+                              <Title level={5} style={{ marginTop: 0 }}>
+                                {g.moduleLabel}
+                              </Title>
                               <Row gutter={[8, 8]}>
-                                {g.perms.map((k) => (
-                                  <Col key={k} xs={24} md={12} lg={8}>
-                                    <Checkbox value={k}>{k}</Checkbox>
-                                  </Col>
-                                ))}
+                                {g.perms.map((k) => {
+                                  const [, action] = k.split(".");
+                                  const actionLabel = actionLabels[action] || action;
+                                  return (
+                                    <Col key={k} xs={24} md={12} lg={8}>
+                                      <Checkbox value={k}>
+                                        {actionLabel}
+                                      </Checkbox>
+                                    </Col>
+                                  );
+                                })}
                               </Row>
-                            </Checkbox.Group>
-                          </Card>
-                        ))}
+                            </Card>
+                          ))}
+                        </Checkbox.Group>
                       </>
                     )}
                   </Card>
@@ -694,6 +863,169 @@ export default function UsersPermissions() {
           <Form.Item name="description" label="Descrição">
             <Input placeholder="Opcional" />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={editingPermission ? "Editar permissão" : "Nova permissão"}
+        open={permissionModalOpen}
+        onCancel={() => {
+          setPermissionModalOpen(false);
+          permissionForm.resetFields();
+        }}
+        onOk={async () => {
+          const values = await permissionForm.validateFields();
+          try {
+            // Se estiver criando nova permissão, gerar a chave automaticamente
+            if (!editingPermission && values.module && values.action) {
+              values.key = `${values.module}.${values.action}`;
+            }
+            
+            if (editingPermission) {
+              await api.put(`/permissions/${editingPermission.id}`, {
+                key: values.key,
+                description: values.description,
+              });
+              message.success("Permissão atualizada");
+            } else {
+              await api.post("/permissions", {
+                key: values.key,
+                description: values.description,
+              });
+              message.success("Permissão criada com sucesso");
+            }
+            setPermissionModalOpen(false);
+            permissionForm.resetFields();
+            await loadPermissions();
+          } catch (e) {
+            const msg =
+              e?.response?.data?.message || "Erro ao salvar permissão";
+            message.error(msg);
+          }
+        }}
+        okText="Salvar"
+        cancelText="Cancelar"
+        destroyOnClose
+        width={600}
+      >
+        <Form form={permissionForm} layout="vertical">
+          {!editingPermission ? (
+            <>
+              <Form.Item
+                name="module"
+                label="Módulo"
+                rules={[
+                  { required: true, message: "Selecione o módulo" },
+                ]}
+                tooltip="Selecione o módulo do sistema ao qual esta permissão se refere"
+              >
+                <Select
+                  placeholder="Selecione o módulo"
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={Object.entries(moduleLabels).map(([value, label]) => ({
+                    value,
+                    label,
+                  }))}
+                  onChange={(value) => {
+                    const action = permissionForm.getFieldValue("action");
+                    if (value && action) {
+                      permissionForm.setFieldsValue({
+                        key: `${value}.${action}`,
+                        description: `${actionLabels[action] || action} ${moduleLabels[value] || value}`,
+                      });
+                    }
+                  }}
+                />
+              </Form.Item>
+              
+              <Form.Item
+                name="action"
+                label="Ação"
+                rules={[
+                  { required: true, message: "Selecione a ação" },
+                ]}
+                tooltip="Selecione a ação que esta permissão permite realizar"
+              >
+                <Select
+                  placeholder="Selecione a ação"
+                  options={Object.entries(actionLabels).map(([value, label]) => ({
+                    value,
+                    label: value === "manage" ? `${label} (todas as ações)` : label,
+                  }))}
+                  onChange={(value) => {
+                    const module = permissionForm.getFieldValue("module");
+                    if (module && value) {
+                      permissionForm.setFieldsValue({
+                        key: `${module}.${value}`,
+                        description: `${actionLabels[value] || value} ${moduleLabels[module] || module}`,
+                      });
+                    }
+                  }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="key"
+                label="Chave Gerada"
+                tooltip="A chave é gerada automaticamente a partir do módulo e ação selecionados"
+              >
+                <Input
+                  disabled
+                  placeholder="Será gerada automaticamente"
+                  style={{ fontFamily: "monospace" }}
+                />
+              </Form.Item>
+            </>
+          ) : (
+            <Form.Item
+              name="key"
+              label="Chave"
+              rules={[
+                { required: true, message: "Informe a chave da permissão" },
+                {
+                  pattern: /^[a-z]+\.[a-z]+$/,
+                  message: "Formato inválido. Use: modulo.acao (ex: users.create)",
+                },
+              ]}
+            >
+              <Input
+                placeholder="Ex.: users.create"
+                disabled
+                style={{ fontFamily: "monospace" }}
+              />
+            </Form.Item>
+          )}
+
+          <Form.Item
+            name="description"
+            label="Descrição"
+            tooltip="Descrição detalhada do que esta permissão permite fazer"
+          >
+            <Input.TextArea
+              placeholder="Ex.: Permite criar novos usuários no sistema"
+              rows={3}
+              showCount
+              maxLength={200}
+            />
+          </Form.Item>
+
+          {!editingPermission && (
+            <div style={{ 
+              background: "#f0f0f0", 
+              padding: "12px", 
+              borderRadius: "4px",
+              marginTop: "8px"
+            }}>
+              <Text type="secondary" style={{ fontSize: "12px" }}>
+                <strong>Dica:</strong> A chave será gerada automaticamente no formato{" "}
+                <Text code>módulo.ação</Text>. A descrição será sugerida automaticamente,
+                mas você pode editá-la.
+              </Text>
+            </div>
+          )}
         </Form>
       </Modal>
     </Card>

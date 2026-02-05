@@ -1,18 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Card, Table, Typography, Button, message } from 'antd';
+import { Card, Table, Typography, Button, message, Result } from 'antd';
 import { useParams } from 'react-router-dom';
 import VehicleMaintenanceModal from '../../../components/Modal/MainTenanceVehicle';
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import { api } from '../../../lib';
 import dayjs from 'dayjs';
+import { usePermission } from '../../../hooks/usePermission';
 
 const { Title } = Typography;
 
 export default function VehicleMaintenanceList() {
-  const { id } = useParams(); 
+  const { id } = useParams();
+  const { hasPermission } = usePermission();
   const [maintenanceData, setMaintenanceData] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingMaintenance, setEditingMaintenance] = useState(null);
+
+  const canView = hasPermission('maintenance.view');
+  const canCreate = hasPermission('maintenance.create');
+  const canUpdate = hasPermission('maintenance.update');
+  const canDelete = hasPermission('maintenance.delete');
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar manutenções."
+      />
+    );
+  }
 
 
   const fetchMaintenance = useCallback(async () => {
@@ -125,14 +142,18 @@ export default function VehicleMaintenanceList() {
       key: 'actions',
       render: (_, record) => (
         <>
-          <FaEdit
-            onClick={() => handleEdit(record)}
-            style={{ cursor: 'pointer', marginRight: '10px' }}
-          />
-          <FaTrash
-            onClick={() => handleDelete(record.id)}
-            style={{ cursor: 'pointer' }}
-          />
+          {canUpdate && (
+            <FaEdit
+              onClick={() => handleEdit(record)}
+              style={{ cursor: 'pointer', marginRight: '10px' }}
+            />
+          )}
+          {canDelete && (
+            <FaTrash
+              onClick={() => handleDelete(record.id)}
+              style={{ cursor: 'pointer' }}
+            />
+          )}
         </>
       ),
     },
@@ -142,13 +163,15 @@ export default function VehicleMaintenanceList() {
     <Card style={{ margin: '20px', padding: '20px' }} bordered>
       <Title level={3}>Manutenção do Caminhão #{id}</Title>
 
-      <Button
-        type="primary"
-        style={{ marginBottom: 16 }}
-        onClick={() => setIsModalVisible(true)}
-      >
-        Adicionar Manutenção
-      </Button>
+      {canCreate && (
+        <Button
+          type="primary"
+          style={{ marginBottom: 16 }}
+          onClick={() => setIsModalVisible(true)}
+        >
+          Adicionar Manutenção
+        </Button>
+      )}
 
       <Table
         dataSource={Array.isArray(maintenanceData) ? maintenanceData : []}
@@ -163,13 +186,15 @@ export default function VehicleMaintenanceList() {
       />
 
 
-      <VehicleMaintenanceModal
-        visible={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        onAddMaintenance={handleAddMaintenance}
-        onEditMaintenance={handleEditMaintenance}
-        editingMaintenance={editingMaintenance}
-      />
+      {(canCreate || canUpdate) && (
+        <VehicleMaintenanceModal
+          visible={isModalVisible}
+          onCancel={() => setIsModalVisible(false)}
+          onAddMaintenance={handleAddMaintenance}
+          onEditMaintenance={handleEditMaintenance}
+          editingMaintenance={editingMaintenance}
+        />
+      )}
     </Card>
   );
 }

@@ -27,7 +27,12 @@ exports.app = (0, fastify_1.default)({
 // CORS: lista de origens permitidas (variável CORS_ORIGIN no DigitalOcean)
 const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
-    : ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"];
+    : [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ];
 function isOriginAllowed(origin) {
     if (!origin)
         return false;

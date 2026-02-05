@@ -1,18 +1,35 @@
 import { useEffect, useState } from 'react';
-import { Card, Button, Input, Form, Table, Typography, Space, message, Popconfirm, DatePicker } from 'antd';
+import { Card, Button, Input, Form, Table, Typography, Space, message, Popconfirm, DatePicker, Result } from 'antd';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { api } from '../../../lib';
+import { usePermission } from '../../../hooks/usePermission';
 
 export default function TripExpenses() {
   const navigate = useNavigate();
   const { state } = useLocation(); // Dados da viagem selecionada
   const params = useParams();
+  const { hasPermission } = usePermission();
   const [expenses, setExpenses] = useState([]);
   const [trip, setTrip] = useState(state || null);
   const [form] = Form.useForm();
 
   const tripId = state?.id || params?.id;
+
+  const canView = hasPermission('tripExpenses.view');
+  const canCreate = hasPermission('tripExpenses.create');
+  const canUpdate = hasPermission('tripExpenses.update');
+  const canDelete = hasPermission('tripExpenses.delete');
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar despesas de viagem."
+      />
+    );
+  }
 
   // Carregar despesas da viagem
   const fetchExpenses = async () => {
@@ -105,16 +122,18 @@ export default function TripExpenses() {
       title: 'Ações',
       key: 'actions',
       render: (_, record) => (
-        <Popconfirm
-          title="Tem certeza de que deseja excluir?"
-          onConfirm={() => handleDeleteExpense(record.id)}
-          okText="Sim"
-          cancelText="Não"
-        >
-          <Button type="link" danger>
-            Excluir
-          </Button>
-        </Popconfirm>
+        canDelete ? (
+          <Popconfirm
+            title="Tem certeza de que deseja excluir?"
+            onConfirm={() => handleDeleteExpense(record.id)}
+            okText="Sim"
+            cancelText="Não"
+          >
+            <Button type="link" danger>
+              Excluir
+            </Button>
+          </Popconfirm>
+        ) : null
       ),
     },
   ];
@@ -147,7 +166,8 @@ export default function TripExpenses() {
       </Typography.Paragraph>
 
       {/* Formulário para adicionar gastos */}
-      <Form form={form} layout="inline" onFinish={handleAddExpense} style={{ marginBottom: 20 }}>
+      {canCreate && (
+        <Form form={form} layout="inline" onFinish={handleAddExpense} style={{ marginBottom: 20 }}>
         <Form.Item
           name="description"
           rules={[{ required: true, message: 'Descrição obrigatória' }]}
@@ -184,7 +204,8 @@ export default function TripExpenses() {
             Adicionar
           </Button>
         </Form.Item>
-      </Form>
+        </Form>
+      )}
 
       {/* Tabela de Gastos */}
       <Table

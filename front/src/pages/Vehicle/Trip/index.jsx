@@ -1,20 +1,37 @@
 import { useEffect, useState } from 'react';
-import { Card, Button, Table, Typography, Space, Popconfirm, message } from 'antd';
+import { Card, Button, Table, Typography, Space, Popconfirm, message, Result } from 'antd';
 import TripModal from '../../../components/Modal/Trip';
 import { PlusCircleOutlined } from '@ant-design/icons';
 import { FaTrash, FaDollarSign, FaEdit } from 'react-icons/fa';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../../lib';
 import dayjs from 'dayjs';
+import { usePermission } from '../../../hooks/usePermission';
 
 const { Title } = Typography;
 
 export default function TripList() {
   const navigate = useNavigate();
   const { id: truckId } = useParams();
+  const { hasPermission } = usePermission();
   const [trips, setTrips] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [currentTrip, setCurrentTrip] = useState(null);
+
+  const canView = hasPermission('trips.view');
+  const canCreate = hasPermission('trips.create');
+  const canUpdate = hasPermission('trips.update');
+  const canDelete = hasPermission('trips.delete');
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar viagens."
+      />
+    );
+  }
 
   // Carregar todas as viagens
   const fetchTrips = async () => {
@@ -183,18 +200,22 @@ export default function TripList() {
               navigate(`/vehicle/trip-expenses/${record.id}`, { state: record });
             }}
           />
-          <FaEdit
-            style={{ cursor: 'pointer', marginRight: 10 }}
-            onClick={() => handleEditTrip(record)}
-          />
-          <Popconfirm
-            title="Tem certeza de que deseja excluir?"
-            onConfirm={() => handleDeleteTrip(record.id)}
-            okText="Sim"
-            cancelText="Não"
-          >
-            <FaTrash style={{ cursor: 'pointer' }} />
-          </Popconfirm>
+          {canUpdate && (
+            <FaEdit
+              style={{ cursor: 'pointer', marginRight: 10 }}
+              onClick={() => handleEditTrip(record)}
+            />
+          )}
+          {canDelete && (
+            <Popconfirm
+              title="Tem certeza de que deseja excluir?"
+              onConfirm={() => handleDeleteTrip(record.id)}
+              okText="Sim"
+              cancelText="Não"
+            >
+              <FaTrash style={{ cursor: 'pointer' }} />
+            </Popconfirm>
+          )}
         </>
       ),
     },
@@ -205,26 +226,30 @@ export default function TripList() {
       <Space direction="vertical" style={{ width: '100%' }}>
         <Title level={2}>Lista de Viagens</Title>
 
-        <Button
-          type="primary"
-          style={{ marginBottom: 16 }}
-          icon={<PlusCircleOutlined />}
-          onClick={() => {
-            setCurrentTrip(null);
-            setIsModalVisible(true);
-          }}
-        >
-          Adicionar Viagem
-        </Button>
+        {canCreate && (
+          <Button
+            type="primary"
+            style={{ marginBottom: 16 }}
+            icon={<PlusCircleOutlined />}
+            onClick={() => {
+              setCurrentTrip(null);
+              setIsModalVisible(true);
+            }}
+          >
+            Adicionar Viagem
+          </Button>
+        )}
 
         <Table dataSource={trips} columns={columns} pagination={{ pageSize: 5 }} rowKey="id" />
 
-        <TripModal
-          visible={isModalVisible}
-          onCancel={() => setIsModalVisible(false)}
-          onSubmit={currentTrip ? handleEditSubmit : handleAddTrip}
-          initialValues={currentTrip}
-        />
+        {(canCreate || canUpdate) && (
+          <TripModal
+            visible={isModalVisible}
+            onCancel={() => setIsModalVisible(false)}
+            onSubmit={currentTrip ? handleEditSubmit : handleAddTrip}
+            initialValues={currentTrip}
+          />
+        )}
       </Space>
     </Card>
   );

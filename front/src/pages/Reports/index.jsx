@@ -11,7 +11,8 @@ import {
   Table,
   Statistic, Tabs,
   Tag,
-  Divider, message
+  Divider, message,
+  Result
 } from 'antd'
 import {
   DownloadOutlined,
@@ -40,6 +41,7 @@ import {
   exportFinancialReport,
   exportTripsReport
 } from '../../utils/exportUtils'
+import { usePermission } from '../../hooks/usePermission'
 
 const { Title, Text, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -48,6 +50,7 @@ const { TabPane } = Tabs
 
 export default function Reports() {
   const navigate = useNavigate()
+  const { hasPermission } = usePermission()
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [reportData, setReportData] = useState({})
@@ -59,6 +62,19 @@ export default function Reports() {
     companyId: 'todos',
     truckId: 'todos'
   })
+
+  const canView = hasPermission('reports.view')
+  const canExport = hasPermission('reports.export')
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar relatórios."
+      />
+    )
+  }
 
   // Estados para diferentes tipos de relatórios
   const [employeesData, setEmployeesData] = useState(null)
@@ -677,12 +693,14 @@ export default function Reports() {
                 <Button
                   icon={<DownloadOutlined />}
                   onClick={() => exportReport('pdf', 'funcionários')}
+                  disabled={!canExport}
                 >
                   Exportar PDF
                 </Button>
                 <Button
                   icon={<DownloadOutlined />}
                   onClick={() => exportReport('excel', 'funcionários')}
+                  disabled={!canExport}
                 >
                   Exportar Excel
                 </Button>
@@ -747,18 +765,22 @@ export default function Reports() {
                 >
                   Gerar Relatório
                 </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('pdf', 'empresas')}
-                >
-                  Exportar PDF
-                </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('excel', 'empresas')}
-                >
-                  Exportar Excel
-                </Button>
+                {canExport && (
+                  <>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('pdf', 'empresas')}
+                    >
+                      Exportar PDF
+                    </Button>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('excel', 'empresas')}
+                    >
+                      Exportar Excel
+                    </Button>
+                  </>
+                )}
               </Space>
             </div>
 
@@ -820,18 +842,22 @@ export default function Reports() {
                 >
                   Gerar Relatório
                 </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('pdf', 'cargas')}
-                >
-                  Exportar PDF
-                </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('excel', 'cargas')}
-                >
-                  Exportar Excel
-                </Button>
+                {canExport && (
+                  <>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('pdf', 'cargas')}
+                    >
+                      Exportar PDF
+                    </Button>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('excel', 'cargas')}
+                    >
+                      Exportar Excel
+                    </Button>
+                  </>
+                )}
               </Space>
             </div>
 
@@ -893,18 +919,22 @@ export default function Reports() {
                 >
                   Gerar Relatório
                 </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('pdf', 'manutenções')}
-                >
-                  Exportar PDF
-                </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('excel', 'manutenções')}
-                >
-                  Exportar Excel
-                </Button>
+                {canExport && (
+                  <>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('pdf', 'manutenções')}
+                    >
+                      Exportar PDF
+                    </Button>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('excel', 'manutenções')}
+                    >
+                      Exportar Excel
+                    </Button>
+                  </>
+                )}
               </Space>
             </div>
 
@@ -966,18 +996,22 @@ export default function Reports() {
                 >
                   Gerar Relatório
                 </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('pdf', 'financeiro')}
-                >
-                  Exportar PDF
-                </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('excel', 'financeiro')}
-                >
-                  Exportar Excel
-                </Button>
+                {canExport && (
+                  <>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('pdf', 'financeiro')}
+                    >
+                      Exportar PDF
+                    </Button>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('excel', 'financeiro')}
+                    >
+                      Exportar Excel
+                    </Button>
+                  </>
+                )}
               </Space>
             </div>
 
@@ -1048,18 +1082,22 @@ export default function Reports() {
                 >
                   Gerar Relatório
                 </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('pdf', 'viagens')}
-                >
-                  Exportar PDF
-                </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => exportReport('excel', 'viagens')}
-                >
-                  Exportar Excel
-                </Button>
+                {canExport && (
+                  <>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('pdf', 'viagens')}
+                    >
+                      Exportar PDF
+                    </Button>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={() => exportReport('excel', 'viagens')}
+                    >
+                      Exportar Excel
+                    </Button>
+                  </>
+                )}
               </Space>
             </div>
 

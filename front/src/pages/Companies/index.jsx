@@ -9,20 +9,38 @@ import {
     Typography,
     message,
     Popconfirm,
+    Result,
 } from 'antd'
 import AddCompanyModal from '../../components/Modal/Companies'
 import { FaEdit, FaTrash, FaPlus } from 'react-icons/fa'
 import api from '../../lib/api'
+import { usePermission } from '../../hooks/usePermission'
 
 const { Title } = Typography
 
 export default function CompanyList() {
+  const { hasPermission } = usePermission()
   const [searchText, setSearchText] = useState('')
   const [filteredData, setFilteredData] = useState([])
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [editingCompany, setEditingCompany] = useState(null) 
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
+
+  const canView = hasPermission('companies.view')
+  const canCreate = hasPermission('companies.create')
+  const canUpdate = hasPermission('companies.update')
+  const canDelete = hasPermission('companies.delete')
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar empresas."
+      />
+    )
+  }
 
   useEffect(() => {
     fetchCompanies()
@@ -157,29 +175,34 @@ export default function CompanyList() {
         width: 120,
         render: (_, record) => (
           <Space>
-            <Button
-              type="primary"
-              icon={<FaEdit />}
-              size="small"
-              onClick={() => handleEdit(record)}
-            >
-              Editar
-            </Button>
-            <Popconfirm
-              title="Tem certeza que deseja excluir esta empresa?"
-              onConfirm={() => handleRemove(record.id)}
-              okText="Sim"
-              cancelText="Não"
-            >
+            {canUpdate && (
               <Button
                 type="primary"
-                danger
-                icon={<FaTrash />}
+                icon={<FaEdit />}
                 size="small"
+                onClick={() => handleEdit(record)}
               >
-                Excluir
+                Editar
               </Button>
-            </Popconfirm>
+            )}
+            {canDelete && (
+              <Popconfirm
+                title="Tem certeza que deseja excluir esta empresa?"
+                onConfirm={() => handleRemove(record.id)}
+                okText="Sim"
+                cancelText="Não"
+              >
+                <Button
+                  type="primary"
+                  danger
+                  icon={<FaTrash />}
+                  size="small"
+                >
+                  Excluir
+                </Button>
+              </Popconfirm>
+            )}
+            {!canUpdate && !canDelete && <span>-</span>}
           </Space>
         ),
       },
@@ -210,13 +233,15 @@ export default function CompanyList() {
           allowClear
         />
 
-        <Button
-          type="primary"
-          icon={<FaPlus />}
-          onClick={handleAddCompany}
-        >
-          Adicionar Empresa
-        </Button>
+        {canCreate && (
+          <Button
+            type="primary"
+            icon={<FaPlus />}
+            onClick={handleAddCompany}
+          >
+            Adicionar Empresa
+          </Button>
+        )}
       </div>
 
       <Table
@@ -236,13 +261,15 @@ export default function CompanyList() {
         scroll={{ x: 1200 }}
       />
 
-      <AddCompanyModal
-        isModalVisible={isModalVisible}
-        setIsModalVisible={setIsModalVisible}
-        onCompanySaved={handleCompanySaved}
-        editingCompany={editingCompany}
-        setEditingCompany={setEditingCompany}
-      />
+      {canCreate || canUpdate ? (
+        <AddCompanyModal
+          isModalVisible={isModalVisible}
+          setIsModalVisible={setIsModalVisible}
+          onCompanySaved={handleCompanySaved}
+          editingCompany={editingCompany}
+          setEditingCompany={setEditingCompany}
+        />
+      ) : null}
     </Card>
   )
 }

@@ -15,7 +15,8 @@ import {
   Tooltip,
   Progress,
   message,
-  Popconfirm
+  Popconfirm,
+  Result
 } from 'antd'
 import {
   PlusOutlined,
@@ -33,6 +34,7 @@ import dayjs from 'dayjs'
 import { useSearchParams } from 'react-router-dom'
 import CustomModal from '../../components/Modal/Closing'
 import api from '../../lib/api'
+import { usePermission } from '../../hooks/usePermission'
 import './styles.css'
 
 const { Title, Text } = Typography
@@ -41,6 +43,7 @@ const { RangePicker } = DatePicker
 
 export default function Closing() {
   const [searchParams] = useSearchParams()
+  const { hasPermission } = usePermission()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentType, setCurrentType] = useState('')
   const [editingEntry, setEditingEntry] = useState(null)
@@ -53,6 +56,21 @@ export default function Closing() {
   const [entries, setEntries] = useState([])
   const [closingId, setClosingId] = useState(null)
   const [closingData, setClosingData] = useState(null)
+
+  const canView = hasPermission('financial.view')
+  const canCreate = hasPermission('financial.create')
+  const canUpdate = hasPermission('financial.update')
+  const canDelete = hasPermission('financial.delete')
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar entradas financeiras."
+      />
+    )
+  }
 
   useEffect(() => {
     fetchCompanies()
@@ -362,29 +380,33 @@ export default function Closing() {
       width: '20%',
       render: (_, record) => (
         <Space>
-          <Tooltip title="Editar">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
-              size="small"
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="Tem certeza que deseja deletar esta entrada?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Sim"
-            cancelText="Não"
-          >
-            <Tooltip title="Deletar">
+          {canUpdate && (
+            <Tooltip title="Editar">
               <Button 
                 type="text" 
-                danger
-                icon={<DeleteOutlined />} 
+                icon={<EditOutlined />} 
                 size="small"
+                onClick={() => handleEdit(record)}
               />
             </Tooltip>
-          </Popconfirm>
+          )}
+          {canDelete && (
+            <Popconfirm
+              title="Tem certeza que deseja deletar esta entrada?"
+              onConfirm={() => handleDelete(record.id)}
+              okText="Sim"
+              cancelText="Não"
+            >
+              <Tooltip title="Deletar">
+                <Button 
+                  type="text" 
+                  danger
+                  icon={<DeleteOutlined />} 
+                  size="small"
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -477,16 +499,18 @@ export default function Closing() {
               </Col>
             </>
           )}
-          <Col span={closingData ? 18 : 4}>
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />}
-              onClick={() => openModal('entrada')}
-              style={{ width: closingData ? '200px' : '100%' }}
-            >
-              Nova Entrada
-            </Button>
-          </Col>
+          {canCreate && (
+            <Col span={closingData ? 18 : 4}>
+              <Button 
+                type="primary" 
+                icon={<PlusOutlined />}
+                onClick={() => openModal('entrada')}
+                style={{ width: closingData ? '200px' : '100%' }}
+              >
+                Nova Entrada
+              </Button>
+            </Col>
+          )}
         </Row>
         
         {selectedPeriod && (
@@ -572,14 +596,16 @@ export default function Closing() {
             }
             className="data-card entrada"
             extra={
-              <Button 
-                type="primary" 
-                size="small" 
-                icon={<PlusOutlined />}
-                onClick={() => openModal('entrada')}
-              >
-                Adicionar
-              </Button>
+              canCreate && (
+                <Button 
+                  type="primary" 
+                  size="small" 
+                  icon={<PlusOutlined />}
+                  onClick={() => openModal('entrada')}
+                >
+                  Adicionar
+                </Button>
+              )
             }
           >
             <Table

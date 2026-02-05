@@ -7,11 +7,13 @@ async function authMiddleware(req, rep) {
     try {
         const auth = req.headers?.authorization;
         if (!auth) {
-            return rep.status(401).send({ message: 'Token ausente' });
+            return rep.status(401).send({ message: "Token ausente" });
         }
         const parts = auth.split(" ");
         if (parts.length !== 2 || parts[0] !== "Bearer") {
-            return rep.status(401).send({ message: "Formato de token inválido. Use: Bearer <token>" });
+            return rep
+                .status(401)
+                .send({ message: "Formato de token inválido. Use: Bearer <token>" });
         }
         const token = parts[1];
         if (!token) {
@@ -20,10 +22,14 @@ async function authMiddleware(req, rep) {
         try {
             const decoded = (0, auth_1.verifyToken)(token);
             if (!decoded.userId) {
-                return rep.status(401).send({ message: "Token inválido - userId não encontrado" });
+                return rep
+                    .status(401)
+                    .send({ message: "Token inválido - userId não encontrado" });
             }
             const userId = Number(decoded.userId);
-            const tokenPermissions = Array.isArray(decoded.permissions) ? decoded.permissions : undefined;
+            const tokenPermissions = Array.isArray(decoded.permissions)
+                ? decoded.permissions
+                : undefined;
             const tokenRoleId = decoded.roleId ?? undefined;
             const tokenRole = decoded.role ?? undefined;
             // Se o token já vier com permissões, usa; senão busca no banco (bom para compatibilidade)
@@ -72,10 +78,10 @@ async function authMiddleware(req, rep) {
         }
         catch (jwtError) {
             console.error("Erro ao verificar token:", jwtError.message);
-            if (jwtError.name === 'TokenExpiredError') {
+            if (jwtError.name === "TokenExpiredError") {
                 return rep.status(401).send({ message: "Token expirado" });
             }
-            if (jwtError.name === 'JsonWebTokenError') {
+            if (jwtError.name === "JsonWebTokenError") {
                 return rep.status(401).send({ message: "Token inválido" });
             }
             return rep.status(401).send({ message: "Token inválido ou expirado" });

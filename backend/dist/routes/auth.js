@@ -26,25 +26,42 @@ async function authRoutes(app) {
             if (existingUser) {
                 return rep.code(400).send({ message: "E-mail já está em uso" });
             }
+            // Buscar ou criar role padrão "User"
+            let defaultRole = await prisma_1.prisma.role.findFirst({
+                where: { name: "User" },
+            });
+            if (!defaultRole) {
+                // Se não existir, criar role padrão "User"
+                defaultRole = await prisma_1.prisma.role.create({
+                    data: {
+                        name: "User",
+                        description: "Usuário padrão do sistema",
+                    },
+                });
+            }
             // Hash da senha
             const hashedPassword = await (0, auth_1.hashPassword)(password);
-            // Criar usuário - o Prisma cuida automaticamente do createdAt
+            // Criar usuário com role padrão
             const newUser = await prisma_1.prisma.user.create({
                 data: {
                     name,
                     email,
-                    password: hashedPassword
-                    // createdAt será gerado automaticamente pelo Prisma
+                    password: hashedPassword,
+                    roleId: defaultRole.id,
+                    status: "active",
                 },
             });
-            console.log("✅ Usuário criado com sucesso:", { id: newUser.id, email: newUser.email });
+            console.log("✅ Usuário criado com sucesso:", {
+                id: newUser.id,
+                email: newUser.email,
+            });
             return rep.code(201).send({
                 message: "Usuário criado com sucesso!",
                 user: {
                     id: newUser.id,
                     name: newUser.name,
-                    email: newUser.email
-                }
+                    email: newUser.email,
+                },
             });
         }
         catch (error) {
@@ -53,26 +70,26 @@ async function authRoutes(app) {
                 message: error?.message,
                 code: error?.code,
                 meta: error?.meta,
-                stack: error?.stack
+                stack: error?.stack,
             });
             // Erros de validação (Zod)
-            if (error.name === 'ZodError') {
+            if (error.name === "ZodError") {
                 return rep.code(400).send({
                     message: "Dados inválidos",
-                    errors: error.errors
+                    errors: error.errors,
                 });
             }
             // Erro de violação de unicidade (email duplicado)
-            if (error.code === 'P2002') {
+            if (error.code === "P2002") {
                 return rep.code(400).send({
                     message: "E-mail já está em uso",
-                    field: error.meta?.target?.[0] || 'email'
+                    field: error.meta?.target?.[0] || "email",
                 });
             }
             // Erro genérico
             return rep.code(500).send({
                 message: "Erro ao criar usuário",
-                error: process.env.NODE_ENV === 'development' ? error?.message : undefined
+                error: process.env.NODE_ENV === "development" ? error?.message : undefined,
             });
         }
     });
@@ -81,18 +98,17 @@ async function authRoutes(app) {
             const { email, password } = loginSchema.parse(req.body);
             const user = await prisma_1.prisma.user.findUnique({
                 where: { email },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    password: true,
-                    status: true,
+                include: {
                     role: {
-                        select: {
-                            id: true,
-                            name: true,
+                        include: {
                             permissions: {
-                                select: { permission: { select: { key: true } } },
+                                include: {
+                                    permission: {
+                                        select: {
+                                            key: true,
+                                        },
+                                    },
+                                },
                             },
                         },
                     },
@@ -124,7 +140,7 @@ async function authRoutes(app) {
                     status: user.status,
                     role: user.role?.name ?? null,
                     permissions,
-                }
+                },
             });
         }
         catch (error) {
@@ -132,18 +148,18 @@ async function authRoutes(app) {
             console.error("Detalhes:", {
                 message: error?.message,
                 code: error?.code,
-                stack: error?.stack
+                stack: error?.stack,
             });
             // Erros de validação (Zod)
-            if (error.name === 'ZodError') {
+            if (error.name === "ZodError") {
                 return rep.code(400).send({
                     message: "Dados inválidos",
-                    errors: error.errors
+                    errors: error.errors,
                 });
             }
             return rep.code(500).send({
                 message: "Erro no servidor",
-                error: process.env.NODE_ENV === 'development' ? error?.message : undefined
+                error: process.env.NODE_ENV === "development" ? error?.message : undefined,
             });
         }
     });

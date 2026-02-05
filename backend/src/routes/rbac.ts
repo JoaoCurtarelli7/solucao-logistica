@@ -35,9 +35,92 @@ export async function rbacRoutes(app: FastifyInstance) {
     async (_req, rep) => {
       const permissions = await prisma.permission.findMany({
         orderBy: { key: "asc" },
-        select: { id: true, key: true, description: true },
+        select: { id: true, key: true, description: true, createdAt: true },
       });
       return rep.send(permissions);
+    },
+  );
+
+  app.post(
+    "/permissions",
+    { preHandler: requirePermission("users.manage") },
+    async (req: FastifyRequest, rep: FastifyReply) => {
+      const schema = z.object({
+        key: z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao"),
+        description: z.string().optional(),
+      });
+      const data = schema.parse(req.body);
+
+      const permission = await prisma.permission.create({
+        data: {
+          key: data.key,
+          description: data.description,
+        },
+        select: { id: true, key: true, description: true, createdAt: true },
+      });
+
+      await logAudit(req.user?.id, "permissions.create", {
+        permissionId: permission.id,
+        key: permission.key,
+      });
+      return rep.code(201).send(permission);
+    },
+  );
+
+  app.put(
+    "/permissions/:id",
+    { preHandler: requirePermission("users.manage") },
+    async (req: FastifyRequest, rep: FastifyReply) => {
+      const paramsSchema = z.object({ id: z.coerce.number() });
+      const bodySchema = z.object({
+        key: z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao").optional(),
+        description: z.string().nullable().optional(),
+      });
+      const { id } = paramsSchema.parse(req.params);
+      const body = bodySchema.parse(req.body);
+
+      const permission = await prisma.permission.update({
+        where: { id },
+        data: {
+          ...(body.key && { key: body.key }),
+          ...(body.description !== undefined && { description: body.description ?? null }),
+        },
+        select: { id: true, key: true, description: true, createdAt: true },
+      });
+
+      await logAudit(req.user?.id, "permissions.update", {
+        permissionId: permission.id,
+      });
+      return rep.send(permission);
+    },
+  );
+
+  app.delete(
+    "/permissions/:id",
+    { preHandler: requirePermission("users.manage") },
+    async (req: FastifyRequest, rep: FastifyReply) => {
+      const paramsSchema = z.object({ id: z.coerce.number() });
+      const { id } = paramsSchema.parse(req.params);
+
+      // Verificar se a permissão está sendo usada
+      const rolePermissions = await prisma.rolePermission.findFirst({
+        where: { permissionId: id },
+      });
+
+      if (rolePermissions) {
+        return rep.code(400).send({
+          message: "Não é possível deletar permissão que está em uso por algum perfil",
+        });
+      }
+
+      await prisma.permission.delete({
+        where: { id },
+      });
+
+      await logAudit(req.user?.id, "permissions.delete", {
+        permissionId: id,
+      });
+      return rep.code(204).send();
     },
   );
 
