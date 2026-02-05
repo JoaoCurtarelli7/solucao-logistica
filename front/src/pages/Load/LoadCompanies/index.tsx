@@ -24,7 +24,7 @@ import CustomModalLoad from '../../../components/Modal/Load'
 import api from '../../../lib/api'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { usePermission } from '../../../hooks/usePermission'
+import { usePermission } from '@/hooks/usePermission'
 
 const { RangePicker } = DatePicker
 const { Option } = Select
@@ -48,16 +48,6 @@ export default function LoadCompanies() {
   const canCreate = hasPermission('loads.create')
   const canUpdate = hasPermission('loads.update')
   const canDelete = hasPermission('loads.delete')
-
-  if (!canView) {
-    return (
-      <Result
-        status="403"
-        title="Acesso negado"
-        subTitle="Você não tem permissão para visualizar cargas."
-      />
-    )
-  }
 
   useEffect(() => {
     fetchCompanies()
@@ -84,7 +74,6 @@ export default function LoadCompanies() {
     valorTotal: load.totalValue,
     frete4: load.freight4,
     somaTotalFrete: load.totalFreight,
-    fechamentos: load.closings,
     observacoes: load.observations || '',
     companyId: load.companyId,
     companyName: load.Company?.name || '', // <-- Company com C maiúsculo
@@ -117,7 +106,6 @@ export default function LoadCompanies() {
         totalValue: Number(newLoad.valorTotal),
         freight4: Number(newLoad.frete4),
         totalFreight: Number(newLoad.somaTotalFrete),
-        closings: Number(newLoad.fechamentos),
         observations: newLoad.observacoes?.trim() || undefined,
       }
 
@@ -142,7 +130,6 @@ export default function LoadCompanies() {
         totalValue: Number(updatedLoad.valorTotal),
         freight4: Number(updatedLoad.frete4),
         totalFreight: Number(updatedLoad.somaTotalFrete),
-        closings: Number(updatedLoad.fechamentos),
         observations: updatedLoad.observacoes?.trim() || undefined,
       }
 
@@ -336,14 +323,6 @@ export default function LoadCompanies() {
       sorter: (a: any, b: any) => a.somaTotalFrete - b.somaTotalFrete,
     },
     {
-      title: 'Fechamentos',
-      dataIndex: 'fechamentos',
-      key: 'fechamentos',
-      align: 'right',
-      width: 120,
-      render: (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`,
-    },
-    {
       title: 'Observações',
       dataIndex: 'observacoes',
       key: 'observacoes',
@@ -465,13 +444,19 @@ export default function LoadCompanies() {
         0,
       ),
       totalFrete4: filteredData.reduce((sum, item) => sum + item.frete4, 0),
-      totalFechamentos: filteredData.reduce(
-        (sum, item) => sum + item.fechamentos,
-        0,
-      ),
       totalPeso: filteredData.reduce((sum, item) => sum + item.pesoCarga, 0),
       totalEntregas: filteredData.reduce((sum, item) => sum + item.entregas, 0),
     }
+  }
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar cargas."
+      />
+    )
   }
 
   const totals = calculateTotals()
@@ -552,8 +537,9 @@ export default function LoadCompanies() {
 
           {canCreate && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            Adicionar Carga
-          </Button>
+              Adicionar Carga
+            </Button>
+          )}
 
           <Button
             type="default"
@@ -656,12 +642,7 @@ export default function LoadCompanies() {
                 R$ {totals.totalFreight.toFixed(2).replace('.', ',')}
               </strong>
             </Table.Summary.Cell>
-            <Table.Summary.Cell index={8} align="right">
-              <strong>
-                R$ {totals.totalFechamentos.toFixed(2).replace('.', ',')}
-              </strong>
-            </Table.Summary.Cell>
-            <Table.Summary.Cell index={9} colSpan={2} />
+            <Table.Summary.Cell index={8} colSpan={2} />
           </Table.Summary.Row>
         )}
       />

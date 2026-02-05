@@ -39,7 +39,7 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
       const tokenRoleId = decoded.roleId ?? undefined;
       const tokenRole = decoded.role ?? undefined;
 
-      // Se o token já vier com permissões, usa; senão busca no banco (bom para compatibilidade)
+      // Se o token já vier com permissões, usa; senão busca no banco
       if (tokenPermissions) {
         req.user = {
           id: userId,
@@ -50,24 +50,33 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
         return;
       }
 
-      const dbUser = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          status: true,
-          role: {
-            select: {
-              id: true,
-              name: true,
-              permissions: {
-                select: {
-                  permission: { select: { key: true } },
+      let dbUser: any = null;
+      try {
+        dbUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            status: true,
+            role: {
+              select: {
+                id: true,
+                name: true,
+                permissions: {
+                  select: {
+                    permission: { select: { key: true } },
+                  },
                 },
               },
             },
           },
-        },
-      });
+        });
+      } catch (dbErr: any) {
+        // Tabelas role/permissions podem não existir; busca só usuário
+        dbUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true },
+        });
+      }
 
       if (!dbUser) {
         return rep.status(401).send({ message: "Usuário não encontrado" });
@@ -77,17 +86,16 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
         return rep.status(403).send({ message: "Usuário inativo" });
       }
 
-      const permissions =
-        dbUser.role?.permissions?.map((rp) => rp.permission.key) ?? [];
+      const permissions: string[] =
+        dbUser.role?.permissions?.map((rp: { permission?: { key?: string } }) => rp.permission?.key).filter(Boolean) ?? [];
 
       req.user = {
         id: dbUser.id,
-        status: dbUser.status,
+        status: dbUser.status ?? null,
         roleId: dbUser.role?.id ?? null,
         role: dbUser.role?.name ?? null,
         permissions,
       };
-      // Não retorna nada, continua para o próximo handler
     } catch (jwtError: any) {
       console.error("Erro ao verificar token:", jwtError.message);
 

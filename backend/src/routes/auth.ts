@@ -110,24 +110,30 @@ export async function authRoutes(app: FastifyInstance) {
     try {
       const { email, password } = loginSchema.parse(req.body);
 
-      const user = await prisma.user.findUnique({
-        where: { email },
-        include: {
-          role: {
-            include: {
-              permissions: {
-                include: {
-                  permission: {
-                    select: {
-                      key: true,
+      let user: any = null;
+      try {
+        user = await prisma.user.findUnique({
+          where: { email },
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  include: {
+                    permission: {
+                      select: { key: true },
                     },
                   },
                 },
               },
             },
           },
-        },
-      });
+        });
+      } catch (includeError: any) {
+        app.log.warn("Login: include role/permissions falhou, buscando só usuário:", includeError?.message);
+        user = await prisma.user.findUnique({
+          where: { email },
+        });
+      }
 
       if (!user) {
         return rep.code(401).send({ message: "Email ou senha inválidos" });
@@ -143,8 +149,8 @@ export async function authRoutes(app: FastifyInstance) {
         return rep.code(401).send({ message: "Email ou senha inválidos" });
       }
 
-      const permissions =
-        user.role?.permissions?.map((rp) => rp.permission.key) ?? [];
+      const permissions: string[] =
+        user.role?.permissions?.map((rp: { permission?: { key?: string } }) => rp.permission?.key).filter(Boolean) ?? [];
       const token = generateToken({
         userId: user.id,
         roleId: user.role?.id ?? null,
@@ -168,11 +174,11 @@ export async function authRoutes(app: FastifyInstance) {
       console.error("Detalhes:", {
         message: error?.message,
         code: error?.code,
+        meta: error?.meta,
         stack: error?.stack,
       });
 
-      // Erros de validação (Zod)
-      if (error.name === "ZodError") {
+      if (error?.name === "ZodError") {
         return rep.code(400).send({
           message: "Dados inválidos",
           errors: error.errors,
@@ -180,9 +186,8 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       return rep.code(500).send({
-        message: "Erro no servidor",
-        error:
-          process.env.NODE_ENV === "development" ? error?.message : undefined,
+        message: "Erro no servidor ao fazer login",
+        error: error?.message ?? undefined,
       });
     }
   });

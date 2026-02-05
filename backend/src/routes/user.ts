@@ -12,51 +12,85 @@ export async function userRoutes(app: FastifyInstance) {
   // Aplicar autenticação em todas as rotas
   app.addHook("preHandler", authMiddleware);
 
-  // Obter dados do usuário logado
+  // Obter dados do usuário logado (com role e permissões para o front)
   app.get("/me", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ message: "Usuário não autenticado" });
       }
       const userId = request.user.id;
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          address: true,
-          status: true,
-          role: {
-            select: {
-              id: true,
-              name: true,
-              permissions: {
-                select: {
-                  permission: { select: { key: true } },
+
+      let user: any = null;
+      try {
+        user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            status: true,
+            role: {
+              select: {
+                id: true,
+                name: true,
+                permissions: {
+                  select: {
+                    permission: { select: { key: true } },
+                  },
                 },
               },
             },
+            createdAt: true,
           },
-          createdAt: true,
-        },
-      });
+        });
+      } catch (includeErr: any) {
+        app.log.warn("GET /me: include role falhou, buscando só usuário:", includeErr?.message);
+        try {
+          user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              address: true,
+              createdAt: true,
+            },
+          });
+          if (user) (user as any).status = null;
+        } catch (fallbackErr: any) {
+          app.log.error("GET /me fallback também falhou:", fallbackErr?.message);
+          throw fallbackErr;
+        }
+      }
 
       if (!user) {
         return reply.code(404).send({ message: "Usuário não encontrado" });
       }
 
-      const permissions =
-        user.role?.permissions?.map((rp) => rp.permission.key) ?? [];
+      const permissions: string[] =
+        user.role?.permissions?.map((rp: { permission?: { key?: string } }) => rp.permission?.key).filter(Boolean) ?? [];
+      const role = user.role ? { id: user.role.id, name: user.role.name } : null;
+
       return reply.send({
-        ...user,
-        role: user.role ? { id: user.role.id, name: user.role.name } : null,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone ?? null,
+        address: user.address ?? null,
+        status: user.status ?? null,
+        createdAt: user.createdAt,
+        role,
         permissions,
       });
-    } catch (error) {
-      console.error("Erro ao buscar usuário:", error);
-      return reply.code(500).send({ message: "Erro interno do servidor" });
+    } catch (error: any) {
+      console.error("Erro ao buscar usuário /me:", error);
+      return reply.code(500).send({
+        message: "Erro interno do servidor",
+        error: error?.message ?? undefined,
+      });
     }
   });
 

@@ -33,7 +33,7 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import 'dayjs/locale/pt-br'
 import api from '../../lib/api'
-import { usePermission } from '../../hooks/usePermission'
+import { usePermission } from '@/hooks/usePermission'
 import './styles.css'
 
 // Configurar dayjs para português
