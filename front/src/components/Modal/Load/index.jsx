@@ -35,7 +35,6 @@ export default function CustomModalLoad({
         valorTotal: editingLoad.valorTotal,
         frete4: editingLoad.frete4,
         somaTotalFrete: editingLoad.somaTotalFrete,
-        fechamentos: editingLoad.fechamentos,
         observacoes: editingLoad.observacoes,
         companyId: editingLoad.companyId
       })
@@ -51,14 +50,16 @@ export default function CustomModalLoad({
     form
       .validateFields()
       .then((values) => {
+        const valorTotal = parseFloat(values.valorTotal) || 0
+        const frete4 = valorTotal * 0.04
+        const somaTotalFrete = frete4
         const formattedValues = {
           ...values,
           data: values.data.format('DD/MM/YYYY'),
           pesoCarga: parseFloat(values.pesoCarga) || 0,
-          valorTotal: parseFloat(values.valorTotal) || 0,
-          frete4: parseFloat(values.frete4) || 0,
-          somaTotalFrete: parseFloat(values.somaTotalFrete) || 0,
-          fechamentos: parseFloat(values.fechamentos) || 0,
+          valorTotal,
+          frete4,
+          somaTotalFrete,
           entregas: parseInt(values.entregas) || 0,
           companyId: values.companyId || selectedCompany
         }
@@ -75,7 +76,8 @@ export default function CustomModalLoad({
 
   const calculateFrete4 = (valorTotal) => {
     if (!valorTotal) return 0
-    return (parseFloat(valorTotal) * 0.04).toFixed(2)
+    const num = parseFloat(valorTotal) * 0.04
+    return Math.round(num * 100) / 100
   }
 
   const handleValorTotalChange = (value) => {
@@ -202,13 +204,7 @@ export default function CustomModalLoad({
         <Form.Item
           name="frete4"
           label="Valor do Frete 4%"
-          rules={[
-            {
-              required: true,
-              message: 'Por favor, insira o valor do frete 4%',
-            },
-            { type: 'number', min: 0, message: 'O frete deve ser maior ou igual a zero' }
-          ]}
+          rules={[{ type: 'number', min: 0, message: 'O frete deve ser maior ou igual a zero' }]}
         >
           <InputNumber
             min={0}
@@ -223,31 +219,7 @@ export default function CustomModalLoad({
         <Form.Item
           name="somaTotalFrete"
           label="Soma Total Frete"
-          rules={[
-            {
-              required: true,
-              message: 'Por favor, insira a soma total do frete',
-            },
-            { type: 'number', min: 0, message: 'O frete total deve ser maior ou igual a zero' }
-          ]}
-        >
-          <InputNumber
-            min={0}
-            step={0.01}
-            style={{ width: '100%' }}
-            placeholder="R$ 0,00"
-            formatter={(value) => `R$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-            parser={(value) => value.replace(/R\$\s?|(\.*)/g, '').replace(',', '.').replace(/\s/g, '')}
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="fechamentos"
-          label="Fechamentos (De Quinzena)"
-          rules={[
-            { required: true, message: 'Por favor, insira o fechamento' },
-            { type: 'number', min: 0, message: 'O fechamento deve ser maior ou igual a zero' }
-          ]}
+          rules={[{ type: 'number', min: 0, message: 'O frete total deve ser maior ou igual a zero' }]}
         >
           <InputNumber
             min={0}

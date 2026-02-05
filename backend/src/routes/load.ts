@@ -26,7 +26,6 @@ export async function loadRoutes(app: FastifyInstance) {
     totalValue: z.coerce.number(),
     freight4: z.coerce.number(),
     totalFreight: z.coerce.number(),
-    closings: z.coerce.number(),
     observations: z.string().optional(),
     companyId: z.coerce.number(),
   });
@@ -39,7 +38,6 @@ export async function loadRoutes(app: FastifyInstance) {
     totalValue: z.coerce.number().optional(),
     freight4: z.coerce.number().optional(),
     totalFreight: z.coerce.number().optional(),
-    closings: z.coerce.number().optional(),
     observations: z.string().optional(),
     companyId: z.coerce.number().optional(),
   });
@@ -112,7 +110,6 @@ export async function loadRoutes(app: FastifyInstance) {
       totalValue,
       freight4,
       totalFreight,
-      closings,
       observations,
       companyId,
     } = bodySchema.parse(req.body);
@@ -137,7 +134,6 @@ export async function loadRoutes(app: FastifyInstance) {
           totalValue,
           freight4,
           totalFreight,
-          closings,
           observations: observations?.trim() ? observations : null,
           Company: { connect: { id: companyId } },
         },
@@ -150,7 +146,11 @@ export async function loadRoutes(app: FastifyInstance) {
         return rep.code(404).send({ message: "Empresa não encontrada" });
       }
       app.log.error("Erro ao criar carregamento:", error);
-      return rep.code(500).send({ message: "Erro interno ao criar o carregamento" });
+      const msg = error?.message || "Erro interno ao criar o carregamento";
+      return rep.code(500).send({
+        message: "Erro interno ao criar o carregamento",
+        error: msg,
+      });
     }
   });
 
@@ -190,7 +190,6 @@ export async function loadRoutes(app: FastifyInstance) {
         ...(updateData.totalValue !== undefined ? { totalValue: updateData.totalValue } : {}),
         ...(updateData.freight4 !== undefined ? { freight4: updateData.freight4 } : {}),
         ...(updateData.totalFreight !== undefined ? { totalFreight: updateData.totalFreight } : {}),
-        ...(updateData.closings !== undefined ? { closings: updateData.closings } : {}),
         ...(updateData.observations !== undefined
           ? { observations: updateData.observations?.trim() ? updateData.observations : null }
           : {}),

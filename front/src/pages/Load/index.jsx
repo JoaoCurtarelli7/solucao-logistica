@@ -59,7 +59,6 @@ export default function Load() {
         valorTotal: load.totalValue,
         frete4: load.freight4,
         somaTotalFrete: load.totalFreight,
-        fechamentos: load.closings,
         observacoes: load.observations || '',
         companyId: load.companyId,
         companyName: load.company?.name || '',
@@ -86,7 +85,6 @@ export default function Load() {
         totalValue: newLoad.valorTotal,
         freight4: newLoad.frete4,
         totalFreight: newLoad.somaTotalFrete,
-        closings: newLoad.fechamentos,
         observations: newLoad.observacoes
       }
 
@@ -112,7 +110,6 @@ export default function Load() {
         totalValue: updatedLoad.valorTotal,
         freight4: updatedLoad.frete4,
         totalFreight: updatedLoad.somaTotalFrete,
-        closings: updatedLoad.fechamentos,
         observations: updatedLoad.observacoes
       }
 
@@ -189,7 +186,6 @@ export default function Load() {
         valorTotal: load.totalValue,
         frete4: load.freight4,
         somaTotalFrete: load.totalFreight,
-        fechamentos: load.closings,
         observacoes: load.observations || '',
         companyId: load.companyId,
         companyName: load.company?.name || '',
@@ -251,14 +247,6 @@ export default function Load() {
       title: 'Soma Total Frete',
       dataIndex: 'somaTotalFrete',
       key: 'somaTotalFrete',
-      align: 'right',
-      width: 120,
-      render: (value) => `R$ ${value.toFixed(2).replace('.', ',')}`,
-    },
-    {
-      title: 'Fechamentos',
-      dataIndex: 'fechamentos',
-      key: 'fechamentos',
       align: 'right',
       width: 120,
       render: (value) => `R$ ${value.toFixed(2).replace('.', ',')}`,
@@ -470,12 +458,7 @@ export default function Load() {
                   R$ {calculateTotalFreight().toFixed(2).replace('.', ',')}
                 </strong>
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={7} align="right">
-                <strong>
-                  R$ {filteredData.reduce((sum, item) => sum + item.fechamentos, 0).toFixed(2).replace('.', ',')}
-                </strong>
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={8} colSpan={2} />
+              <Table.Summary.Cell index={7} colSpan={2} />
             </Table.Summary.Row>
           )}
         />
