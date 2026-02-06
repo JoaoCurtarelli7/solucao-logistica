@@ -1,40 +1,41 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Card, Table, Typography, Button, message } from 'antd';
-import { useParams } from 'react-router-dom';
-import VehicleMaintenanceModal from '../../../components/Modal/MainTenanceVehicle';
-import { FaEdit, FaTrash } from 'react-icons/fa';
-import { api } from '../../../lib';
-import dayjs from 'dayjs';
+import { useCallback, useEffect, useState } from "react";
+import { Card, Table, Typography, Button, message } from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
+import { useParams, useNavigate } from "react-router-dom";
+import VehicleMaintenanceModal from "../../../components/Modal/MainTenanceVehicle";
+import { FaEdit, FaTrash } from "react-icons/fa";
+import { api } from "../../../lib";
+import dayjs from "dayjs";
 
 const { Title } = Typography;
 
 export default function VehicleMaintenanceList() {
-  const { id } = useParams(); 
+  const { id } = useParams();
+  const navigate = useNavigate();
   const [maintenanceData, setMaintenanceData] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingMaintenance, setEditingMaintenance] = useState(null);
 
-
   const fetchMaintenance = useCallback(async () => {
     try {
       const response = await api.get(`/trucks/${id}/maintenances`);
-  
+
       // backend responde { maintenances }
       const arr = Array.isArray(response.data.maintenances)
         ? response.data.maintenances
         : [];
-  
+
       setMaintenanceData(arr);
     } catch (error) {
-      console.error('Erro ao carregar manutenções:', error);
-      message.error('Erro ao carregar manutenções');
+      console.error("Erro ao carregar manutenções:", error);
+      message.error("Erro ao carregar manutenções");
       setMaintenanceData([]);
     }
   }, [id]);
-  
+
   const totalGasto = Array.isArray(maintenanceData)
-  ? maintenanceData.reduce((acc, curr) => acc + (curr.valor || 0), 0)
-  : 0;
+    ? maintenanceData.reduce((acc, curr) => acc + (curr.valor || 0), 0)
+    : 0;
 
   useEffect(() => {
     fetchMaintenance();
@@ -45,7 +46,9 @@ export default function VehicleMaintenanceList() {
     try {
       // mapear campos para o backend: data->date, servico->service, valor->value
       const payload = {
-        date: values?.data ? dayjs(values.data, 'DD/MM/YYYY').toDate().toISOString() : undefined,
+        date: values?.data
+          ? dayjs(values.data, "DD/MM/YYYY").toDate().toISOString()
+          : undefined,
         service: values?.servico,
         km: values?.km,
         value: values?.valor,
@@ -54,10 +57,10 @@ export default function VehicleMaintenanceList() {
       const response = await api.post(`/trucks/${id}/maintenances`, payload);
       setMaintenanceData((prev) => [...prev, response.data]);
       setIsModalVisible(false);
-      message.success('Manutenção adicionada com sucesso!');
+      message.success("Manutenção adicionada com sucesso!");
     } catch (error) {
       console.error(error);
-      message.error('Erro ao adicionar manutenção');
+      message.error("Erro ao adicionar manutenção");
     }
   };
 
@@ -65,7 +68,9 @@ export default function VehicleMaintenanceList() {
   const handleEditMaintenance = async (values) => {
     try {
       const payload = {
-        date: values?.data ? dayjs(values.data, 'DD/MM/YYYY').toDate().toISOString() : undefined,
+        date: values?.data
+          ? dayjs(values.data, "DD/MM/YYYY").toDate().toISOString()
+          : undefined,
         service: values?.servico,
         km: values?.km,
         value: values?.valor,
@@ -74,19 +79,19 @@ export default function VehicleMaintenanceList() {
       // backend de update é /maintenances/:id
       const response = await api.put(
         `/maintenances/${editingMaintenance.id}`,
-        payload
+        payload,
       );
       setMaintenanceData((prev) =>
         prev.map((item) =>
-          item.id === editingMaintenance.id ? response.data : item
-        )
+          item.id === editingMaintenance.id ? response.data : item,
+        ),
       );
       setIsModalVisible(false);
       setEditingMaintenance(null);
-      message.success('Manutenção atualizada com sucesso!');
+      message.success("Manutenção atualizada com sucesso!");
     } catch (error) {
       console.error(error);
-      message.error('Erro ao atualizar manutenção');
+      message.error("Erro ao atualizar manutenção");
     }
   };
 
@@ -96,12 +101,12 @@ export default function VehicleMaintenanceList() {
       // backend de delete é /maintenances/:id
       await api.delete(`/maintenances/${maintenanceId}`);
       setMaintenanceData((prev) =>
-        prev.filter((item) => item.id !== maintenanceId)
+        prev.filter((item) => item.id !== maintenanceId),
       );
-      message.success('Manutenção removida com sucesso!');
+      message.success("Manutenção removida com sucesso!");
     } catch (error) {
       console.error(error);
-      message.error('Erro ao remover manutenção');
+      message.error("Erro ao remover manutenção");
     }
   };
 
@@ -111,27 +116,27 @@ export default function VehicleMaintenanceList() {
   };
 
   const columns = [
-    { 
-      title: 'Data', 
-      dataIndex: 'date', 
-      key: 'date',
-      render: (date) => date ? dayjs(date).format('DD/MM/YYYY') : '-'
-    },
-    { title: 'Serviço Realizado', dataIndex: 'service', key: 'service' },
-    { title: 'KM', dataIndex: 'km', key: 'km', align: 'right' },
-    { title: 'Valor (R$)', dataIndex: 'value', key: 'value', align: 'right' },
     {
-      title: 'Ações',
-      key: 'actions',
+      title: "Data",
+      dataIndex: "date",
+      key: "date",
+      render: (date) => (date ? dayjs(date).format("DD/MM/YYYY") : "-"),
+    },
+    { title: "Serviço Realizado", dataIndex: "service", key: "service" },
+    { title: "KM", dataIndex: "km", key: "km", align: "right" },
+    { title: "Valor (R$)", dataIndex: "value", key: "value", align: "right" },
+    {
+      title: "Ações",
+      key: "actions",
       render: (_, record) => (
         <>
           <FaEdit
             onClick={() => handleEdit(record)}
-            style={{ cursor: 'pointer', marginRight: '10px' }}
+            style={{ cursor: "pointer", marginRight: "10px" }}
           />
           <FaTrash
             onClick={() => handleDelete(record.id)}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: "pointer" }}
           />
         </>
       ),
@@ -139,16 +144,32 @@ export default function VehicleMaintenanceList() {
   ];
 
   return (
-    <Card style={{ margin: '20px', padding: '20px' }} bordered>
-      <Title level={3}>Manutenção do Caminhão #{id}</Title>
-
-      <Button
-        type="primary"
-        style={{ marginBottom: 16 }}
-        onClick={() => setIsModalVisible(true)}
+    <Card style={{ margin: "20px", padding: "20px" }} bordered>
+      <div
+        style={{
+          marginBottom: 16,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 8,
+        }}
       >
-        Adicionar Manutenção
-      </Button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate("/vehicle-maintenance")}
+          >
+            Voltar
+          </Button>
+          <Title level={3} style={{ margin: 0 }}>
+            Manutenção do Caminhão #{id}
+          </Title>
+        </div>
+        <Button type="primary" onClick={() => setIsModalVisible(true)}>
+          Adicionar Manutenção
+        </Button>
+      </div>
 
       <Table
         dataSource={Array.isArray(maintenanceData) ? maintenanceData : []}
@@ -157,11 +178,13 @@ export default function VehicleMaintenanceList() {
         pagination={{ pageSize: 5 }}
         footer={() => (
           <div style={{ textAlign: "right", fontWeight: "bold" }}>
-            Total Gasto: R$ {maintenanceData.reduce((acc, curr) => acc + (curr.value || 0), 0).toFixed(2)}
+            Total Gasto: R${" "}
+            {maintenanceData
+              .reduce((acc, curr) => acc + (curr.value || 0), 0)
+              .toFixed(2)}
           </div>
         )}
       />
-
 
       <VehicleMaintenanceModal
         visible={isModalVisible}
