@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Card, Button, Table, Typography, Space, Popconfirm, message } from 'antd';
+import { Card, Button, Table, Typography, Space, Popconfirm, message, Tag, Row, Col, Statistic } from 'antd';
 import TripModal from '../../../components/Modal/Trip';
-import { PlusCircleOutlined } from '@ant-design/icons';
+import { PlusCircleOutlined, CarOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { FaTrash, FaDollarSign, FaEdit } from 'react-icons/fa';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../../lib';
 import dayjs from 'dayjs';
 
 const { Title } = Typography;
+
+const STATUS_CONFIG = {
+  em_andamento: { label: 'Em andamento', color: 'processing', icon: <ClockCircleOutlined /> },
+  concluida: { label: 'Concluída', color: 'success', icon: <CheckCircleOutlined /> },
+  cancelada: { label: 'Cancelada', color: 'default', icon: null },
+};
 
 export default function TripList() {
   const navigate = useNavigate();
@@ -80,22 +86,28 @@ export default function TripList() {
     };
   }, []);
 
+  const buildPayload = (values) => {
+    return {
+      ...values,
+      origin: values?.origin || undefined,
+      date: values?.date?.toDate ? values.date.toDate().toISOString() : (values?.date ? new Date(values.date).toISOString() : undefined),
+      estimatedArrival: values?.estimatedArrival?.toDate ? values.estimatedArrival.toDate().toISOString() : (values?.estimatedArrival ? new Date(values.estimatedArrival).toISOString() : undefined),
+      truckId: truckId ? Number(truckId) : values?.truckId,
+    };
+  };
+
   // Adicionar viagem
   const handleAddTrip = async (values) => {
     try {
-      // garantir data ISO e associar ao caminhão quando filtrado por truckId
-      const payload = {
-        ...values,
-        date: values?.date?.toDate ? values.date.toDate().toISOString() : (values?.date ? new Date(values.date).toISOString() : undefined),
-        truckId: truckId ? Number(truckId) : undefined,
-      };
+      const payload = buildPayload(values);
       const response = await api.post('/trips', payload);
       setTrips((prev) => [...prev, response.data]);
       setIsModalVisible(false);
       message.success('Viagem adicionada com sucesso!');
     } catch (error) {
       console.error(error);
-      message.error('Erro ao adicionar viagem');
+      const msg = error.response?.data?.message || 'Erro ao adicionar viagem';
+      message.error(msg);
     }
   };
 
@@ -107,11 +119,7 @@ export default function TripList() {
 
   const handleEditSubmit = async (values) => {
     try {
-      const payload = {
-        ...values,
-        date: values?.date?.toDate ? values.date.toDate().toISOString() : (values?.date ? new Date(values.date).toISOString() : undefined),
-        truckId: truckId ? Number(truckId) : values?.truckId,
-      };
+      const payload = buildPayload(values);
       const response = await api.put(`/trips/${currentTrip.id}`, payload);
       setTrips((prev) =>
         prev.map((trip) => (trip.id === currentTrip.id ? response.data : trip))
@@ -130,7 +138,8 @@ export default function TripList() {
     try {
       // Verificar se a viagem tem despesas antes de deletar
       const trip = trips.find(t => t.id === id);
-      if (trip && trip.expenses && trip.expenses.length > 0) {
+      const expenses = trip?.TripExpense ?? trip?.expenses ?? [];
+      if (trip && expenses.length > 0) {
         message.error('Não é possível deletar uma viagem que possui despesas vinculadas. Remova as despesas primeiro.');
         return;
       }
@@ -149,75 +158,153 @@ export default function TripList() {
   };
 
   const columns = [
-    { title: 'Destino', dataIndex: 'destination', key: 'destination' },
-    { title: 'Motorista', dataIndex: 'driver', key: 'driver' },
-    { 
-      title: 'Data', 
-      dataIndex: 'date', 
+    {
+      title: 'Rota',
+      key: 'route',
+      width: 220,
+      render: (_, record) => {
+        const origin = record.origin?.trim();
+        const dest = record.destination?.trim() || '-';
+        const route = origin ? `${origin} → ${dest}` : dest;
+        return <span title={route}>{route}</span>;
+      },
+    },
+    { title: 'Motorista', dataIndex: 'driver', key: 'driver', width: 140 },
+    {
+      title: 'Data saída',
+      dataIndex: 'date',
       key: 'date',
-      render: (date) => date ? dayjs(date).format('DD/MM/YYYY') : '-'
+      width: 110,
+      render: (date) => (date ? dayjs(date).format('DD/MM/YYYY') : '-'),
     },
-    { 
-      title: 'Caminhão', 
-      dataIndex: 'truck', 
-      key: 'truck',
-      render: (truck) => (truck ? `${truck.name} (${truck.plate})` : '-')
+    {
+      title: 'Previsão chegada',
+      dataIndex: 'estimatedArrival',
+      key: 'estimatedArrival',
+      width: 140,
+      render: (date) =>
+        date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—',
     },
-    { 
-      title: 'Valor do Frete', 
-      dataIndex: 'freightValue', 
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 130,
+      render: (status) => {
+        const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.em_andamento;
+        return (
+          <Tag color={cfg.color} icon={cfg.icon}>
+            {cfg.label}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Frete',
+      dataIndex: 'freightValue',
       key: 'freightValue',
-      render: (value) => value ? `R$ ${value.toFixed(2).replace('.', ',')}` : '-',
-      align: 'right'
+      width: 100,
+      align: 'right',
+      render: (value) =>
+        value != null ? `R$ ${Number(value).toFixed(2).replace('.', ',')}` : '—',
     },
     {
       title: 'Ações',
       key: 'actions',
+      width: 120,
+      fixed: 'right',
       render: (_, record) => (
-        <>
-          <FaDollarSign
-            style={{ cursor: 'pointer', marginRight: 10 }}
+        <Space size="small">
+          <Button
+            type="link"
+            size="small"
+            icon={<FaDollarSign />}
+            title="Despesas"
             onClick={() => {
-              // Salvar dados atuais antes de navegar
               localStorage.setItem('tripsData', JSON.stringify(trips));
               navigate(`/vehicle/trip-expenses/${record.id}`, { state: record });
             }}
           />
-          <FaEdit
-            style={{ cursor: 'pointer', marginRight: 10 }}
+          <Button
+            type="link"
+            size="small"
+            icon={<FaEdit />}
+            title="Editar"
             onClick={() => handleEditTrip(record)}
           />
           <Popconfirm
-            title="Tem certeza de que deseja excluir?"
+            title="Excluir esta viagem?"
             onConfirm={() => handleDeleteTrip(record.id)}
             okText="Sim"
             cancelText="Não"
           >
-            <FaTrash style={{ cursor: 'pointer' }} />
+            <Button type="link" size="small" danger icon={<FaTrash />} title="Excluir" />
           </Popconfirm>
-        </>
+        </Space>
       ),
     },
   ];
 
+  const stats = {
+    total: trips.length,
+    emAndamento: trips.filter((t) => t.status === 'em_andamento').length,
+    concluidas: trips.filter((t) => t.status === 'concluida').length,
+  };
+
   return (
-    <Card style={{ margin: 20, padding: 20 }} bordered>
-      <Space direction="vertical" style={{ width: '100%' }}>
-        <Title level={2}>Lista de Viagens</Title>
+    <Card style={{ margin: 20, padding: 24 }} bordered>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <Title level={2} style={{ margin: 0 }}>Viagens</Title>
+          <Button
+            type="primary"
+            icon={<PlusCircleOutlined />}
+            onClick={() => {
+              setCurrentTrip(null);
+              setIsModalVisible(true);
+            }}
+          >
+            Nova viagem
+          </Button>
+        </div>
 
-        <Button
-          type="primary"
-          style={{ marginBottom: 16 }}
-          icon={<PlusCircleOutlined />}
-          onClick={() => {
-            setCurrentTrip(null);
-            setIsModalVisible(true);
-          }}
-        >
-          Adicionar Viagem
-        </Button>
+        <Row gutter={16}>
+          <Col xs={24} sm={8}>
+            <Card size="small">
+              <Statistic
+                title="Total de viagens"
+                value={stats.total}
+                prefix={<CarOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={8}>
+            <Card size="small">
+              <Statistic
+                title="Em andamento"
+                value={stats.emAndamento}
+                prefix={<ClockCircleOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={8}>
+            <Card size="small">
+              <Statistic
+                title="Concluídas"
+                value={stats.concluidas}
+                prefix={<CheckCircleOutlined />}
+              />
+            </Card>
+          </Col>
+        </Row>
 
-        <Table dataSource={trips} columns={columns} pagination={{ pageSize: 5 }} rowKey="id" />
+        <Table
+          dataSource={trips}
+          columns={columns}
+          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `${total} viagens` }}
+          rowKey="id"
+          scroll={{ x: 900 }}
+        />
 
         <TripModal
           visible={isModalVisible}

@@ -27,12 +27,11 @@ api.interceptors.response.use(
     return response // Retorna a resposta se não houver erro
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Token expirado ou inválido
-      localStorage.removeItem('token') // Remove o token do localStorage
+    const isLoginRequest = error.config?.url?.includes('/login')
+    if (error.response && error.response.status === 401 && !isLoginRequest) {
+      // 401 em outras rotas = token expirado ou inválido (não tratar 401 do próprio login)
+      localStorage.removeItem('token')
       message.error('Sua sessão expirou. Faça login novamente.')
-
-      // Redireciona para login usando window.location
       window.location.href = '/login'
     }
 

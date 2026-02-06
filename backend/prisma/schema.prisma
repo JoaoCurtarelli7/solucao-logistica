@@ -155,18 +155,20 @@ model Transaction {
 }
 
 model Trip {
-  id           Int           @id @default(autoincrement())
-  destination  String
-  driver       String
-  date         DateTime      @db.Timestamptz(6)
-  freightValue Float
-  status       String        @default("em_andamento")
-  notes        String?
-  truckId      Int?
-  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime      @default(now()) @db.Timestamptz(6)
-  Truck        Truck?        @relation(fields: [truckId], references: [id], onDelete: Restrict, map: "fk_trip_truck")
-  TripExpense  TripExpense[]
+  id                Int           @id @default(autoincrement())
+  origin            String?       // Origem da viagem (rota: origem → destino)
+  destination       String
+  driver            String
+  date              DateTime      @db.Timestamptz(6)
+  estimatedArrival  DateTime?     @db.Timestamptz(6) // Previsão de chegada
+  freightValue      Float
+  status            String        @default("em_andamento")
+  notes             String?
+  truckId           Int?
+  createdAt         DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime      @default(now()) @db.Timestamptz(6)
+  Truck             Truck?        @relation(fields: [truckId], references: [id], onDelete: Restrict, map: "fk_trip_truck")
+  TripExpense       TripExpense[]
 
   @@index([truckId], map: "idx_trip_truckId")
 }
