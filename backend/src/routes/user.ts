@@ -46,7 +46,10 @@ export async function userRoutes(app: FastifyInstance) {
           },
         });
       } catch (includeErr: any) {
-        app.log.warn("GET /me: include role falhou, buscando só usuário:", includeErr?.message);
+        app.log.warn(
+          "GET /me: include role falhou, buscando só usuário:",
+          includeErr?.message,
+        );
         try {
           user = await prisma.user.findUnique({
             where: { id: userId },
@@ -61,7 +64,10 @@ export async function userRoutes(app: FastifyInstance) {
           });
           if (user) (user as any).status = null;
         } catch (fallbackErr: any) {
-          app.log.error("GET /me fallback também falhou:", fallbackErr?.message);
+          app.log.error(
+            "GET /me fallback também falhou:",
+            fallbackErr?.message,
+          );
           throw fallbackErr;
         }
       }
@@ -71,8 +77,12 @@ export async function userRoutes(app: FastifyInstance) {
       }
 
       const permissions: string[] =
-        user.role?.permissions?.map((rp: { permission?: { key?: string } }) => rp.permission?.key).filter(Boolean) ?? [];
-      const role = user.role ? { id: user.role.id, name: user.role.name } : null;
+        user.role?.permissions
+          ?.map((rp: { permission?: { key?: string } }) => rp.permission?.key)
+          .filter(Boolean) ?? [];
+      const role = user.role
+        ? { id: user.role.id, name: user.role.name }
+        : null;
 
       return reply.send({
         id: user.id,
@@ -142,13 +152,41 @@ export async function userRoutes(app: FastifyInstance) {
           email: true,
           phone: true,
           address: true,
+          status: true,
           createdAt: true,
+          role: {
+            select: {
+              id: true,
+              name: true,
+              permissions: {
+                select: { permission: { select: { key: true } } },
+              },
+            },
+          },
         },
       });
 
+      const permissions: string[] =
+        updatedUser.role?.permissions
+          ?.map((rp: { permission?: { key?: string } }) => rp.permission?.key)
+          .filter((k): k is string => Boolean(k)) ?? [];
+      const role = updatedUser.role
+        ? { id: updatedUser.role.id, name: updatedUser.role.name }
+        : null;
+
       return reply.send({
         message: "Perfil atualizado com sucesso!",
-        user: updatedUser,
+        user: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          phone: updatedUser.phone ?? null,
+          address: updatedUser.address ?? null,
+          status: updatedUser.status ?? null,
+          createdAt: updatedUser.createdAt,
+          role,
+          permissions,
+        },
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -207,11 +245,9 @@ export async function userRoutes(app: FastifyInstance) {
           user.password,
         );
         if (newPasswordMatch) {
-          return reply
-            .code(400)
-            .send({
-              message: "A nova senha deve ser diferente da senha atual",
-            });
+          return reply.code(400).send({
+            message: "A nova senha deve ser diferente da senha atual",
+          });
         }
 
         // Criptografar nova senha

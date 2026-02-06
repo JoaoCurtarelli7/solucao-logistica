@@ -1,32 +1,35 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    Button,
-    Card,
-    Checkbox,
-    Col,
-    Descriptions,
-    Form,
-    Input,
-    List,
-    Modal,
-    Result,
-    Row,
-    Select,
-    Space,
-    Table,
-    Tabs,
-    Tag,
-    Typography,
-    message,
+  Button,
+  Card,
+  Checkbox,
+  Col,
+  Descriptions,
+  Form,
+  Input,
+  List,
+  Modal,
+  Result,
+  Row,
+  Select,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+  Typography,
+  message,
+  Spin,
 } from "antd";
 import {
-    PlusOutlined,
-    EditOutlined,
-    StopOutlined,
-    ReloadOutlined,
+  PlusOutlined,
+  EditOutlined,
+  StopOutlined,
+  CheckCircleOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import api from "../../lib/api";
 import { usePermission } from "../../hooks/usePermission";
+import { useUserContext } from "../../context/userContext";
 
 const { Title, Text } = Typography;
 
@@ -80,7 +83,8 @@ function groupPermissions(keys) {
 }
 
 export default function UsersPermissions() {
-  const { hasPermission } = usePermission();
+  const { hasPermission, user } = usePermission();
+  const { loading: userLoading } = useUserContext();
 
   const [activeTab, setActiveTab] = useState("users");
 
@@ -194,13 +198,28 @@ export default function UsersPermissions() {
   }, [canManageUsers]);
 
   useEffect(() => {
+    if (activeTab === "logs") loadLogs(1, logsPageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  useEffect(() => {
     if (!selectedRole) return;
     setRolePerms(
       Array.isArray(selectedRole.permissions) ? selectedRole.permissions : [],
     );
   }, [selectedRole]);
 
-  if (!canManageUsers) {
+  if (userLoading) {
+    return (
+      <Card bordered={false}>
+        <div style={{ textAlign: "center", padding: 48 }}>
+          <Spin size="large" tip="Carregando..." />
+        </div>
+      </Card>
+    );
+  }
+
+  if (user && !canManageUsers) {
     return (
       <Result
         status="403"
@@ -282,6 +301,26 @@ export default function UsersPermissions() {
           await loadUsers();
         } catch (e) {
           message.error("Erro ao desativar usuário");
+        }
+      },
+    });
+  };
+
+  const activateUser = (record) => {
+    Modal.confirm({
+      title: "Ativar usuário?",
+      content: `O usuário "${record.name}" voltará a acessar o sistema.`,
+      okText: "Ativar",
+      cancelText: "Cancelar",
+      onOk: async () => {
+        try {
+          await api.patch(`/admin/users/${record.id}/status`, {
+            status: "active",
+          });
+          message.success("Usuário ativado");
+          await loadUsers();
+        } catch (e) {
+          message.error("Erro ao ativar usuário");
         }
       },
     });
@@ -369,15 +408,25 @@ export default function UsersPermissions() {
           >
             Editar
           </Button>
-          <Button
-            size="small"
-            danger
-            icon={<StopOutlined />}
-            disabled={r.status !== "active"}
-            onClick={() => deactivateUser(r)}
-          >
-            Desativar
-          </Button>
+          {r.status === "active" ? (
+            <Button
+              size="small"
+              danger
+              icon={<StopOutlined />}
+              onClick={() => deactivateUser(r)}
+            >
+              Desativar
+            </Button>
+          ) : (
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              onClick={() => activateUser(r)}
+            >
+              Ativar
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -502,11 +551,7 @@ export default function UsersPermissions() {
                       render: (_, record) => {
                         const [module] = record.key.split(".");
                         const moduleLabel = moduleLabels[module] || module;
-                        return (
-                          <Tag color="blue">
-                            {moduleLabel}
-                          </Tag>
-                        );
+                        return <Tag color="blue">{moduleLabel}</Tag>;
                       },
                     },
                     {
@@ -516,11 +561,7 @@ export default function UsersPermissions() {
                       render: (_, record) => {
                         const [, action] = record.key.split(".");
                         const actionLabel = actionLabels[action] || action;
-                        return (
-                          <Tag color="green">
-                            {actionLabel}
-                          </Tag>
-                        );
+                        return <Tag color="green">{actionLabel}</Tag>;
                       },
                     },
                     {
@@ -533,7 +574,8 @@ export default function UsersPermissions() {
                       title: "Descrição",
                       dataIndex: "description",
                       key: "description",
-                      render: (v) => v || <Text type="secondary">Sem descrição</Text>,
+                      render: (v) =>
+                        v || <Text type="secondary">Sem descrição</Text>,
                     },
                     {
                       title: "Ações",
@@ -570,13 +612,15 @@ export default function UsersPermissions() {
                                 cancelText: "Cancelar",
                                 onOk: async () => {
                                   try {
-                                    await api.delete(`/permissions/${record.id}`);
+                                    await api.delete(
+                                      `/permissions/${record.id}`,
+                                    );
                                     message.success("Permissão deletada");
                                     await loadPermissions();
                                   } catch (e) {
                                     message.error(
                                       e?.response?.data?.message ||
-                                        "Erro ao deletar permissão"
+                                        "Erro ao deletar permissão",
                                     );
                                   }
                                 },
@@ -729,7 +773,8 @@ export default function UsersPermissions() {
                               <Row gutter={[8, 8]}>
                                 {g.perms.map((k) => {
                                   const [, action] = k.split(".");
-                                  const actionLabel = actionLabels[action] || action;
+                                  const actionLabel =
+                                    actionLabels[action] || action;
                                   return (
                                     <Col key={k} xs={24} md={12} lg={8}>
                                       <Checkbox value={k}>
@@ -880,7 +925,7 @@ export default function UsersPermissions() {
             if (!editingPermission && values.module && values.action) {
               values.key = `${values.module}.${values.action}`;
             }
-            
+
             if (editingPermission) {
               await api.put(`/permissions/${editingPermission.id}`, {
                 key: values.key,
@@ -914,21 +959,23 @@ export default function UsersPermissions() {
               <Form.Item
                 name="module"
                 label="Módulo"
-                rules={[
-                  { required: true, message: "Selecione o módulo" },
-                ]}
+                rules={[{ required: true, message: "Selecione o módulo" }]}
                 tooltip="Selecione o módulo do sistema ao qual esta permissão se refere"
               >
                 <Select
                   placeholder="Selecione o módulo"
                   showSearch
                   filterOption={(input, option) =>
-                    (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                    (option?.label ?? "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
                   }
-                  options={Object.entries(moduleLabels).map(([value, label]) => ({
-                    value,
-                    label,
-                  }))}
+                  options={Object.entries(moduleLabels).map(
+                    ([value, label]) => ({
+                      value,
+                      label,
+                    }),
+                  )}
                   onChange={(value) => {
                     const action = permissionForm.getFieldValue("action");
                     if (value && action) {
@@ -940,21 +987,24 @@ export default function UsersPermissions() {
                   }}
                 />
               </Form.Item>
-              
+
               <Form.Item
                 name="action"
                 label="Ação"
-                rules={[
-                  { required: true, message: "Selecione a ação" },
-                ]}
+                rules={[{ required: true, message: "Selecione a ação" }]}
                 tooltip="Selecione a ação que esta permissão permite realizar"
               >
                 <Select
                   placeholder="Selecione a ação"
-                  options={Object.entries(actionLabels).map(([value, label]) => ({
-                    value,
-                    label: value === "manage" ? `${label} (todas as ações)` : label,
-                  }))}
+                  options={Object.entries(actionLabels).map(
+                    ([value, label]) => ({
+                      value,
+                      label:
+                        value === "manage"
+                          ? `${label} (todas as ações)`
+                          : label,
+                    }),
+                  )}
                   onChange={(value) => {
                     const module = permissionForm.getFieldValue("module");
                     if (module && value) {
@@ -987,7 +1037,8 @@ export default function UsersPermissions() {
                 { required: true, message: "Informe a chave da permissão" },
                 {
                   pattern: /^[a-z]+\.[a-z]+$/,
-                  message: "Formato inválido. Use: modulo.acao (ex: users.create)",
+                  message:
+                    "Formato inválido. Use: modulo.acao (ex: users.create)",
                 },
               ]}
             >
@@ -1013,16 +1064,18 @@ export default function UsersPermissions() {
           </Form.Item>
 
           {!editingPermission && (
-            <div style={{ 
-              background: "#f0f0f0", 
-              padding: "12px", 
-              borderRadius: "4px",
-              marginTop: "8px"
-            }}>
+            <div
+              style={{
+                background: "#f0f0f0",
+                padding: "12px",
+                borderRadius: "4px",
+                marginTop: "8px",
+              }}
+            >
               <Text type="secondary" style={{ fontSize: "12px" }}>
-                <strong>Dica:</strong> A chave será gerada automaticamente no formato{" "}
-                <Text code>módulo.ação</Text>. A descrição será sugerida automaticamente,
-                mas você pode editá-la.
+                <strong>Dica:</strong> A chave será gerada automaticamente no
+                formato <Text code>módulo.ação</Text>. A descrição será sugerida
+                automaticamente, mas você pode editá-la.
               </Text>
             </div>
           )}

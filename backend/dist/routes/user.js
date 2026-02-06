@@ -11,49 +11,88 @@ const authMiddleware_1 = require("../middlewares/authMiddleware");
 async function userRoutes(app) {
     // Aplicar autenticação em todas as rotas
     app.addHook("preHandler", authMiddleware_1.authMiddleware);
-    // Obter dados do usuário logado
+    // Obter dados do usuário logado (com role e permissões para o front)
     app.get("/me", async (request, reply) => {
         try {
             if (!request.user) {
                 return reply.code(401).send({ message: "Usuário não autenticado" });
             }
             const userId = request.user.id;
-            const user = await prisma_1.prisma.user.findUnique({
-                where: { id: userId },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    phone: true,
-                    address: true,
-                    status: true,
-                    role: {
-                        select: {
-                            id: true,
-                            name: true,
-                            permissions: {
-                                select: {
-                                    permission: { select: { key: true } },
+            let user = null;
+            try {
+                user = await prisma_1.prisma.user.findUnique({
+                    where: { id: userId },
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        phone: true,
+                        address: true,
+                        status: true,
+                        role: {
+                            select: {
+                                id: true,
+                                name: true,
+                                permissions: {
+                                    select: {
+                                        permission: { select: { key: true } },
+                                    },
                                 },
                             },
                         },
+                        createdAt: true,
                     },
-                    createdAt: true,
-                },
-            });
+                });
+            }
+            catch (includeErr) {
+                app.log.warn("GET /me: include role falhou, buscando só usuário:", includeErr?.message);
+                try {
+                    user = await prisma_1.prisma.user.findUnique({
+                        where: { id: userId },
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            phone: true,
+                            address: true,
+                            createdAt: true,
+                        },
+                    });
+                    if (user)
+                        user.status = null;
+                }
+                catch (fallbackErr) {
+                    app.log.error("GET /me fallback também falhou:", fallbackErr?.message);
+                    throw fallbackErr;
+                }
+            }
             if (!user) {
                 return reply.code(404).send({ message: "Usuário não encontrado" });
             }
-            const permissions = user.role?.permissions?.map((rp) => rp.permission.key) ?? [];
+            const permissions = user.role?.permissions
+                ?.map((rp) => rp.permission?.key)
+                .filter(Boolean) ?? [];
+            const role = user.role
+                ? { id: user.role.id, name: user.role.name }
+                : null;
             return reply.send({
-                ...user,
-                role: user.role ? { id: user.role.id, name: user.role.name } : null,
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone ?? null,
+                address: user.address ?? null,
+                status: user.status ?? null,
+                createdAt: user.createdAt,
+                role,
                 permissions,
             });
         }
         catch (error) {
-            console.error("Erro ao buscar usuário:", error);
-            return reply.code(500).send({ message: "Erro interno do servidor" });
+            console.error("Erro ao buscar usuário /me:", error);
+            return reply.code(500).send({
+                message: "Erro interno do servidor",
+                error: error?.message ?? undefined,
+            });
         }
     });
     // Editar dados do perfil do usuário logado
@@ -98,12 +137,38 @@ async function userRoutes(app) {
                     email: true,
                     phone: true,
                     address: true,
+                    status: true,
                     createdAt: true,
+                    role: {
+                        select: {
+                            id: true,
+                            name: true,
+                            permissions: {
+                                select: { permission: { select: { key: true } } },
+                            },
+                        },
+                    },
                 },
             });
+            const permissions = updatedUser.role?.permissions
+                ?.map((rp) => rp.permission?.key)
+                .filter((k) => Boolean(k)) ?? [];
+            const role = updatedUser.role
+                ? { id: updatedUser.role.id, name: updatedUser.role.name }
+                : null;
             return reply.send({
                 message: "Perfil atualizado com sucesso!",
-                user: updatedUser,
+                user: {
+                    id: updatedUser.id,
+                    name: updatedUser.name,
+                    email: updatedUser.email,
+                    phone: updatedUser.phone ?? null,
+                    address: updatedUser.address ?? null,
+                    status: updatedUser.status ?? null,
+                    createdAt: updatedUser.createdAt,
+                    role,
+                    permissions,
+                },
             });
         }
         catch (error) {
@@ -146,9 +211,7 @@ async function userRoutes(app) {
             // Verificar se a nova senha é diferente da atual
             const newPasswordMatch = await bcrypt_1.default.compare(newPassword, user.password);
             if (newPasswordMatch) {
-                return reply
-                    .code(400)
-                    .send({
+                return reply.code(400).send({
                     message: "A nova senha deve ser diferente da senha atual",
                 });
             }

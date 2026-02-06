@@ -8,6 +8,72 @@ const prisma_1 = require("../lib/prisma");
 const zod_1 = require("zod");
 const auth_1 = require("../lib/auth");
 const bcrypt_1 = __importDefault(require("bcrypt"));
+// Permissões mínimas para o primeiro usuário (Admin) quando não há seed
+const BOOTSTRAP_ADMIN_PERMISSIONS = [
+    "dashboard.view",
+    "users.view",
+    "users.create",
+    "users.update",
+    "users.delete",
+    "users.manage",
+    "roles.view",
+    "roles.create",
+    "roles.update",
+    "roles.delete",
+    "permissions.view",
+    "companies.view",
+    "employees.view",
+    "trucks.view",
+    "trips.view",
+    "loads.view",
+    "financial.view",
+    "closings.view",
+    "months.view",
+    "reports.view",
+    "reports.export",
+];
+async function ensureAdminRoleExists() {
+    let adminRole = await prisma_1.prisma.role.findFirst({ where: { name: "Admin" } });
+    if (adminRole)
+        return { id: adminRole.id };
+    await prisma_1.prisma.permission.createMany({
+        data: BOOTSTRAP_ADMIN_PERMISSIONS.map((key) => ({ key })),
+        skipDuplicates: true,
+    });
+    adminRole = await prisma_1.prisma.role.create({
+        data: { name: "Admin", description: "Acesso total ao sistema" },
+    });
+    const perms = await prisma_1.prisma.permission.findMany({
+        where: { key: { in: BOOTSTRAP_ADMIN_PERMISSIONS } },
+        select: { id: true },
+    });
+    if (perms.length) {
+        await prisma_1.prisma.rolePermission.createMany({
+            data: perms.map((p) => ({ roleId: adminRole.id, permissionId: p.id })),
+            skipDuplicates: true,
+        });
+    }
+    return { id: adminRole.id };
+}
+async function ensureUserRoleExists() {
+    let userRole = await prisma_1.prisma.role.findFirst({ where: { name: "User" } });
+    if (userRole)
+        return { id: userRole.id };
+    userRole = await prisma_1.prisma.role.create({
+        data: { name: "User", description: "Usuário padrão do sistema" },
+    });
+    const perms = await prisma_1.prisma.permission.findMany({
+        where: { key: { in: ["dashboard.view"] } },
+        select: { id: true },
+    });
+    if (perms.length) {
+        await prisma_1.prisma.rolePermission.createMany({
+            data: perms.map((p) => ({ roleId: userRole.id, permissionId: p.id })),
+            skipDuplicates: true,
+        });
+    }
+    return { id: userRole.id };
+}
 async function authRoutes(app) {
     const loginSchema = zod_1.z.object({
         email: zod_1.z.string().email(),
@@ -21,46 +87,46 @@ async function authRoutes(app) {
                 password: zod_1.z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
             });
             const { name, email, password } = bodySchema.parse(req.body);
-            // Verificar se o usuário já existe
             const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
             if (existingUser) {
                 return rep.code(400).send({ message: "E-mail já está em uso" });
             }
-            // Buscar ou criar role padrão "User"
-            let defaultRole = await prisma_1.prisma.role.findFirst({
-                where: { name: "User" },
-            });
-            if (!defaultRole) {
-                // Se não existir, criar role padrão "User"
-                defaultRole = await prisma_1.prisma.role.create({
-                    data: {
-                        name: "User",
-                        description: "Usuário padrão do sistema",
-                    },
-                });
-            }
-            // Hash da senha
+            const userCount = await prisma_1.prisma.user.count();
+            const isFirstUser = userCount === 0;
+            const roleToAssign = isFirstUser
+                ? await ensureAdminRoleExists()
+                : await ensureUserRoleExists();
             const hashedPassword = await (0, auth_1.hashPassword)(password);
-            // Criar usuário com role padrão
             const newUser = await prisma_1.prisma.user.create({
                 data: {
                     name,
                     email,
                     password: hashedPassword,
-                    roleId: defaultRole.id,
+                    roleId: roleToAssign.id,
                     status: "active",
                 },
             });
-            console.log("✅ Usuário criado com sucesso:", {
-                id: newUser.id,
-                email: newUser.email,
-            });
+            if (isFirstUser) {
+                console.log("✅ Primeiro usuário do sistema criado como Admin:", {
+                    id: newUser.id,
+                    email: newUser.email,
+                });
+            }
+            else {
+                console.log("✅ Usuário criado com sucesso:", {
+                    id: newUser.id,
+                    email: newUser.email,
+                });
+            }
             return rep.code(201).send({
-                message: "Usuário criado com sucesso!",
+                message: isFirstUser
+                    ? "Cadastro realizado! Você é o primeiro usuário e recebeu o perfil Admin."
+                    : "Usuário criado com sucesso!",
                 user: {
                     id: newUser.id,
                     name: newUser.name,
                     email: newUser.email,
+                    role: isFirstUser ? "Admin" : "User",
                 },
             });
         }
@@ -96,24 +162,31 @@ async function authRoutes(app) {
     app.post("/login", async (req, rep) => {
         try {
             const { email, password } = loginSchema.parse(req.body);
-            const user = await prisma_1.prisma.user.findUnique({
-                where: { email },
-                include: {
-                    role: {
-                        include: {
-                            permissions: {
-                                include: {
-                                    permission: {
-                                        select: {
-                                            key: true,
+            let user = null;
+            try {
+                user = await prisma_1.prisma.user.findUnique({
+                    where: { email },
+                    include: {
+                        role: {
+                            include: {
+                                permissions: {
+                                    include: {
+                                        permission: {
+                                            select: { key: true },
                                         },
                                     },
                                 },
                             },
                         },
                     },
-                },
-            });
+                });
+            }
+            catch (includeError) {
+                app.log.warn("Login: include role/permissions falhou, buscando só usuário:", includeError?.message);
+                user = await prisma_1.prisma.user.findUnique({
+                    where: { email },
+                });
+            }
             if (!user) {
                 return rep.code(401).send({ message: "Email ou senha inválidos" });
             }
@@ -124,7 +197,7 @@ async function authRoutes(app) {
             if (!isPasswordValid) {
                 return rep.code(401).send({ message: "Email ou senha inválidos" });
             }
-            const permissions = user.role?.permissions?.map((rp) => rp.permission.key) ?? [];
+            const permissions = user.role?.permissions?.map((rp) => rp.permission?.key).filter(Boolean) ?? [];
             const token = (0, auth_1.generateToken)({
                 userId: user.id,
                 roleId: user.role?.id ?? null,
@@ -148,18 +221,18 @@ async function authRoutes(app) {
             console.error("Detalhes:", {
                 message: error?.message,
                 code: error?.code,
+                meta: error?.meta,
                 stack: error?.stack,
             });
-            // Erros de validação (Zod)
-            if (error.name === "ZodError") {
+            if (error?.name === "ZodError") {
                 return rep.code(400).send({
                     message: "Dados inválidos",
                     errors: error.errors,
                 });
             }
             return rep.code(500).send({
-                message: "Erro no servidor",
-                error: process.env.NODE_ENV === "development" ? error?.message : undefined,
+                message: "Erro no servidor ao fazer login",
+                error: error?.message ?? undefined,
             });
         }
     });

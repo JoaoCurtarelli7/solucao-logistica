@@ -32,7 +32,7 @@ async function authMiddleware(req, rep) {
                 : undefined;
             const tokenRoleId = decoded.roleId ?? undefined;
             const tokenRole = decoded.role ?? undefined;
-            // Se o token já vier com permissões, usa; senão busca no banco (bom para compatibilidade)
+            // Se o token já vier com permissões, usa; senão busca no banco
             if (tokenPermissions) {
                 req.user = {
                     id: userId,
@@ -42,39 +42,48 @@ async function authMiddleware(req, rep) {
                 };
                 return;
             }
-            const dbUser = await prisma_1.prisma.user.findUnique({
-                where: { id: userId },
-                select: {
-                    id: true,
-                    status: true,
-                    role: {
-                        select: {
-                            id: true,
-                            name: true,
-                            permissions: {
-                                select: {
-                                    permission: { select: { key: true } },
+            let dbUser = null;
+            try {
+                dbUser = await prisma_1.prisma.user.findUnique({
+                    where: { id: userId },
+                    select: {
+                        id: true,
+                        status: true,
+                        role: {
+                            select: {
+                                id: true,
+                                name: true,
+                                permissions: {
+                                    select: {
+                                        permission: { select: { key: true } },
+                                    },
                                 },
                             },
                         },
                     },
-                },
-            });
+                });
+            }
+            catch (dbErr) {
+                // Tabelas role/permissions podem não existir; busca só usuário
+                dbUser = await prisma_1.prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { id: true },
+                });
+            }
             if (!dbUser) {
                 return rep.status(401).send({ message: "Usuário não encontrado" });
             }
             if (dbUser.status && dbUser.status !== "active") {
                 return rep.status(403).send({ message: "Usuário inativo" });
             }
-            const permissions = dbUser.role?.permissions?.map((rp) => rp.permission.key) ?? [];
+            const permissions = dbUser.role?.permissions?.map((rp) => rp.permission?.key).filter(Boolean) ?? [];
             req.user = {
                 id: dbUser.id,
-                status: dbUser.status,
+                status: dbUser.status ?? null,
                 roleId: dbUser.role?.id ?? null,
                 role: dbUser.role?.name ?? null,
                 permissions,
             };
-            // Não retorna nada, continua para o próximo handler
         }
         catch (jwtError) {
             console.error("Erro ao verificar token:", jwtError.message);

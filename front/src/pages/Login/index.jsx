@@ -9,12 +9,13 @@ import {
   LoginOutlined,
   UserAddOutlined,
   CheckCircleOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import "./styles.css";
 import loginImage from "../../components/assets/login.jpg";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib";
+import { useUserContext } from "../../context/userContext";
 
 const { Title, Text } = Typography;
 
@@ -25,13 +26,14 @@ export default function LoginAndRegister() {
   const [activeTab, setActiveTab] = useState("1");
   const [passwordStrength, setPasswordStrength] = useState(0);
   const navigate = useNavigate();
+  const { setUser } = useUserContext();
 
   useEffect(() => {
-    const elements = document.querySelectorAll('.fade-in');
+    const elements = document.querySelectorAll(".fade-in");
     elements.forEach((el, index) => {
       setTimeout(() => {
-        el.style.opacity = '1';
-        el.style.transform = 'translateY(0)';
+        el.style.opacity = "1";
+        el.style.transform = "translateY(0)";
       }, index * 100);
     });
   }, []);
@@ -52,43 +54,47 @@ export default function LoginAndRegister() {
   };
 
   const getPasswordStrengthColor = () => {
-    if (passwordStrength <= 2) return '#ff4d4f';
-    if (passwordStrength <= 3) return '#faad14';
-    if (passwordStrength <= 4) return '#52c41a';
-    return '#1890ff';
+    if (passwordStrength <= 2) return "#ff4d4f";
+    if (passwordStrength <= 3) return "#faad14";
+    if (passwordStrength <= 4) return "#52c41a";
+    return "#1890ff";
   };
 
   const getPasswordStrengthText = () => {
-    if (passwordStrength <= 2) return 'Fraca';
-    if (passwordStrength <= 3) return 'Média';
-    if (passwordStrength <= 4) return 'Forte';
-    return 'Muito Forte';
+    if (passwordStrength <= 2) return "Fraca";
+    if (passwordStrength <= 3) return "Média";
+    if (passwordStrength <= 4) return "Forte";
+    return "Muito Forte";
   };
 
   const handleLogin = async (values) => {
     setLoading(true);
     try {
-      const res = await api.post('/login', values);
-      localStorage.setItem('token', res.data.token);
+      const res = await api.post("/login", values);
+      localStorage.setItem("token", res.data.token);
+      if (res.data.user && setUser) {
+        setUser(res.data.user);
+      }
       message.success({
-        content: 'Login realizado com sucesso! Bem-vindo de volta! 🎉',
-        icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
-        duration: 3
+        content: "Login realizado com sucesso! Bem-vindo de volta! 🎉",
+        icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
+        duration: 3,
       });
-      navigate('/');
+      navigate("/");
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Erro desconhecido';
+      const errorMessage = err.response?.data?.message || "Erro desconhecido";
       if (err.response?.status === 401) {
         message.error({
-          content: 'Credenciais inválidas. Por favor, verifique seu e-mail e senha.',
-          icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
-          duration: 4
+          content:
+            "Credenciais inválidas. Por favor, verifique seu e-mail e senha.",
+          icon: <ExclamationCircleOutlined style={{ color: "#ff4d4f" }} />,
+          duration: 4,
         });
       } else {
         message.error({
           content: `Erro ao fazer login: ${errorMessage}`,
-          icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
-          duration: 4
+          icon: <ExclamationCircleOutlined style={{ color: "#ff4d4f" }} />,
+          duration: 4,
         });
       }
     } finally {
@@ -99,23 +105,41 @@ export default function LoginAndRegister() {
   const handleRegister = async (values) => {
     setLoading(true);
     try {
-      await api.post('/register', values);
-      message.success({
-        content: 'Cadastro realizado com sucesso! Agora você pode fazer login.',
-        icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
-        duration: 4
-      });
-      registerForm.resetFields();
-      setPasswordStrength(0);
-      setActiveTab("1");
+      const res = await api.post("/register", values);
+      const isFirstUser = res.data?.user?.role === "Admin";
+      if (isFirstUser) {
+        const loginRes = await api.post("/login", {
+          email: values.email,
+          password: values.password,
+        });
+        localStorage.setItem("token", loginRes.data.token);
+        if (setUser && loginRes.data.user) setUser(loginRes.data.user);
+        message.success({
+          content:
+            "Você é o primeiro usuário! Cadastro concluído e já logado como Admin.",
+          icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
+          duration: 4,
+        });
+        navigate("/");
+      } else {
+        message.success({
+          content:
+            "Cadastro realizado com sucesso! Agora você pode fazer login.",
+          icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
+          duration: 4,
+        });
+        registerForm.resetFields();
+        setPasswordStrength(0);
+        setActiveTab("1");
+      }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Erro ao cadastrar.';
+      const errorMessage = err.response?.data?.message || "Erro ao cadastrar.";
       if (err.response?.data?.errors) {
         err.response.data.errors.forEach((error) => {
-          if (error.path.includes('password')) {
+          if (error.path.includes("password")) {
             registerForm.setFields([
               {
-                name: 'password',
+                name: "password",
                 errors: [error.message],
               },
             ]);
@@ -124,8 +148,8 @@ export default function LoginAndRegister() {
       } else {
         message.error({
           content: errorMessage,
-          icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
-          duration: 4
+          icon: <ExclamationCircleOutlined style={{ color: "#ff4d4f" }} />,
+          duration: 4,
         });
       }
     } finally {
@@ -142,7 +166,7 @@ export default function LoginAndRegister() {
     <div className="login-container">
       {/* Background com gradiente animado */}
       <div className="animated-background"></div>
-      
+
       {/* Seção esquerda com imagem */}
       <div className="left-section fade-in">
         <div className="image-overlay">
@@ -155,7 +179,7 @@ export default function LoginAndRegister() {
             </Text>
           </div>
         </div>
-        <div 
+        <div
           className="background-image"
           style={{ backgroundImage: `url(${loginImage})` }}
         ></div>
@@ -176,9 +200,9 @@ export default function LoginAndRegister() {
             </Text>
           </div>
 
-          <Tabs 
-            defaultActiveKey="1" 
-            centered 
+          <Tabs
+            defaultActiveKey="1"
+            centered
             activeKey={activeTab}
             onChange={handleTabChange}
             className="custom-tabs"
@@ -193,9 +217,9 @@ export default function LoginAndRegister() {
                 ),
                 children: (
                   <div className="tab-content fade-in">
-                    <Form 
-                      form={loginForm} 
-                      onFinish={handleLogin} 
+                    <Form
+                      form={loginForm}
+                      onFinish={handleLogin}
                       layout="vertical"
                       className="login-form"
                     >
@@ -213,19 +237,22 @@ export default function LoginAndRegister() {
                           },
                         ]}
                       >
-                        <Input 
-                          prefix={<MailOutlined className="input-icon" />} 
+                        <Input
+                          prefix={<MailOutlined className="input-icon" />}
                           placeholder="seu@email.com"
                           size="large"
                           className="custom-input"
                         />
                       </Form.Item>
-                      
+
                       <Form.Item
                         name="password"
                         label="Senha"
                         rules={[
-                          { required: true, message: "Por favor, insira sua senha!" },
+                          {
+                            required: true,
+                            message: "Por favor, insira sua senha!",
+                          },
                         ]}
                       >
                         <Input.Password
@@ -233,22 +260,22 @@ export default function LoginAndRegister() {
                           placeholder="Sua senha"
                           size="large"
                           className="custom-input"
-                          iconRender={(visible) => 
+                          iconRender={(visible) =>
                             visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />
                           }
                         />
                       </Form.Item>
-                      
+
                       <Form.Item>
-                        <Button 
-                          type="primary" 
-                          htmlType="submit" 
+                        <Button
+                          type="primary"
+                          htmlType="submit"
                           loading={loading}
                           size="large"
                           className="submit-button"
                           icon={<LoginOutlined />}
                         >
-                          {loading ? 'Entrando...' : 'Entrar'}
+                          {loading ? "Entrando..." : "Entrar"}
                         </Button>
                       </Form.Item>
                     </Form>
@@ -288,7 +315,7 @@ export default function LoginAndRegister() {
                           className="custom-input"
                         />
                       </Form.Item>
-                      
+
                       <Form.Item
                         name="email"
                         label="E-mail"
@@ -303,26 +330,27 @@ export default function LoginAndRegister() {
                           },
                         ]}
                       >
-                        <Input 
-                          prefix={<MailOutlined className="input-icon" />} 
+                        <Input
+                          prefix={<MailOutlined className="input-icon" />}
                           placeholder="seu@email.com"
                           size="large"
                           className="custom-input"
                         />
                       </Form.Item>
-                      
+
                       <Form.Item
                         name="password"
                         label="Senha"
                         rules={[
-                          { 
-                            required: true, 
-                            message: "Por favor, insira uma senha!" 
+                          {
+                            required: true,
+                            message: "Por favor, insira uma senha!",
                           },
-                          { 
-                            min: 8, 
-                            message: "A senha deve ter pelo menos 8 caracteres!" 
-                          }
+                          {
+                            min: 8,
+                            message:
+                              "A senha deve ter pelo menos 8 caracteres!",
+                          },
                         ]}
                       >
                         <Input.Password
@@ -331,7 +359,7 @@ export default function LoginAndRegister() {
                           size="large"
                           className="custom-input"
                           onChange={handlePasswordChange}
-                          iconRender={(visible) => 
+                          iconRender={(visible) =>
                             visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />
                           }
                         />
@@ -340,17 +368,19 @@ export default function LoginAndRegister() {
                       {/* Indicador de força da senha */}
                       {passwordStrength > 0 && (
                         <div className="password-strength">
-                          <Text className="strength-label">Força da senha:</Text>
+                          <Text className="strength-label">
+                            Força da senha:
+                          </Text>
                           <div className="strength-bar">
-                            <div 
+                            <div
                               className="strength-fill"
-                              style={{ 
+                              style={{
                                 width: `${(passwordStrength / 5) * 100}%`,
-                                backgroundColor: getPasswordStrengthColor()
+                                backgroundColor: getPasswordStrengthColor(),
                               }}
                             ></div>
                           </div>
-                          <Text 
+                          <Text
                             className="strength-text"
                             style={{ color: getPasswordStrengthColor() }}
                           >
@@ -358,45 +388,53 @@ export default function LoginAndRegister() {
                           </Text>
                         </div>
                       )}
-                      
+
                       <Form.Item
                         name="confirmPassword"
                         label="Confirmar Senha"
-                        dependencies={['password']}
+                        dependencies={["password"]}
                         rules={[
-                          { required: true, message: 'Por favor, confirme sua senha!' },
+                          {
+                            required: true,
+                            message: "Por favor, confirme sua senha!",
+                          },
                           ({ getFieldValue }) => ({
                             validator(_, value) {
-                              if (!value || getFieldValue('password') === value) {
+                              if (
+                                !value ||
+                                getFieldValue("password") === value
+                              ) {
                                 return Promise.resolve();
                               }
-                              return Promise.reject(new Error('As senhas não coincidem!'));
+                              return Promise.reject(
+                                new Error("As senhas não coincidem!"),
+                              );
                             },
                           }),
                         ]}
                       >
-                        <Input.Password 
-                          prefix={<LockOutlined className="input-icon" />} 
+                        <Input.Password
+                          prefix={<LockOutlined className="input-icon" />}
                           placeholder="Confirme sua senha"
                           size="large"
                           className="custom-input"
-                          iconRender={(visible) => 
+                          iconRender={(visible) =>
                             visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />
                           }
                         />
                       </Form.Item>
-                      
+
                       <Form.Item>
-                        <Button 
-                          type="primary" 
-                          htmlType="submit" 
+                        <Button
+                          type="primary"
+                          htmlType="submit"
                           loading={loading}
                           size="large"
                           className="submit-button"
                           icon={<UserAddOutlined />}
                           block
                         >
-                          {loading ? 'Cadastrando...' : 'Criar Conta'}
+                          {loading ? "Cadastrando..." : "Criar Conta"}
                         </Button>
                       </Form.Item>
                     </Form>

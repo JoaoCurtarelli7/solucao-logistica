@@ -8,6 +8,73 @@ import { z } from "zod";
 import { generateToken, hashPassword } from "../lib/auth";
 import bcrypt from "bcrypt";
 
+// Permissões mínimas para o primeiro usuário (Admin) quando não há seed
+const BOOTSTRAP_ADMIN_PERMISSIONS = [
+  "dashboard.view",
+  "users.view",
+  "users.create",
+  "users.update",
+  "users.delete",
+  "users.manage",
+  "roles.view",
+  "roles.create",
+  "roles.update",
+  "roles.delete",
+  "permissions.view",
+  "companies.view",
+  "employees.view",
+  "trucks.view",
+  "trips.view",
+  "loads.view",
+  "financial.view",
+  "closings.view",
+  "months.view",
+  "reports.view",
+  "reports.export",
+];
+
+async function ensureAdminRoleExists(): Promise<{ id: number }> {
+  let adminRole = await prisma.role.findFirst({ where: { name: "Admin" } });
+  if (adminRole) return { id: adminRole.id };
+  await prisma.permission.createMany({
+    data: BOOTSTRAP_ADMIN_PERMISSIONS.map((key) => ({ key })),
+    skipDuplicates: true,
+  });
+  adminRole = await prisma.role.create({
+    data: { name: "Admin", description: "Acesso total ao sistema" },
+  });
+  const perms = await prisma.permission.findMany({
+    where: { key: { in: BOOTSTRAP_ADMIN_PERMISSIONS } },
+    select: { id: true },
+  });
+  if (perms.length) {
+    await prisma.rolePermission.createMany({
+      data: perms.map((p) => ({ roleId: adminRole!.id, permissionId: p.id })),
+      skipDuplicates: true,
+    });
+  }
+  return { id: adminRole.id };
+}
+
+async function ensureUserRoleExists(): Promise<{ id: number }> {
+  let userRole = await prisma.role.findFirst({ where: { name: "User" } });
+  if (userRole) return { id: userRole.id };
+  userRole = await prisma.role.create({
+    data: { name: "User", description: "Usuário padrão do sistema" },
+  });
+  const perms = await prisma.permission.findMany({
+    where: { key: { in: ["dashboard.view"] } },
+    select: { id: true },
+  });
+  if (perms.length) {
+    await prisma.rolePermission.createMany({
+      data: perms.map((p) => ({ roleId: userRole!.id, permissionId: p.id })),
+      skipDuplicates: true,
+    });
+  }
+  return { id: userRole.id };
+}
+
 export async function authRoutes(app: FastifyInstance) {
   const loginSchema = z.object({
     email: z.string().email(),
@@ -24,52 +91,51 @@ export async function authRoutes(app: FastifyInstance) {
 
       const { name, email, password } = bodySchema.parse(req.body);
 
-      // Verificar se o usuário já existe
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         return rep.code(400).send({ message: "E-mail já está em uso" });
       }
 
-      // Buscar ou criar role padrão "User"
-      let defaultRole = await prisma.role.findFirst({
-        where: { name: "User" },
-      });
+      const userCount = await prisma.user.count();
+      const isFirstUser = userCount === 0;
 
-      if (!defaultRole) {
-        // Se não existir, criar role padrão "User"
-        defaultRole = await prisma.role.create({
-          data: {
-            name: "User",
-            description: "Usuário padrão do sistema",
-          },
-        });
-      }
+      const roleToAssign = isFirstUser
+        ? await ensureAdminRoleExists()
+        : await ensureUserRoleExists();
 
-      // Hash da senha
       const hashedPassword = await hashPassword(password);
 
-      // Criar usuário com role padrão
       const newUser = await prisma.user.create({
         data: {
           name,
           email,
           password: hashedPassword,
-          roleId: defaultRole.id,
+          roleId: roleToAssign.id,
           status: "active",
         },
       });
 
-      console.log("✅ Usuário criado com sucesso:", {
-        id: newUser.id,
-        email: newUser.email,
-      });
+      if (isFirstUser) {
+        console.log("✅ Primeiro usuário do sistema criado como Admin:", {
+          id: newUser.id,
+          email: newUser.email,
+        });
+      } else {
+        console.log("✅ Usuário criado com sucesso:", {
+          id: newUser.id,
+          email: newUser.email,
+        });
+      }
 
       return rep.code(201).send({
-        message: "Usuário criado com sucesso!",
+        message: isFirstUser
+          ? "Cadastro realizado! Você é o primeiro usuário e recebeu o perfil Admin."
+          : "Usuário criado com sucesso!",
         user: {
           id: newUser.id,
           name: newUser.name,
           email: newUser.email,
+          role: isFirstUser ? "Admin" : "User",
         },
       });
     } catch (error: any) {
@@ -129,7 +195,10 @@ export async function authRoutes(app: FastifyInstance) {
           },
         });
       } catch (includeError: any) {
-        app.log.warn("Login: include role/permissions falhou, buscando só usuário:", includeError?.message);
+        app.log.warn(
+          "Login: include role/permissions falhou, buscando só usuário:",
+          includeError?.message,
+        );
         user = await prisma.user.findUnique({
           where: { email },
         });
@@ -150,7 +219,9 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       const permissions: string[] =
-        user.role?.permissions?.map((rp: { permission?: { key?: string } }) => rp.permission?.key).filter(Boolean) ?? [];
+        user.role?.permissions
+          ?.map((rp: { permission?: { key?: string } }) => rp.permission?.key)
+          .filter(Boolean) ?? [];
       const token = generateToken({
         userId: user.id,
         roleId: user.role?.id ?? null,
