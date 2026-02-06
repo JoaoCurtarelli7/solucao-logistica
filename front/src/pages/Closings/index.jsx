@@ -612,7 +612,15 @@ export default function Closings() {
                     </Option>
                   ))}
                 </Select>
-              
+                {selectedMonth && (
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={openModal}
+                  >
+                    Novo Fechamento
+                  </Button>
+                )}
               </Space>
             </Col>
           </Row>

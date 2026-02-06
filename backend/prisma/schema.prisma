@@ -108,7 +108,6 @@ model Load {
   totalValue    Float
   freight4      Float
   totalFreight  Float
-  closings      Float
   observations  String?
   companyId     Int
   Company       Company  @relation(fields: [companyId], references: [id], map: "fk_load_company")
