@@ -86,8 +86,20 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
         return rep.status(403).send({ message: "Usuário inativo" });
       }
 
-      const permissions: string[] =
+      let permissions: string[] =
         dbUser.role?.permissions?.map((rp: { permission?: { key?: string } }) => rp.permission?.key).filter(Boolean) ?? [];
+
+      // Usuário sem perfil (roleId null) = acesso total (super admin)
+      if (permissions.length === 0) {
+        try {
+          const allPerms = await (prisma as any).permission.findMany({
+            select: { key: true },
+          });
+          permissions = (allPerms as { key: string }[]).map((p) => p.key);
+        } catch {
+          permissions = ["users.manage"];
+        }
+      }
 
       req.user = {
         id: dbUser.id,

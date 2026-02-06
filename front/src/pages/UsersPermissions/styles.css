@@ -1,0 +1,231 @@
+/* Usuários & Permissões - Layout e organização */
+
+.users-permissions-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 4px;
+}
+
+.users-permissions-page .page-header {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.users-permissions-page .page-header .page-title {
+  margin: 0 0 4px 0;
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: #1f2937;
+}
+
+.users-permissions-page .page-header .page-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.users-permissions-page .header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Tabs mais claras */
+.users-permissions-page .ant-tabs-nav {
+  margin-bottom: 20px;
+}
+
+.users-permissions-page .ant-tabs-tab {
+  padding: 10px 16px;
+  font-weight: 500;
+}
+
+.users-permissions-page .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #1890ff;
+}
+
+/* === Aba Perfis === */
+.roles-layout {
+  display: flex;
+  gap: 20px;
+  min-height: 420px;
+}
+
+@media (max-width: 768px) {
+  .roles-layout {
+    flex-direction: column;
+    min-height: auto;
+  }
+  .roles-sidebar {
+    width: 100%;
+  }
+}
+
+.roles-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+}
+
+.roles-sidebar .ant-card {
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.roles-sidebar .ant-card-head {
+  min-height: 48px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.role-item {
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.role-item:hover {
+  background: #f8fafc;
+}
+
+.role-item.selected {
+  background: #eff6ff;
+  border-color: #1890ff;
+  box-shadow: 0 0 0 1px rgba(24, 144, 255, 0.15);
+}
+
+.role-item .role-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.role-item .role-desc {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.3;
+}
+
+.permissions-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+.permissions-panel .ant-card {
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.permissions-panel .ant-card-head {
+  min-height: 56px;
+  padding: 0 20px;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.permissions-panel .ant-card-body {
+  padding: 20px;
+}
+
+/* Barra de busca de módulos */
+.module-search-wrap {
+  margin-bottom: 16px;
+}
+
+.module-search-wrap .ant-input-affix-wrapper {
+  border-radius: 8px;
+}
+
+/* Grupos de permissões (Collapse) */
+.permissions-collapse .ant-collapse-item {
+  margin-bottom: 8px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.permissions-collapse .ant-collapse-header {
+  align-items: center;
+  padding: 12px 16px !important;
+  font-weight: 600;
+  color: #374151;
+}
+
+.permissions-collapse .ant-collapse-content-box {
+  padding: 12px 16px 16px !important;
+}
+
+/* Card de módulo dentro do collapse */
+.module-perm-card {
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: background 0.2s;
+}
+
+.module-perm-card:hover {
+  background: #f5f5f5;
+}
+
+.module-perm-card:last-child {
+  margin-bottom: 0;
+}
+
+.module-perm-card .module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.module-perm-card .module-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.module-perm-card .module-actions-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+}
+
+.module-perm-card .ant-checkbox-wrapper {
+  margin-right: 0;
+}
+
+/* Botão Salvar permissões fixo no topo do painel */
+.save-perms-btn {
+  min-width: 160px;
+  font-weight: 500;
+}
+
+/* Empty state */
+.select-role-placeholder {
+  padding: 60px 24px;
+  text-align: center;
+}
+
+.select-role-placeholder .ant-result-subtitle {
+  color: #6b7280;
+}
+
+/* Categorias de módulos */
+.perm-category-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9ca3af;
+  margin-bottom: 6px;
+  padding-left: 2px;
+}

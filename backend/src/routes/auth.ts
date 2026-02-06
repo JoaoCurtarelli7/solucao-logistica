@@ -8,7 +8,7 @@ import { z } from "zod";
 import { generateToken, hashPassword } from "../lib/auth";
 import bcrypt from "bcrypt";
 
-// Permissões mínimas para o primeiro usuário (Admin) quando não há seed
+// Permissões completas do perfil Admin (view + create + update + delete em todos os módulos)
 const BOOTSTRAP_ADMIN_PERMISSIONS = [
   "dashboard.view",
   "users.view",
@@ -21,33 +21,72 @@ const BOOTSTRAP_ADMIN_PERMISSIONS = [
   "roles.update",
   "roles.delete",
   "permissions.view",
+  "permissions.create",
+  "permissions.update",
+  "permissions.delete",
   "companies.view",
+  "companies.create",
+  "companies.update",
+  "companies.delete",
   "employees.view",
+  "employees.create",
+  "employees.update",
+  "employees.delete",
   "trucks.view",
+  "trucks.create",
+  "trucks.update",
+  "trucks.delete",
   "trips.view",
+  "trips.create",
+  "trips.update",
+  "trips.delete",
+  "tripExpenses.view",
+  "tripExpenses.create",
+  "tripExpenses.update",
+  "tripExpenses.delete",
+  "maintenance.view",
+  "maintenance.create",
+  "maintenance.update",
+  "maintenance.delete",
   "loads.view",
+  "loads.create",
+  "loads.update",
+  "loads.delete",
   "financial.view",
+  "financial.create",
+  "financial.update",
+  "financial.delete",
   "closings.view",
+  "closings.create",
+  "closings.update",
+  "closings.delete",
   "months.view",
+  "months.create",
+  "months.update",
+  "months.delete",
   "reports.view",
   "reports.export",
 ];
 
 async function ensureAdminRoleExists(): Promise<{ id: number }> {
-  let adminRole = await prisma.role.findFirst({ where: { name: "Admin" } });
-  if (adminRole) return { id: adminRole.id };
   await prisma.permission.createMany({
     data: BOOTSTRAP_ADMIN_PERMISSIONS.map((key) => ({ key })),
     skipDuplicates: true,
   });
-  adminRole = await prisma.role.create({
-    data: { name: "Admin", description: "Acesso total ao sistema" },
-  });
+
+  let adminRole = await prisma.role.findFirst({ where: { name: "Admin" } });
+  if (!adminRole) {
+    adminRole = await prisma.role.create({
+      data: { name: "Admin", description: "Acesso total ao sistema" },
+    });
+  }
+
   const perms = await prisma.permission.findMany({
     where: { key: { in: BOOTSTRAP_ADMIN_PERMISSIONS } },
     select: { id: true },
   });
   if (perms.length) {
+    await prisma.rolePermission.deleteMany({ where: { roleId: adminRole.id } });
     await prisma.rolePermission.createMany({
       data: perms.map((p) => ({ roleId: adminRole!.id, permissionId: p.id })),
       skipDuplicates: true,
@@ -96,12 +135,9 @@ export async function authRoutes(app: FastifyInstance) {
         return rep.code(400).send({ message: "E-mail já está em uso" });
       }
 
-      const userCount = await prisma.user.count();
-      const isFirstUser = userCount === 0;
-
-      const roleToAssign = isFirstUser
-        ? await ensureAdminRoleExists()
-        : await ensureUserRoleExists();
+      await ensureAdminRoleExists();
+      const adminRole = await prisma.role.findFirst({ where: { name: "Admin" } });
+      const roleToAssign = adminRole!;
 
       const hashedPassword = await hashPassword(password);
 
@@ -115,27 +151,18 @@ export async function authRoutes(app: FastifyInstance) {
         },
       });
 
-      if (isFirstUser) {
-        console.log("✅ Primeiro usuário do sistema criado como Admin:", {
-          id: newUser.id,
-          email: newUser.email,
-        });
-      } else {
-        console.log("✅ Usuário criado com sucesso:", {
-          id: newUser.id,
-          email: newUser.email,
-        });
-      }
+      console.log("✅ Usuário criado com perfil Admin:", {
+        id: newUser.id,
+        email: newUser.email,
+      });
 
       return rep.code(201).send({
-        message: isFirstUser
-          ? "Cadastro realizado! Você é o primeiro usuário e recebeu o perfil Admin."
-          : "Usuário criado com sucesso!",
+        message: "Cadastro realizado! Você foi criado com perfil Admin.",
         user: {
           id: newUser.id,
           name: newUser.name,
           email: newUser.email,
-          role: isFirstUser ? "Admin" : "User",
+          role: "Admin",
         },
       });
     } catch (error: any) {

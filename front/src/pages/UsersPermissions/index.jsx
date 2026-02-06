@@ -4,10 +4,9 @@ import {
   Card,
   Checkbox,
   Col,
-  Descriptions,
+  Collapse,
   Form,
   Input,
-  List,
   Modal,
   Result,
   Row,
@@ -26,10 +25,14 @@ import {
   StopOutlined,
   CheckCircleOutlined,
   ReloadOutlined,
+  SearchOutlined,
+  TeamOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import api from "../../lib/api";
 import { usePermission } from "../../hooks/usePermission";
 import { useUserContext } from "../../context/userContext";
+import "./styles.css";
 
 const { Title, Text } = Typography;
 
@@ -61,6 +64,55 @@ const actionLabels = {
   manage: "Gerenciar",
   export: "Exportar",
 };
+
+// Grade fixa: todos os módulos com todas as ações (view, create, update, delete, etc.)
+// Assim a tela sempre mostra Criar, Editar, Deletar, Visualizar para cada módulo
+const MODULES_WITH_ACTIONS = [
+  { module: "dashboard", actions: ["view"] },
+  { module: "users", actions: ["view", "create", "update", "delete", "manage"] },
+  { module: "roles", actions: ["view", "create", "update", "delete"] },
+  { module: "permissions", actions: ["view", "create", "update", "delete"] },
+  { module: "companies", actions: ["view", "create", "update", "delete"] },
+  { module: "employees", actions: ["view", "create", "update", "delete"] },
+  { module: "trucks", actions: ["view", "create", "update", "delete"] },
+  { module: "trips", actions: ["view", "create", "update", "delete"] },
+  { module: "tripExpenses", actions: ["view", "create", "update", "delete"] },
+  { module: "maintenance", actions: ["view", "create", "update", "delete"] },
+  { module: "loads", actions: ["view", "create", "update", "delete"] },
+  { module: "financial", actions: ["view", "create", "update", "delete"] },
+  { module: "closings", actions: ["view", "create", "update", "delete"] },
+  { module: "months", actions: ["view", "create", "update", "delete"] },
+  { module: "reports", actions: ["view", "export"] },
+];
+
+// Agrupar módulos por categoria para a UI
+const MODULE_CATEGORIES = [
+  {
+    key: "sistema",
+    label: "Sistema",
+    modules: ["dashboard", "users", "roles", "permissions"],
+  },
+  {
+    key: "gestao",
+    label: "Gestão",
+    modules: ["companies", "employees"],
+  },
+  {
+    key: "operacoes",
+    label: "Operações",
+    modules: ["trucks", "trips", "tripExpenses", "maintenance", "loads"],
+  },
+  {
+    key: "financeiro",
+    label: "Financeiro",
+    modules: ["financial", "closings", "months"],
+  },
+  {
+    key: "relatorios",
+    label: "Relatórios",
+    modules: ["reports"],
+  },
+];
 
 function groupPermissions(keys) {
   const groups = {};
@@ -109,6 +161,7 @@ export default function UsersPermissions() {
   const [editingRole, setEditingRole] = useState(null);
   const [roleForm] = Form.useForm();
   const [savingRolePerms, setSavingRolePerms] = useState(false);
+  const [moduleSearch, setModuleSearch] = useState("");
 
   // Audit logs
   const [logs, setLogs] = useState([]);
@@ -138,6 +191,36 @@ export default function UsersPermissions() {
     () => roles.find((r) => r.id === selectedRoleId) || null,
     [roles, selectedRoleId],
   );
+
+  const filteredModulesBySearch = useMemo(() => {
+    const q = moduleSearch.trim().toLowerCase();
+    if (!q) return MODULES_WITH_ACTIONS;
+    return MODULES_WITH_ACTIONS.filter((g) =>
+      (moduleLabels[g.module] || g.module).toLowerCase().includes(q),
+    );
+  }, [moduleSearch]);
+
+  const categoriesWithModules = useMemo(() => {
+    return MODULE_CATEGORIES.map((cat) => ({
+      ...cat,
+      modules: cat.modules
+        .map((modKey) =>
+          filteredModulesBySearch.find((m) => m.module === modKey),
+        )
+        .filter(Boolean),
+    })).filter((cat) => cat.modules.length > 0);
+  }, [filteredModulesBySearch]);
+
+  const toggleModulePerms = (moduleKey, checked) => {
+    const g = MODULES_WITH_ACTIONS.find((m) => m.module === moduleKey);
+    if (!g) return;
+    const keys = g.actions.map((a) => `${moduleKey}.${a}`);
+    if (checked) {
+      setRolePerms((prev) => [...new Set([...prev, ...keys])]);
+    } else {
+      setRolePerms((prev) => prev.filter((k) => !keys.includes(k)));
+    }
+  };
 
   const loadRoles = async () => {
     const res = await api.get("/roles");
@@ -224,7 +307,12 @@ export default function UsersPermissions() {
       <Result
         status="403"
         title="Acesso negado"
-        subTitle="Você não tem permissão para acessar Usuários & Permissões."
+        subTitle="Você não tem permissão para acessar Usuários e Permissões. Peça a um administrador para atribuir o perfil com permissão 'Gerenciar usuários' ao seu usuário."
+        extra={
+          <Text type="secondary">
+            Se você é o primeiro usuário e não tem perfil atribuído, faça logout e login novamente para que o sistema reconheça seu acesso total.
+          </Text>
+        }
       />
     );
   }
@@ -232,7 +320,11 @@ export default function UsersPermissions() {
   const openCreateUser = () => {
     setEditingUser(null);
     userForm.resetFields();
-    userForm.setFieldsValue({ status: "active" });
+    const adminRole = roles.find((r) => r.name === "Admin");
+    userForm.setFieldsValue({
+      status: "active",
+      roleId: adminRole?.id ?? roles[0]?.id,
+    });
     setUserModalOpen(true);
   };
 
@@ -466,18 +558,16 @@ export default function UsersPermissions() {
   ];
 
   return (
-    <Card bordered={false}>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 12 }}>
+    <Card bordered={false} className="users-permissions-page">
+      <Row justify="space-between" align="middle" className="page-header">
         <Col>
-          <Title level={3} style={{ margin: 0 }}>
-            Usuários & Permissões
-          </Title>
-          <Text type="secondary">
+          <h1 className="page-title">Usuários & Permissões</h1>
+          <p className="page-subtitle">
             Gerencie usuários, perfis e acessos por módulo.
-          </Text>
+          </p>
         </Col>
         <Col>
-          <Space>
+          <Space size="middle" className="header-actions">
             <Button
               icon={<ReloadOutlined />}
               onClick={() =>
@@ -641,7 +731,12 @@ export default function UsersPermissions() {
           },
           {
             key: "users",
-            label: "Usuários",
+            label: (
+              <span>
+                <TeamOutlined style={{ marginRight: 6 }} />
+                Usuários
+              </span>
+            ),
             children: (
               <>
                 <Row gutter={12} style={{ marginBottom: 12 }}>
@@ -699,44 +794,46 @@ export default function UsersPermissions() {
           },
           {
             key: "roles",
-            label: "Perfis (Roles)",
+            label: (
+              <span>
+                <SafetyCertificateOutlined style={{ marginRight: 6 }} />
+                Perfis
+              </span>
+            ),
             children: (
-              <Row gutter={12}>
-                <Col xs={24} md={7}>
+              <div className="roles-layout">
+                <div className="roles-sidebar">
                   <Card size="small" title="Perfis" bordered>
-                    <List
-                      dataSource={roles}
-                      rowKey="id"
-                      renderItem={(item) => (
-                        <List.Item
-                          style={{
-                            cursor: "pointer",
-                            background:
-                              item.id === selectedRoleId
-                                ? "#f5f5f5"
-                                : "transparent",
-                            borderRadius: 6,
-                            paddingInline: 8,
-                          }}
-                          onClick={() => setSelectedRoleId(item.id)}
-                        >
-                          <List.Item.Meta
-                            title={item.name}
-                            description={
-                              item.description || (
-                                <Text type="secondary">Sem descrição</Text>
-                              )
-                            }
-                          />
-                        </List.Item>
-                      )}
-                    />
+                    {roles.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`role-item ${item.id === selectedRoleId ? "selected" : ""}`}
+                        onClick={() => setSelectedRoleId(item.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedRoleId(item.id);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <div className="role-name">{item.name}</div>
+                        <div className="role-desc">
+                          {item.description || "Sem descrição"}
+                        </div>
+                      </div>
+                    ))}
                   </Card>
-                </Col>
-                <Col xs={24} md={17}>
+                </div>
+                <div className="permissions-panel">
                   <Card
                     size="small"
-                    title={`Permissões${selectedRole ? `: ${selectedRole.name}` : ""}`}
+                    title={
+                      selectedRole
+                        ? `Permissões: ${selectedRole.name}`
+                        : "Permissões"
+                    }
                     bordered
                     extra={
                       <Button
@@ -744,6 +841,7 @@ export default function UsersPermissions() {
                         loading={savingRolePerms}
                         onClick={saveRolePermissions}
                         disabled={!selectedRole}
+                        className="save-perms-btn"
                       >
                         Salvar permissões
                       </Button>
@@ -752,46 +850,97 @@ export default function UsersPermissions() {
                     {!selectedRole ? (
                       <Result
                         status="info"
-                        title="Selecione um perfil à esquerda"
+                        title="Selecione um perfil"
+                        subTitle="Escolha um perfil à esquerda para editar as permissões."
+                        className="select-role-placeholder"
                       />
                     ) : (
                       <>
+                        <div className="module-search-wrap">
+                          <Input
+                            prefix={<SearchOutlined style={{ color: "#9ca3af" }} />}
+                            placeholder="Buscar módulo (ex.: Financeiro, Cargas)"
+                            value={moduleSearch}
+                            onChange={(e) => setModuleSearch(e.target.value)}
+                            allowClear
+                            style={{ maxWidth: 320 }}
+                          />
+                        </div>
                         <Checkbox.Group
                           value={rolePerms}
                           onChange={(vals) => setRolePerms(vals)}
                           style={{ width: "100%" }}
                         >
-                          {groupedPerms.map((g) => (
-                            <Card
-                              key={g.module}
-                              size="small"
-                              style={{ marginBottom: 12 }}
-                            >
-                              <Title level={5} style={{ marginTop: 0 }}>
-                                {g.moduleLabel}
-                              </Title>
-                              <Row gutter={[8, 8]}>
-                                {g.perms.map((k) => {
-                                  const [, action] = k.split(".");
-                                  const actionLabel =
-                                    actionLabels[action] || action;
+                          <Collapse
+                            defaultActiveKey={MODULE_CATEGORIES.map((c) => c.key)}
+                            className="permissions-collapse"
+                          >
+                            {categoriesWithModules.map((cat) => (
+                              <Collapse.Panel
+                                header={cat.label}
+                                key={cat.key}
+                              >
+                                {cat.modules.map((g) => {
+                                  const moduleKey = g.module;
+                                  const allKeys = g.actions.map(
+                                    (a) => `${moduleKey}.${a}`,
+                                  );
+                                  const checkedCount = allKeys.filter((k) =>
+                                    rolePerms.includes(k),
+                                  ).length;
+                                  const allChecked =
+                                    checkedCount === allKeys.length;
+                                  const someChecked = checkedCount > 0;
                                   return (
-                                    <Col key={k} xs={24} md={12} lg={8}>
-                                      <Checkbox value={k}>
-                                        {actionLabel}
-                                      </Checkbox>
-                                    </Col>
+                                    <div
+                                      key={moduleKey}
+                                      className="module-perm-card"
+                                    >
+                                      <div className="module-header">
+                                        <span className="module-title">
+                                          {moduleLabels[moduleKey] || moduleKey}
+                                        </span>
+                                        <Space size="small">
+                                          <Button
+                                            type="link"
+                                            size="small"
+                                            onClick={() =>
+                                              toggleModulePerms(
+                                                moduleKey,
+                                                !allChecked,
+                                              )
+                                            }
+                                          >
+                                            {allChecked
+                                              ? "Desmarcar todos"
+                                              : "Marcar todos"}
+                                          </Button>
+                                        </Space>
+                                      </div>
+                                      <div className="module-actions-inline">
+                                        {g.actions.map((action) => {
+                                          const k = `${moduleKey}.${action}`;
+                                          const label =
+                                            actionLabels[action] || action;
+                                          return (
+                                            <Checkbox key={k} value={k}>
+                                              {label}
+                                            </Checkbox>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
                                   );
                                 })}
-                              </Row>
-                            </Card>
-                          ))}
+                              </Collapse.Panel>
+                            ))}
+                          </Collapse>
                         </Checkbox.Group>
                       </>
                     )}
                   </Card>
-                </Col>
-              </Row>
+                </div>
+              </div>
             ),
           },
           {

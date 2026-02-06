@@ -307,11 +307,20 @@ export async function rbacRoutes(app: FastifyInstance) {
       const schema = z.object({
         name: z.string().min(2),
         email: z.string().email(),
-        roleId: z.number(),
+        roleId: z.number().optional(),
         status: z.enum(["active", "inactive"]).default("active"),
         password: z.string().min(6).optional(),
       });
       const body = schema.parse(req.body);
+
+      let roleId = body.roleId;
+      if (roleId == null) {
+        const adminRole = await prisma.role.findFirst({
+          where: { name: "Admin" },
+          select: { id: true },
+        });
+        roleId = adminRole?.id ?? body.roleId;
+      }
 
       const tempPassword =
         body.password ?? crypto.randomBytes(9).toString("base64url"); // ~12 chars
@@ -323,7 +332,7 @@ export async function rbacRoutes(app: FastifyInstance) {
           email: body.email,
           password: hashed,
           status: body.status,
-          roleId: body.roleId,
+          roleId: roleId!,
         },
         select: {
           id: true,
@@ -338,7 +347,7 @@ export async function rbacRoutes(app: FastifyInstance) {
       await logAudit(req.user?.id, "users.create", {
         userId: user.id,
         email: user.email,
-        roleId: body.roleId,
+        roleId: roleId,
       });
       return rep
         .code(201)

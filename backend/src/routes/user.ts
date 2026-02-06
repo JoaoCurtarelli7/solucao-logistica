@@ -76,10 +76,24 @@ export async function userRoutes(app: FastifyInstance) {
         return reply.code(404).send({ message: "Usuário não encontrado" });
       }
 
-      const permissions: string[] =
+      let permissions: string[] =
         user.role?.permissions
           ?.map((rp: { permission?: { key?: string } }) => rp.permission?.key)
           .filter(Boolean) ?? [];
+
+      // Usuário sem perfil (roleId null) = acesso total (super admin) para configurar perfis
+      if (permissions.length === 0) {
+        try {
+          const allPerms = await (prisma as any).permission.findMany({
+            select: { key: true },
+            orderBy: { key: "asc" },
+          });
+          permissions = (allPerms as { key: string }[]).map((p) => p.key);
+        } catch {
+          permissions = ["users.manage"];
+        }
+      }
+
       const role = user.role
         ? { id: user.role.id, name: user.role.name }
         : null;
@@ -166,24 +180,38 @@ export async function userRoutes(app: FastifyInstance) {
         },
       });
 
-      const permissions: string[] =
-        updatedUser.role?.permissions
+      const u = updatedUser as any;
+      let permissions: string[] =
+        u.role?.permissions
           ?.map((rp: { permission?: { key?: string } }) => rp.permission?.key)
-          .filter((k): k is string => Boolean(k)) ?? [];
-      const role = updatedUser.role
-        ? { id: updatedUser.role.id, name: updatedUser.role.name }
+          .filter((k: string | undefined): k is string => Boolean(k)) ?? [];
+
+      if (permissions.length === 0) {
+        try {
+          const allPerms = await (prisma as any).permission.findMany({
+            select: { key: true },
+            orderBy: { key: "asc" },
+          });
+          permissions = (allPerms as { key: string }[]).map((p) => p.key);
+        } catch {
+          permissions = ["users.manage"];
+        }
+      }
+
+      const role = u.role
+        ? { id: u.role.id, name: u.role.name }
         : null;
 
       return reply.send({
         message: "Perfil atualizado com sucesso!",
         user: {
-          id: updatedUser.id,
-          name: updatedUser.name,
-          email: updatedUser.email,
-          phone: updatedUser.phone ?? null,
-          address: updatedUser.address ?? null,
-          status: updatedUser.status ?? null,
-          createdAt: updatedUser.createdAt,
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone ?? null,
+          address: u.address ?? null,
+          status: u.status ?? null,
+          createdAt: u.createdAt,
           role,
           permissions,
         },
