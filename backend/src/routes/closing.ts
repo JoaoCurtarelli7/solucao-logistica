@@ -9,7 +9,7 @@ export async function closingRoutes(app: FastifyInstance) {
   // Schema para validação de fechamento
   const createClosingSchema = z.object({
     monthId: z.number(),
-    companyId: z.number().optional(),
+    companyId: z.number().nullable().optional(),
     name: z.string().min(1, "Nome do fechamento é obrigatório"),
     startDate: z.string().nullable().optional().transform((str) => {
       if (!str) return null;
@@ -151,6 +151,8 @@ export async function closingRoutes(app: FastifyInstance) {
   app.post("/closings", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = createClosingSchema.parse(req.body);
+      // Garantir companyId null quando não informado (Todas as empresas)
+      const companyId = data.companyId === undefined ? null : data.companyId;
 
       // Verificar se o mês existe
       const month = await prisma.month.findUnique({
@@ -162,9 +164,9 @@ export async function closingRoutes(app: FastifyInstance) {
       }
 
       // Verificar se a empresa existe (se fornecida)
-      if (data.companyId) {
+      if (companyId != null) {
         const company = await prisma.company.findUnique({
-          where: { id: data.companyId },
+          where: { id: companyId },
         });
 
         if (!company) {
@@ -175,7 +177,7 @@ export async function closingRoutes(app: FastifyInstance) {
       // Criar fechamento usando Prisma ORM em vez de SQL bruto
       const closingData = {
         monthId: data.monthId,
-        companyId: data.companyId || null,
+        companyId,
         name: data.name,
         status: 'aberto',
         startDate: data.startDate || null,
@@ -204,8 +206,14 @@ export async function closingRoutes(app: FastifyInstance) {
       });
 
       return rep.code(201).send(newClosing);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao criar fechamento:", error);
+      if (error?.name === "ZodError" && error?.errors) {
+        const msg = error.errors.map((e: { path: string[]; message: string }) => 
+          `${e.path.join(".")}: ${e.message}`
+        ).join("; ");
+        return rep.code(400).send({ message: msg });
+      }
       return rep.code(500).send({ 
         message: "Erro interno do servidor",
         error: error instanceof Error ? error.message : "Erro desconhecido"

@@ -1,25 +1,38 @@
-import { useEffect, useState } from 'react';
-import { Card, Button, Input, Form, Table, Typography, Space, message, Popconfirm, DatePicker, Result } from 'antd';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { api } from '../../../lib';
-import { usePermission } from '../../../hooks/usePermission';
+import { useEffect, useState } from 'react'
+import {
+  Card,
+  Button,
+  Input,
+  Form,
+  Table,
+  Typography,
+  Space,
+  message,
+  Popconfirm,
+  DatePicker,
+  Result,
+} from 'antd'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { api } from '../../../lib'
+import { usePermission } from '../../../hooks/usePermission'
 
 export default function TripExpenses() {
-  const navigate = useNavigate();
-  const { state } = useLocation(); // Dados da viagem selecionada
-  const params = useParams();
-  const { hasPermission } = usePermission();
-  const [expenses, setExpenses] = useState([]);
-  const [trip, setTrip] = useState(state || null);
-  const [form] = Form.useForm();
+  const navigate = useNavigate()
+  const { state } = useLocation()
+  const params = useParams()
+  const { hasPermission } = usePermission()
 
-  const tripId = state?.id || params?.id;
+  const [expenses, setExpenses] = useState<any[]>([])
+  const [trip, setTrip] = useState<any>(state || null)
+  const [form] = Form.useForm()
 
-  const canView = hasPermission('tripExpenses.view');
-  const canCreate = hasPermission('tripExpenses.create');
-  const canUpdate = hasPermission('tripExpenses.update');
-  const canDelete = hasPermission('tripExpenses.delete');
+  const tripId = (state as any)?.id || (params as any)?.id
+
+  const canView = hasPermission('tripExpenses.view')
+  const canCreate = hasPermission('tripExpenses.create')
+  const canUpdate = hasPermission('tripExpenses.update')
+  const canDelete = hasPermission('tripExpenses.delete')
 
   if (!canView) {
     return (
@@ -28,100 +41,99 @@ export default function TripExpenses() {
         title="Acesso negado"
         subTitle="Você não tem permissão para visualizar despesas de viagem."
       />
-    );
+    )
   }
 
-  // Carregar despesas da viagem
   const fetchExpenses = async () => {
     try {
-      const response = await api.get(`/trips/${tripId}/expenses`);
-      // backend responde { expenses }
-      setExpenses(response.data?.expenses || []);
+      const response = await api.get(`/trips/${tripId}/expenses`)
+      setExpenses(response.data?.expenses || [])
     } catch (error) {
-      console.error(error);
-      message.error('Erro ao carregar despesas');
+      console.error(error)
+      message.error('Erro ao carregar despesas')
     }
-  };
+  }
 
   const fetchTrip = async () => {
     try {
-      const response = await api.get(`/trips/${tripId}`);
-      setTrip(response.data);
+      const response = await api.get(`/trips/${tripId}`)
+      setTrip(response.data)
     } catch (error) {
-      console.error(error);
+      console.error(error)
     }
-  };
+  }
 
   useEffect(() => {
     if (tripId) {
-      fetchExpenses();
-      fetchTrip();
+      fetchExpenses()
+      fetchTrip()
     }
-  }, [tripId]);
+  }, [tripId])
 
-  // Recarregar dados quando voltar da página de despesas
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Força recarregamento da listagem de viagens ao voltar
-      window.dispatchEvent(new CustomEvent('reloadTrips'));
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
+      window.dispatchEvent(new CustomEvent('reloadTrips'))
+    }
 
-  // Adicionar despesa
-  const handleAddExpense = async (values) => {
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  const handleAddExpense = async (values: any) => {
     try {
-      // Endpoint correto de criação é /expenses com tripId, date ISO e category
-      const payload = { 
-        ...values, 
+      const payload = {
+        ...values,
         tripId,
-        date: values?.date ? new Date(values.date).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR'),
-        category: values?.category || 'Outro'
-      };
-      const response = await api.post(`/expenses`, payload);
-      setExpenses((prev) => [...prev, response.data]);
-      form.resetFields();
-      message.success('Despesa adicionada com sucesso!');
-    } catch (error) {
-      console.error(error);
-      message.error('Erro ao adicionar despesa');
-    }
-  };
+        date: values?.date
+          ? new Date(values.date).toLocaleDateString('pt-BR')
+          : new Date().toLocaleDateString('pt-BR'),
+        category: values?.category || 'Outro',
+      }
 
-  // Deletar despesa
-  const handleDeleteExpense = async (id) => {
-    try {
-      // Endpoint correto de exclusão é /expenses/:id
-      await api.delete(`/expenses/${id}`);
-      setExpenses((prev) => prev.filter((exp) => exp.id !== id));
-      message.success('Despesa removida com sucesso!');
+      const response = await api.post(`/expenses`, payload)
+      setExpenses((prev) => [...prev, response.data])
+      form.resetFields()
+      message.success('Despesa adicionada com sucesso!')
     } catch (error) {
-      console.error(error);
-      message.error('Erro ao remover despesa');
+      console.error(error)
+      message.error('Erro ao adicionar despesa')
     }
-  };
+  }
+
+  const handleDeleteExpense = async (id: number) => {
+    try {
+      await api.delete(`/expenses/${id}`)
+      setExpenses((prev) => prev.filter((exp) => exp.id !== id))
+      message.success('Despesa removida com sucesso!')
+    } catch (error) {
+      console.error(error)
+      message.error('Erro ao remover despesa')
+    }
+  }
 
   const calculateTotal = () =>
-    expenses.reduce((total, expense) => total + parseFloat(expense.amount), 0);
+    expenses.reduce(
+      (total, expense: any) => total + parseFloat(expense.amount || 0),
+      0,
+    )
 
-  const freightValue = trip?.freightValue || 0;
-  const totalExpenses = calculateTotal();
-  const profit = freightValue - totalExpenses;
+  const freightValue = Number(trip?.freightValue || 0)
+  const totalExpenses = calculateTotal()
+  const profit = freightValue - totalExpenses
 
-  const columns = [
+  const columns: any[] = [
     { title: 'Descrição', dataIndex: 'description', key: 'description' },
     {
       title: 'Valor',
       dataIndex: 'amount',
       key: 'amount',
-      render: (value) => `R$ ${parseFloat(value).toFixed(2)}`,
+      render: (value: any) =>
+        `R$ ${Number(parseFloat(value || 0)).toFixed(2).replace('.', ',')}`,
     },
     {
       title: 'Ações',
       key: 'actions',
-      render: (_, record) => (
+      render: (_: any, record: any) =>
         canDelete ? (
           <Popconfirm
             title="Tem certeza de que deseja excluir?"
@@ -133,10 +145,9 @@ export default function TripExpenses() {
               Excluir
             </Button>
           </Popconfirm>
-        ) : null
-      ),
+        ) : null,
     },
-  ];
+  ]
 
   return (
     <Card
@@ -149,65 +160,93 @@ export default function TripExpenses() {
       }}
       bordered={false}
     >
-      <Typography.Title level={2} style={{ color: '#3b4e6f', marginBottom: 20 }}>
-        Gastos da Viagem
-      </Typography.Title>
+      <div
+        style={{
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('reloadTrips'))
+            navigate(-1)
+          }}
+        >
+          Voltar
+        </Button>
+
+        <Typography.Title level={2} style={{ color: '#3b4e6f', margin: 0 }}>
+          Gastos da Viagem
+        </Typography.Title>
+      </div>
+
       <Typography.Paragraph style={{ fontSize: 16, color: '#6c757d' }}>
         <strong>Destino:</strong> {trip?.destination}
         <br />
         <strong>Motorista:</strong> {trip?.driver}
         <br />
-        <strong>Caminhão:</strong> {trip?.truck ? `${trip.truck.name} (${trip.truck.plate})` : '-'}
+        <strong>Caminhão:</strong>{' '}
+        {trip?.truck ? `${trip.truck.name} (${trip.truck.plate})` : '-'}
         <br />
         <strong>Valor do Frete:</strong>{' '}
         <Typography.Text strong style={{ color: '#28a745' }}>
-          R$ {freightValue.toFixed(2)}
+          R$ {freightValue.toFixed(2).replace('.', ',')}
         </Typography.Text>
       </Typography.Paragraph>
 
-      {/* Formulário para adicionar gastos */}
       {canCreate && (
-        <Form form={form} layout="inline" onFinish={handleAddExpense} style={{ marginBottom: 20 }}>
-        <Form.Item
-          name="description"
-          rules={[{ required: true, message: 'Descrição obrigatória' }]}
-          style={{ flex: 1 }}
+        <Form
+          form={form}
+          layout="inline"
+          onFinish={handleAddExpense}
+          style={{ marginBottom: 20 }}
         >
-          <Input placeholder="Descrição do gasto" />
-        </Form.Item>
-        <Form.Item
-          name="amount"
-          rules={[
-            { required: true, message: 'Valor obrigatório' },
-            { pattern: /^\d+(\.\d{1,2})?$/, message: 'Insira um valor válido' },
-          ]}
-          style={{ flex: 1 }}
-        >
-          <Input placeholder="Valor (R$)" />
-        </Form.Item>
-        <Form.Item
-          name="category"
-          rules={[{ required: true, message: 'Categoria obrigatória' }]}
-          style={{ flex: 1 }}
-        >
-          <Input placeholder="Categoria (ex: Combustível)" />
-        </Form.Item>
-        <Form.Item
-          name="date"
-          rules={[{ required: true, message: 'Data obrigatória' }]}
-          style={{ flex: 1 }}
-        >
-          <DatePicker placeholder="Data (DD/MM/YYYY)" format="DD/MM/YYYY" />
-        </Form.Item>
-        <Form.Item>
-          <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>
-            Adicionar
-          </Button>
-        </Form.Item>
+          <Form.Item
+            name="description"
+            rules={[{ required: true, message: 'Descrição obrigatória' }]}
+            style={{ flex: 1 }}
+          >
+            <Input placeholder="Descrição do gasto" />
+          </Form.Item>
+
+          <Form.Item
+            name="amount"
+            rules={[
+              { required: true, message: 'Valor obrigatório' },
+              { pattern: /^\d+(\.\d{1,2})?$/, message: 'Insira um valor válido' },
+            ]}
+            style={{ flex: 1 }}
+          >
+            <Input placeholder="Valor (R$)" />
+          </Form.Item>
+
+          <Form.Item
+            name="category"
+            rules={[{ required: true, message: 'Categoria obrigatória' }]}
+            style={{ flex: 1 }}
+          >
+            <Input placeholder="Categoria (ex: Combustível)" />
+          </Form.Item>
+
+          <Form.Item
+            name="date"
+            rules={[{ required: true, message: 'Data obrigatória' }]}
+            style={{ flex: 1 }}
+          >
+            <DatePicker placeholder="Data (DD/MM/YYYY)" format="DD/MM/YYYY" />
+          </Form.Item>
+
+          <Form.Item>
+            <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>
+              Adicionar
+            </Button>
+          </Form.Item>
         </Form>
       )}
 
-      {/* Tabela de Gastos */}
       <Table
         dataSource={expenses}
         columns={columns}
@@ -218,7 +257,7 @@ export default function TripExpenses() {
             <Table.Summary.Cell>Total</Table.Summary.Cell>
             <Table.Summary.Cell>
               <Typography.Text strong style={{ color: '#28a745' }}>
-                R$ {totalExpenses.toFixed(2)}
+                R$ {totalExpenses.toFixed(2).replace('.', ',')}
               </Typography.Text>
             </Table.Summary.Cell>
           </Table.Summary.Row>
@@ -232,21 +271,23 @@ export default function TripExpenses() {
         <Typography.Paragraph>
           <strong>Lucro Final:</strong>{' '}
           <Typography.Text type="success" style={{ fontSize: 20, color: '#28a745' }}>
-            R$ {profit.toFixed(2)}
+            R$ {profit.toFixed(2).replace('.', ',')}
           </Typography.Text>
         </Typography.Paragraph>
       </Card>
 
-      {/* Botão Voltar */}
       <Space style={{ marginTop: 20 }}>
-        <Button type="default" icon={<ArrowLeftOutlined />} onClick={() => {
-          // Disparar evento para recarregar viagens
-          window.dispatchEvent(new CustomEvent('reloadTrips'));
-          navigate(-1);
-        }}>
+        <Button
+          type="default"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('reloadTrips'))
+            navigate(-1)
+          }}
+        >
           Voltar
         </Button>
       </Space>
     </Card>
-  );
+  )
 }

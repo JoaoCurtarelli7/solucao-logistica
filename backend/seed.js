@@ -1,4 +1,5 @@
 const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcrypt");
 
 const prisma = new PrismaClient();
 
@@ -10,78 +11,78 @@ async function main() {
     const basePermissions = [
       // Dashboard
       "dashboard.view",
-      
+
       // Usuários e Permissões
       "users.view",
       "users.create",
       "users.update",
       "users.delete",
       "users.manage",
-      
+
       // Empresas
       "companies.view",
       "companies.create",
       "companies.update",
       "companies.delete",
-      
+
       // Funcionários
       "employees.view",
       "employees.create",
       "employees.update",
       "employees.delete",
-      
+
       // Caminhões
       "trucks.view",
       "trucks.create",
       "trucks.update",
       "trucks.delete",
-      
+
       // Viagens
       "trips.view",
       "trips.create",
       "trips.update",
       "trips.delete",
-      
+
       // Despesas de Viagem
       "tripExpenses.view",
       "tripExpenses.create",
       "tripExpenses.update",
       "tripExpenses.delete",
-      
+
       // Manutenções
       "maintenance.view",
       "maintenance.create",
       "maintenance.update",
       "maintenance.delete",
-      
+
       // Cargas
       "loads.view",
       "loads.create",
       "loads.update",
       "loads.delete",
-      
+
       // Financeiro
       "financial.view",
       "financial.create",
       "financial.update",
       "financial.delete",
-      
+
       // Fechamentos
       "closings.view",
       "closings.create",
       "closings.update",
       "closings.delete",
-      
+
       // Meses
       "months.view",
       "months.create",
       "months.update",
       "months.delete",
-      
+
       // Relatórios
       "reports.view",
       "reports.export",
-      
+
       // Perfis e Permissões
       "roles.view",
       "roles.create",
@@ -138,7 +139,7 @@ async function main() {
       "months.view",
       "reports.view",
     ];
-    
+
     const userPerms = await prisma.permission.findMany({
       where: { key: { in: userPermissions } },
       select: { id: true },
@@ -147,7 +148,10 @@ async function main() {
     await prisma.rolePermission.deleteMany({ where: { roleId: userRole.id } });
     if (userPerms.length > 0) {
       await prisma.rolePermission.createMany({
-        data: userPerms.map((p) => ({ roleId: userRole.id, permissionId: p.id })),
+        data: userPerms.map((p) => ({
+          roleId: userRole.id,
+          permissionId: p.id,
+        })),
         skipDuplicates: true,
       });
     }
@@ -173,7 +177,8 @@ async function main() {
       data: { roleId: userRole.id },
     });
 
-    // Usuário admin básico
+    // Usuário admin básico (senha: admin123)
+    const adminPassword = await bcrypt.hash("admin123", 10);
     await prisma.user.upsert({
       where: { id: 1 },
       update: {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from "react";
 import {
   Card,
   Table,
@@ -11,95 +11,96 @@ import {
   Input,
   Tooltip,
   Result,
-} from 'antd'
-import * as XLSX from 'xlsx'
+} from "antd";
+import * as XLSX from "xlsx";
 import {
   EditOutlined,
   DeleteOutlined,
   PlusOutlined,
   SearchOutlined,
   EyeOutlined,
-} from '@ant-design/icons'
-import CustomModalLoad from '../../../components/Modal/Load'
-import api from '../../../lib/api'
-import { useNavigate } from 'react-router-dom'
-import dayjs from 'dayjs'
-import { usePermission } from '@/hooks/usePermission'
+} from "@ant-design/icons";
+import CustomModalLoad from "../../../components/Modal/Load";
+import api from "../../../lib/api";
+import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
+import { usePermission } from "@/hooks/usePermission";
 
-const { RangePicker } = DatePicker
-const { Option } = Select
+const { RangePicker } = DatePicker;
+const { Option } = Select;
 
 export default function LoadCompanies() {
-  const navigate = useNavigate()
-  const { hasPermission } = usePermission()
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingLoad, setEditingLoad] = useState<any>(null)
-  const [companies, setCompanies] = useState<any[]>([])
-  const [selectedCompany, setSelectedCompany] = useState<number | null>(null)
-  const [dateRange, setDateRange] = useState<any>(null)
-  const [searchText, setSearchText] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'recent' | 'old'>(
-    'all',
-  )
+  const navigate = useNavigate();
+  const { hasPermission } = usePermission();
 
-  const canView = hasPermission('loads.view')
-  const canCreate = hasPermission('loads.create')
-  const canUpdate = hasPermission('loads.update')
-  const canDelete = hasPermission('loads.delete')
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingLoad, setEditingLoad] = useState<any>(null);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<number | null>(null);
+  const [dateRange, setDateRange] = useState<any>(null);
+  const [searchText, setSearchText] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "recent" | "old">(
+    "all",
+  );
+
+  const canView = hasPermission("loads.view");
+  const canCreate = hasPermission("loads.create");
+  const canUpdate = hasPermission("loads.update");
+  const canDelete = hasPermission("loads.delete");
 
   useEffect(() => {
-    fetchCompanies()
-    fetchAllLoads()
-  }, [])
+    fetchCompanies();
+    fetchAllLoads();
+  }, []);
 
   const fetchCompanies = async () => {
     try {
-      const response = await api.get('/companies')
-      setCompanies(response.data)
+      const response = await api.get("/companies");
+      setCompanies(response.data);
     } catch (error) {
-      console.error('Erro ao buscar empresas:', error)
-      message.error('Erro ao carregar empresas')
+      console.error("Erro ao buscar empresas:", error);
+      message.error("Erro ao carregar empresas");
     }
-  }
+  };
 
   const mapLoadRow = (load: any) => ({
     key: load.id,
     id: load.id,
-    data: dayjs(load.date).format('DD/MM/YYYY'),
+    data: dayjs(load.date).format("DD/MM/YYYY"),
     numeroCarregamento: load.loadingNumber,
     entregas: load.deliveries,
     pesoCarga: load.cargoWeight,
     valorTotal: load.totalValue,
     frete4: load.freight4,
     somaTotalFrete: load.totalFreight,
-    observacoes: load.observations || '',
+    observacoes: load.observations || "",
     companyId: load.companyId,
-    companyName: load.Company?.name || '', // <-- Company com C maiúsculo
-    companyCnpj: load.Company?.cnpj || '',
-    rawData: load, // mantém o objeto original (com .Company)
-  })
+    companyName: load.Company?.name || "",
+    companyCnpj: load.Company?.cnpj || "",
+    rawData: load,
+  });
 
   const fetchAllLoads = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await api.get('/loads')
-      const formattedData = response.data.map(mapLoadRow)
-      setData(formattedData)
+      const response = await api.get("/loads");
+      const formattedData = response.data.map(mapLoadRow);
+      setData(formattedData);
     } catch (error) {
-      console.error('Erro ao buscar cargas:', error)
-      message.error('Erro ao carregar cargas')
+      console.error("Erro ao buscar cargas:", error);
+      message.error("Erro ao carregar cargas");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleAddLoad = async (newLoad: any) => {
     try {
       const loadData = {
-        companyId: Number(newLoad.companyId), // garante número
-        date: dayjs(newLoad.data, 'DD/MM/YYYY').toDate(),
+        companyId: Number(newLoad.companyId),
+        date: dayjs(newLoad.data, "DD/MM/YYYY").toDate(),
         loadingNumber: newLoad.numeroCarregamento,
         deliveries: Number(newLoad.entregas),
         cargoWeight: Number(newLoad.pesoCarga),
@@ -107,23 +108,23 @@ export default function LoadCompanies() {
         freight4: Number(newLoad.frete4),
         totalFreight: Number(newLoad.somaTotalFrete),
         observations: newLoad.observacoes?.trim() || undefined,
-      }
+      };
 
-      await api.post('/loads', loadData)
-      message.success('Carga criada com sucesso!')
-      fetchAllLoads()
-      setIsModalOpen(false)
+      await api.post("/loads", loadData);
+      message.success("Carga criada com sucesso!");
+      fetchAllLoads();
+      setIsModalOpen(false);
     } catch (error: any) {
-      console.error('Erro ao criar carga:', error)
-      message.error(error.response?.data?.message || 'Erro ao criar carga')
+      console.error("Erro ao criar carga:", error);
+      message.error(error.response?.data?.message || "Erro ao criar carga");
     }
-  }
+  };
 
   const handleEditLoad = async (updatedLoad: any) => {
     try {
       const loadData = {
         companyId: Number(updatedLoad.companyId),
-        date: dayjs(updatedLoad.data, 'DD/MM/YYYY').toDate(),
+        date: dayjs(updatedLoad.data, "DD/MM/YYYY").toDate(),
         loadingNumber: updatedLoad.numeroCarregamento,
         deliveries: Number(updatedLoad.entregas),
         cargoWeight: Number(updatedLoad.pesoCarga),
@@ -131,216 +132,228 @@ export default function LoadCompanies() {
         freight4: Number(updatedLoad.frete4),
         totalFreight: Number(updatedLoad.somaTotalFrete),
         observations: updatedLoad.observacoes?.trim() || undefined,
-      }
+      };
 
-      await api.put(`/loads/${editingLoad.id}`, loadData)
-      message.success('Carga atualizada com sucesso!')
-      fetchAllLoads()
-      setEditingLoad(null)
-      setIsModalOpen(false)
+      await api.put(`/loads/${editingLoad.id}`, loadData);
+      message.success("Carga atualizada com sucesso!");
+      fetchAllLoads();
+      setEditingLoad(null);
+      setIsModalOpen(false);
     } catch (error: any) {
-      console.error('Erro ao atualizar carga:', error)
-      message.error(error.response?.data?.message || 'Erro ao atualizar carga')
+      console.error("Erro ao atualizar carga:", error);
+      message.error(error.response?.data?.message || "Erro ao atualizar carga");
     }
-  }
+  };
 
   const handleDeleteLoad = async (loadId: number) => {
     try {
-      await api.delete(`/loads/${loadId}`)
-      message.success('Carga excluída com sucesso!')
-      fetchAllLoads()
+      await api.delete(`/loads/${loadId}`);
+      message.success("Carga excluída com sucesso!");
+      fetchAllLoads();
     } catch (error) {
-      console.error('Erro ao excluir carga:', error)
-      message.error('Erro ao excluir carga')
+      console.error("Erro ao excluir carga:", error);
+      message.error("Erro ao excluir carga");
     }
-  }
+  };
 
   const handleEdit = (record: any) => {
-    setEditingLoad(record)
-    setIsModalOpen(true)
-  }
+    setEditingLoad(record);
+    setIsModalOpen(true);
+  };
 
   const handleAdd = () => {
-    setEditingLoad(null)
-    setIsModalOpen(true)
-  }
+    setEditingLoad(null);
+    setIsModalOpen(true);
+  };
 
   const handleModalClose = () => {
-    setEditingLoad(null)
-    setIsModalOpen(false)
-  }
+    setEditingLoad(null);
+    setIsModalOpen(false);
+  };
 
   const handleViewCompany = (companyId: number) => {
-    // ajuste a rota conforme seu router
-    navigate(`/load/${companyId}`)
-  }
+    navigate(`/load/${companyId}`);
+  };
 
   const handleCompanyChange = (value: number | null) => {
-    setSelectedCompany(value)
-  }
+    setSelectedCompany(value);
+  };
 
   const handleDateRangeChange = (dates: any) => {
-    setDateRange(dates)
-  }
+    setDateRange(dates);
+  };
 
   const handleSearch = () => {
     if (!dateRange) {
-      message.warning('Selecione um período para buscar')
-      return
+      message.warning("Selecione um período para buscar");
+      return;
     }
 
-    const startDate = dateRange[0].toDate()
-    const endDate = dateRange[1].toDate()
+    const startDate = dateRange[0].toDate();
+    const endDate = dateRange[1].toDate();
 
-    const params: any = { startDate, endDate }
-    if (selectedCompany) params.companyId = selectedCompany
+    const params: any = { startDate, endDate };
+    if (selectedCompany) params.companyId = selectedCompany;
 
     api
-      .get('/loads/period', { params })
+      .get("/loads/period", { params })
       .then((response) => {
-        const formattedData = response.data.map(mapLoadRow)
-        setData(formattedData)
+        const formattedData = response.data.map(mapLoadRow);
+        setData(formattedData);
         message.success(
           `${formattedData.length} cargas encontradas no período selecionado`,
-        )
+        );
       })
       .catch((error) => {
-        console.error('Erro na busca por período:', error)
-        message.error('Erro ao buscar cargas por período')
-      })
-  }
+        console.error("Erro na busca por período:", error);
+        message.error("Erro ao buscar cargas por período");
+      });
+  };
 
-  const handleStatusFilterChange = (value: 'all' | 'recent' | 'old') => {
-    setStatusFilter(value)
-  }
+  const handleStatusFilterChange = (value: "all" | "recent" | "old") => {
+    setStatusFilter(value);
+  };
 
   const filteredData = data.filter((item) => {
+    const numero = String(item.numeroCarregamento ?? "");
+    const obs = String(item.observacoes ?? "");
+    const company = String(item.companyName ?? "");
+
     const matchesSearch =
-      item.numeroCarregamento
-        .toLowerCase()
-        .includes(searchText.toLowerCase()) ||
-      item.observacoes.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.companyName.toLowerCase().includes(searchText.toLowerCase())
+      numero.toLowerCase().includes(searchText.toLowerCase()) ||
+      obs.toLowerCase().includes(searchText.toLowerCase()) ||
+      company.toLowerCase().includes(searchText.toLowerCase());
 
     const matchesCompany =
-      !selectedCompany || item.companyId === selectedCompany
+      !selectedCompany || item.companyId === selectedCompany;
 
     const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'recent' &&
-        dayjs(item.data, 'DD/MM/YYYY').isAfter(dayjs().subtract(30, 'days'))) ||
-      (statusFilter === 'old' &&
-        dayjs(item.data, 'DD/MM/YYYY').isBefore(dayjs().subtract(30, 'days')))
+      statusFilter === "all" ||
+      (statusFilter === "recent" &&
+        dayjs(item.data, "DD/MM/YYYY").isAfter(dayjs().subtract(30, "days"))) ||
+      (statusFilter === "old" &&
+        dayjs(item.data, "DD/MM/YYYY").isBefore(dayjs().subtract(30, "days")));
 
-    return matchesSearch && matchesCompany && matchesStatus
-  })
+    return matchesSearch && matchesCompany && matchesStatus;
+  });
 
   const companyFilterOptions = Array.from(
     new Map(
       data
         .map((i) => [i.companyId, { text: i.companyName, value: i.companyId }])
-        .filter(([_, obj]) => (obj as any).text), // remove vazios
+        .filter(([_, obj]) => (obj as any).text),
     ).values(),
-  ) as { text: string; value: number }[]
+  ) as { text: string; value: number }[];
 
   const columns: any[] = [
     {
-      title: 'Data',
-      dataIndex: 'data',
-      key: 'data',
-      align: 'center',
+      title: "Data",
+      dataIndex: "data",
+      key: "data",
+      align: "center",
       width: 100,
       sorter: (a: any, b: any) =>
-        dayjs(a.data, 'DD/MM/YYYY').unix() - dayjs(b.data, 'DD/MM/YYYY').unix(),
+        dayjs(a.data, "DD/MM/YYYY").unix() - dayjs(b.data, "DD/MM/YYYY").unix(),
     },
     {
-      title: 'Empresa',
-      key: 'company',
-      align: 'left',
+      title: "Empresa",
+      key: "company",
+      align: "left",
       width: 220,
       render: (_: any, record: any) => {
         return (
           <div>
-            <div style={{ fontWeight: 'bold' }}>
-              {record.rawData.Company?.name || '-'}
+            <div style={{ fontWeight: "bold" }}>
+              {record.rawData.Company?.name || "-"}
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {record.rawData.Company?.cnpj || ''}
+            <div style={{ fontSize: "12px", color: "#666" }}>
+              {record.rawData.Company?.cnpj || ""}
             </div>
           </div>
-        )
+        );
       },
       filters: companyFilterOptions,
       onFilter: (value: any, record: any) => record.companyId === value,
     },
     {
-      title: 'Número do Carregamento',
-      dataIndex: 'numeroCarregamento',
-      key: 'numeroCarregamento',
-      align: 'center',
+      title: "Número do Carregamento",
+      dataIndex: "numeroCarregamento",
+      key: "numeroCarregamento",
+      align: "center",
       width: 150,
     },
     {
-      title: 'Entregas',
-      dataIndex: 'entregas',
-      key: 'entregas',
-      align: 'center',
+      title: "Entregas",
+      dataIndex: "entregas",
+      key: "entregas",
+      align: "center",
       width: 80,
     },
     {
-      title: 'Peso (kg)',
-      dataIndex: 'pesoCarga',
-      key: 'pesoCarga',
-      align: 'center',
+      title: "Peso (kg)",
+      dataIndex: "pesoCarga",
+      key: "pesoCarga",
+      align: "center",
       width: 100,
       render: (value: number) =>
-        value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+        Number(value || 0).toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+        }),
     },
     {
-      title: 'Valor Total',
-      dataIndex: 'valorTotal',
-      key: 'valorTotal',
-      align: 'right',
+      title: "Valor Total",
+      dataIndex: "valorTotal",
+      key: "valorTotal",
+      align: "right",
       width: 120,
-      render: (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`,
+      render: (value: number) =>
+        `R$ ${Number(value || 0)
+          .toFixed(2)
+          .replace(".", ",")}`,
       sorter: (a: any, b: any) => a.valorTotal - b.valorTotal,
     },
     {
-      title: 'Frete 4%',
-      dataIndex: 'frete4',
-      key: 'frete4',
-      align: 'right',
+      title: "Frete 4%",
+      dataIndex: "frete4",
+      key: "frete4",
+      align: "right",
       width: 100,
-      render: (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`,
+      render: (value: number) =>
+        `R$ ${Number(value || 0)
+          .toFixed(2)
+          .replace(".", ",")}`,
     },
     {
-      title: 'Total Frete',
-      dataIndex: 'somaTotalFrete',
-      key: 'somaTotalFrete',
-      align: 'right',
+      title: "Total Frete",
+      dataIndex: "somaTotalFrete",
+      key: "somaTotalFrete",
+      align: "right",
       width: 120,
-      render: (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`,
+      render: (value: number) =>
+        `R$ ${Number(value || 0)
+          .toFixed(2)
+          .replace(".", ",")}`,
       sorter: (a: any, b: any) => a.somaTotalFrete - b.somaTotalFrete,
     },
     {
-      title: 'Observações',
-      dataIndex: 'observacoes',
-      key: 'observacoes',
-      align: 'left',
+      title: "Observações",
+      dataIndex: "observacoes",
+      key: "observacoes",
+      align: "left",
       width: 200,
       ellipsis: true,
       render: (text: string) => (
         <Tooltip title={text}>
-          <span>{text || '-'}</span>
+          <span>{text || "-"}</span>
         </Tooltip>
       ),
     },
     {
-      title: 'Ações',
-      key: 'actions',
-      align: 'center',
+      title: "Ações",
+      key: "actions",
+      align: "center",
       width: 200,
-      fixed: 'right',
+      fixed: "right",
       render: (_: any, record: any) => (
         <Space>
           <Button
@@ -351,6 +364,7 @@ export default function LoadCompanies() {
           >
             Ver Empresa
           </Button>
+
           {canUpdate && (
             <Button
               type="default"
@@ -361,6 +375,7 @@ export default function LoadCompanies() {
               Editar
             </Button>
           )}
+
           {canDelete && (
             <Popconfirm
               title="Tem certeza que deseja excluir esta carga?"
@@ -381,73 +396,85 @@ export default function LoadCompanies() {
         </Space>
       ),
     },
-  ]
+  ];
 
   const exportToExcel = () => {
     if (filteredData.length === 0) {
-      message.warning('Não há dados para exportar')
-      return
+      message.warning("Não há dados para exportar");
+      return;
     }
 
-    const wb = XLSX.utils.book_new()
+    const wb = XLSX.utils.book_new();
     const fileName = selectedCompany
-      ? `Cargas_${companies.find((c) => c.id === selectedCompany)?.name}_${dayjs().format('DD-MM-YYYY')}.xlsx`
-      : `Todas_Cargas_${dayjs().format('DD-MM-YYYY')}.xlsx`
+      ? `Cargas_${companies.find((c) => c.id === selectedCompany)?.name}_${dayjs().format("DD-MM-YYYY")}.xlsx`
+      : `Todas_Cargas_${dayjs().format("DD-MM-YYYY")}.xlsx`;
 
-    const headerData: any[] = [['RELATÓRIO DE CARGAS'], []]
+    const headerData: any[] = [["RELATÓRIO DE CARGAS"], []];
 
     if (selectedCompany) {
       headerData[0].push(
         `Empresa: ${companies.find((c) => c.id === selectedCompany)?.name}`,
-      )
+      );
     }
 
     if (dateRange) {
       headerData.push([
-        `Período: ${dateRange[0].format('DD/MM/YYYY')} a ${dateRange[1].format('DD/MM/YYYY')}`,
-      ])
+        `Período: ${dateRange[0].format("DD/MM/YYYY")} a ${dateRange[1].format("DD/MM/YYYY")}`,
+      ]);
     }
 
-    headerData.push([])
+    headerData.push([]);
 
     const titles = columns
-      .filter((col) => col.key !== 'actions')
-      .map((col) => col.title)
-    headerData.push(titles)
+      .filter((col) => col.key !== "actions")
+      .map((col) => col.title);
+    headerData.push(titles);
 
     const tableData = filteredData.map((item) => {
       return columns
-        .filter((col) => col.key !== 'actions')
+        .filter((col) => col.key !== "actions")
         .map((col) => {
-          if (col.dataIndex) return item[col.dataIndex] ?? ''
-          if (col.key === 'company') {
-            const name = item.rawData.Company?.name || ''
-            const cnpj = item.rawData.Company?.cnpj || ''
-            return `${name}${name && cnpj ? ' - ' : ''}${cnpj}`
+          if (col.dataIndex) return item[col.dataIndex] ?? "";
+          if (col.key === "company") {
+            const name = item.rawData.Company?.name || "";
+            const cnpj = item.rawData.Company?.cnpj || "";
+            return `${name}${name && cnpj ? " - " : ""}${cnpj}`;
           }
-          return ''
-        })
-    })
+          return "";
+        });
+    });
 
-    const finalData = [...headerData, ...tableData]
+    const finalData = [...headerData, ...tableData];
 
-    const ws = XLSX.utils.aoa_to_sheet(finalData)
-    XLSX.utils.book_append_sheet(wb, ws, 'Cargas')
-    XLSX.writeFile(wb, fileName)
-  }
+    const ws = XLSX.utils.aoa_to_sheet(finalData);
+    XLSX.utils.book_append_sheet(wb, ws, "Cargas");
+    XLSX.writeFile(wb, fileName);
+  };
 
   const calculateTotals = () => {
     return {
-      totalValue: filteredData.reduce((sum, item) => sum + item.valorTotal, 0),
-      totalFreight: filteredData.reduce(
-        (sum, item) => sum + item.somaTotalFrete,
+      totalValue: filteredData.reduce(
+        (sum, item) => sum + Number(item.valorTotal || 0),
         0,
       ),
-      totalFrete4: filteredData.reduce((sum, item) => sum + item.frete4, 0),
-      totalPeso: filteredData.reduce((sum, item) => sum + item.pesoCarga, 0),
-      totalEntregas: filteredData.reduce((sum, item) => sum + item.entregas, 0),
-    }
-  }
+      totalFreight: filteredData.reduce(
+        (sum, item) => sum + Number(item.somaTotalFrete || 0),
+        0,
+      ),
+      totalFrete4: filteredData.reduce(
+        (sum, item) => sum + Number(item.frete4 || 0),
+        0,
+      ),
+      totalPeso: filteredData.reduce(
+        (sum, item) => sum + Number(item.pesoCarga || 0),
+        0,
+      ),
+      totalEntregas: filteredData.reduce(
+        (sum, item) => sum + Number(item.entregas || 0),
+        0,
+      ),
+    };
+  };
 
   if (!canView) {
     return (
@@ -456,22 +483,22 @@ export default function LoadCompanies() {
         title="Acesso negado"
         subTitle="Você não tem permissão para visualizar cargas."
       />
-    )
+    );
   }
 
-  const totals = calculateTotals()
+  const totals = calculateTotals();
 
   return (
-    <Card style={{ margin: '20px', padding: '20px' }} bordered>
+    <Card style={{ margin: "20px", padding: "20px" }} bordered>
       <div style={{ marginBottom: 20 }}>
         <h1>Visão Geral de Cargas - Todas as Empresas</h1>
 
         <div
           style={{
-            display: 'flex',
+            display: "flex",
             gap: 16,
             marginBottom: 16,
-            flexWrap: 'wrap',
+            flexWrap: "wrap",
           }}
         >
           <Select
@@ -506,7 +533,7 @@ export default function LoadCompanies() {
           </Select>
 
           <RangePicker
-            placeholder={['Data Início', 'Data Fim']}
+            placeholder={["Data Início", "Data Fim"]}
             onChange={handleDateRangeChange}
             value={dateRange}
             format="DD/MM/YYYY"
@@ -526,7 +553,7 @@ export default function LoadCompanies() {
           </Button>
         </div>
 
-        <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
           <Input.Search
             placeholder="Buscar por número de carregamento, observações ou empresa"
             value={searchText}
@@ -553,51 +580,54 @@ export default function LoadCompanies() {
         {/* Resumo */}
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
             gap: 16,
             marginBottom: 16,
-            padding: '16px',
-            backgroundColor: '#f5f5f5',
-            borderRadius: '8px',
+            padding: "16px",
+            backgroundColor: "#f5f5f5",
+            borderRadius: "8px",
           }}
         >
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: "center" }}>
             <div
-              style={{ fontSize: '24px', fontWeight: 'bold', color: '#1890ff' }}
+              style={{ fontSize: "24px", fontWeight: "bold", color: "#1890ff" }}
             >
               {filteredData.length}
             </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>
+            <div style={{ fontSize: "14px", color: "#666" }}>
               Total de Cargas
             </div>
           </div>
-          <div style={{ textAlign: 'center' }}>
+
+          <div style={{ textAlign: "center" }}>
             <div
-              style={{ fontSize: '24px', fontWeight: 'bold', color: '#52c41a' }}
+              style={{ fontSize: "24px", fontWeight: "bold", color: "#52c41a" }}
             >
-              R$ {totals.totalValue.toFixed(2).replace('.', ',')}
+              R$ {totals.totalValue.toFixed(2).replace(".", ",")}
             </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Valor Total</div>
+            <div style={{ fontSize: "14px", color: "#666" }}>Valor Total</div>
           </div>
-          <div style={{ textAlign: 'center' }}>
+
+          <div style={{ textAlign: "center" }}>
             <div
-              style={{ fontSize: '24px', fontWeight: 'bold', color: '#fa8c16' }}
+              style={{ fontSize: "24px", fontWeight: "bold", color: "#fa8c16" }}
             >
-              R$ {totals.totalFreight.toFixed(2).replace('.', ',')}
+              R$ {totals.totalFreight.toFixed(2).replace(".", ",")}
             </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Total Frete</div>
+            <div style={{ fontSize: "14px", color: "#666" }}>Total Frete</div>
           </div>
-          <div style={{ textAlign: 'center' }}>
+
+          <div style={{ textAlign: "center" }}>
             <div
-              style={{ fontSize: '24px', fontWeight: 'bold', color: '#722ed1' }}
+              style={{ fontSize: "24px", fontWeight: "bold", color: "#722ed1" }}
             >
-              {totals.totalPeso.toLocaleString('pt-BR', {
+              {totals.totalPeso.toLocaleString("pt-BR", {
                 minimumFractionDigits: 2,
-              })}{' '}
+              })}{" "}
               kg
             </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>Peso Total</div>
+            <div style={{ fontSize: "14px", color: "#666" }}>Peso Total</div>
           </div>
         </div>
       </div>
@@ -619,29 +649,34 @@ export default function LoadCompanies() {
             <Table.Summary.Cell index={0} colSpan={4}>
               <strong>Totais:</strong>
             </Table.Summary.Cell>
+
             <Table.Summary.Cell index={4} align="right">
               <strong>
-                {totals.totalPeso.toLocaleString('pt-BR', {
+                {totals.totalPeso.toLocaleString("pt-BR", {
                   minimumFractionDigits: 2,
-                })}{' '}
+                })}{" "}
                 kg
               </strong>
             </Table.Summary.Cell>
+
             <Table.Summary.Cell index={5} align="right">
               <strong>
-                R$ {totals.totalValue.toFixed(2).replace('.', ',')}
+                R$ {totals.totalValue.toFixed(2).replace(".", ",")}
               </strong>
             </Table.Summary.Cell>
+
             <Table.Summary.Cell index={6} align="right">
               <strong>
-                R$ {totals.totalFrete4.toFixed(2).replace('.', ',')}
+                R$ {totals.totalFrete4.toFixed(2).replace(".", ",")}
               </strong>
             </Table.Summary.Cell>
+
             <Table.Summary.Cell index={7} align="right">
               <strong>
-                R$ {totals.totalFreight.toFixed(2).replace('.', ',')}
+                R$ {totals.totalFreight.toFixed(2).replace(".", ",")}
               </strong>
             </Table.Summary.Cell>
+
             <Table.Summary.Cell index={8} colSpan={2} />
           </Table.Summary.Row>
         )}
@@ -656,5 +691,5 @@ export default function LoadCompanies() {
         selectedCompany={null}
       />
     </Card>
-  )
+  );
 }

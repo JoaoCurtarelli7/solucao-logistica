@@ -10,19 +10,25 @@ export default function TripModal({
 }) {
   const [form] = Form.useForm()
 
-  // Preenche os campos (inclui conversão de date e defaults)
+  // Preenche ou limpa os campos ao abrir o modal
   useEffect(() => {
+    if (!visible) return
     if (initialValues) {
       form.setFieldsValue({
+        origin: initialValues.origin || '',
         destination: initialValues.destination,
         driver: initialValues.driver,
         date: initialValues.date ? dayjs(initialValues.date) : null,
+        estimatedArrival: initialValues.estimatedArrival ? dayjs(initialValues.estimatedArrival) : null,
         freightValue: initialValues.freightValue,
         status: initialValues.status || 'em_andamento',
         notes: initialValues.notes || ''
       })
+    } else {
+      form.resetFields()
+      form.setFieldsValue({ status: 'em_andamento' })
     }
-  }, [initialValues, form])
+  }, [initialValues, visible, form])
 
   const handleOk = () => {
     form
@@ -46,12 +52,16 @@ export default function TripModal({
       cancelText="Cancelar"
     >
       <Form form={form} layout="vertical" style={{ paddingTop: 8 }}>
+        <Form.Item label="Origem" name="origin">
+          <Input placeholder="Cidade/região de partida (ex: São Paulo)" />
+        </Form.Item>
+
         <Form.Item
           label="Destino"
           name="destination"
           rules={[{ required: true, message: 'Por favor, insira o destino!' }]}
         >
-          <Input placeholder="Destino da viagem" />
+          <Input placeholder="Cidade/região de destino" />
         </Form.Item>
 
         <Form.Item
@@ -78,7 +88,20 @@ export default function TripModal({
         </Form.Item>
 
         <Form.Item
-          label="Valor"
+          label="Previsão de chegada"
+          name="estimatedArrival"
+          tooltip="Data e hora previstas para chegada ao destino"
+        >
+          <DatePicker
+            showTime
+            format="DD/MM/YYYY HH:mm"
+            style={{ width: '100%' }}
+            placeholder="Selecione data e hora"
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Valor do frete"
           name="freightValue"
           rules={[
             { required: true, message: 'Por favor, insira o valor do frete!' },

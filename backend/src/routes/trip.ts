@@ -7,13 +7,15 @@ export async function tripRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({ id: z.coerce.number() });
   
   const tripBodySchema = z.object({
+    origin: z.union([z.string(), z.null()]).optional().transform((v) => v || null),
     destination: z.string().min(1, "Destino é obrigatório"),
     driver: z.string().min(1, "Motorista é obrigatório"),
-    date: z.string().transform((str) => new Date(str)),
+    date: z.union([z.string(), z.date()]).transform((v) => (typeof v === 'string' ? new Date(v) : v)),
+    estimatedArrival: z.union([z.string(), z.null()]).optional().transform((v) => (v && v !== '' ? new Date(v as string) : null)),
     freightValue: z.coerce.number().min(0, "Valor do frete deve ser válido"),
-    truckId: z.coerce.number().optional(),
+    truckId: z.coerce.number().optional().nullable(),
     status: z.enum(["em_andamento", "concluida", "cancelada"]).default("em_andamento"),
-    notes: z.string().optional(),
+    notes: z.union([z.string(), z.null()]).optional().transform((v) => v || null),
   });
 
   app.addHook("preHandler", authMiddleware);
@@ -115,9 +117,11 @@ export async function tripRoutes(app: FastifyInstance) {
 
       const trip = await prisma.trip.create({
         data: {
+          origin: data.origin || null,
           destination: data.destination,
           driver: data.driver,
           date: data.date,
+          estimatedArrival: data.estimatedArrival ?? null,
           freightValue: data.freightValue,
           truckId: data.truckId,
           status: data.status,
@@ -135,9 +139,13 @@ export async function tripRoutes(app: FastifyInstance) {
       });
       
       return rep.code(201).send(trip);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao criar viagem:", error);
-      return rep.code(500).send({ message: "Erro ao criar viagem" });
+      const isPrismaSchemaError = error?.code === 'P2010' || error?.message?.includes('column') || error?.message?.includes('does not exist');
+      const message = isPrismaSchemaError
+        ? "Banco desatualizado. No terminal do backend execute: npx prisma migrate deploy"
+        : (error?.message || "Erro ao criar viagem");
+      return rep.code(500).send({ message });
     }
   });
 
@@ -170,9 +178,11 @@ export async function tripRoutes(app: FastifyInstance) {
       const trip = await prisma.trip.update({ 
         where: { id }, 
         data: {
+          origin: data.origin ?? undefined,
           destination: data.destination,
           driver: data.driver,
           date: data.date,
+          estimatedArrival: data.estimatedArrival ?? undefined,
           freightValue: data.freightValue,
           truckId: data.truckId,
           status: data.status,
