@@ -1,28 +1,28 @@
 import { useEffect, useState } from "react";
 import {
-    Card,
-    Button,
-    Row,
-    Col,
-    message,
-    Typography,
-    Table,
-    Space,
-    Tag,
-    Popconfirm,
-    Tooltip,
-    Statistic,
-    Progress
+  Card,
+  Button,
+  Row,
+  Col,
+  message,
+  Typography,
+  Table,
+  Space,
+  Tag,
+  Popconfirm,
+  Tooltip,
+  Statistic,
+  Progress,
 } from "antd";
 import {
-    PlusOutlined,
-    EditOutlined,
-    DeleteOutlined,
-    ToolOutlined,
-    CarOutlined,
-    EyeOutlined,
-    CalendarOutlined,
-    DollarOutlined
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  ToolOutlined,
+  CarOutlined,
+  EyeOutlined,
+  CalendarOutlined,
+  DollarOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -43,10 +43,16 @@ export default function VehicleList() {
     setLoading(true);
     try {
       const response = await api.get("/trucks");
-      setData(response.data.trucks || []);
+      // Backend pode retornar { trucks: [...] } ou o array direto
+      const trucks = Array.isArray(response.data)
+        ? response.data
+        : response.data?.trucks ?? [];
+      setData(trucks);
     } catch (error) {
       console.error("Erro ao carregar os caminhões:", error);
-      message.error("Erro ao carregar os caminhões");
+      const msg =
+        error.response?.data?.message || "Erro ao carregar os caminhões";
+      message.error(msg);
     } finally {
       setLoading(false);
     }
@@ -63,7 +69,7 @@ export default function VehicleList() {
         // Editar
         const response = await api.put(`/trucks/${currentVehicle.id}`, values);
         setData((prev) =>
-          prev.map((v) => (v.id === currentVehicle.id ? response.data : v))
+          prev.map((v) => (v.id === currentVehicle.id ? response.data : v)),
         );
         message.success("Caminhão atualizado com sucesso!");
       } else {
@@ -90,13 +96,15 @@ export default function VehicleList() {
       loadTrucks(); // Recarregar dados
     } catch (error) {
       console.error("Erro ao deletar caminhão:", error);
-      message.error(error.response?.data?.message || "Erro ao deletar caminhão");
+      message.error(
+        error.response?.data?.message || "Erro ao deletar caminhão",
+      );
     }
   };
 
   // Calcular estatísticas
   const totalTrucks = data.length;
-  const activeTrucks = data.filter(truck => {
+  const activeTrucks = data.filter((truck) => {
     const docExpiry = dayjs(truck.docExpiry);
     const today = dayjs();
     return docExpiry.isAfter(today);
@@ -106,110 +114,118 @@ export default function VehicleList() {
   // Colunas da tabela
   const columns = [
     {
-      title: 'Caminhão',
-      key: 'truck',
+      title: "Caminhão",
+      key: "truck",
       render: (_, record) => (
         <div>
-          <div style={{ fontWeight: 500, fontSize: '16px' }}>{record.name}</div>
-          <Text type="secondary">{record.brand} - {record.year}</Text>
+          <div style={{ fontWeight: 500, fontSize: "16px" }}>{record.name}</div>
+          <Text type="secondary">
+            {record.brand} - {record.year}
+          </Text>
         </div>
       ),
     },
     {
-      title: 'Placa',
-      dataIndex: 'plate',
-      key: 'plate',
+      title: "Placa",
+      dataIndex: "plate",
+      key: "plate",
       render: (plate) => (
-        <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+        <Tag color="blue" style={{ fontSize: "14px", fontWeight: "bold" }}>
           {plate}
         </Tag>
       ),
     },
     {
-      title: 'Documentação',
-      key: 'docExpiry',
+      title: "Documentação",
+      key: "docExpiry",
       render: (_, record) => {
         const docExpiry = dayjs(record.docExpiry);
         const today = dayjs();
-        const daysUntilExpiry = docExpiry.diff(today, 'day');
-        
-        let color = 'green';
-        let status = 'Válida';
-        
+        const daysUntilExpiry = docExpiry.diff(today, "day");
+
+        let color = "green";
+        let status = "Válida";
+
         if (daysUntilExpiry < 0) {
-          color = 'red';
-          status = 'Expirada';
+          color = "red";
+          status = "Expirada";
         } else if (daysUntilExpiry <= 30) {
-          color = 'orange';
-          status = 'Expira em breve';
+          color = "orange";
+          status = "Expira em breve";
         }
-        
+
         return (
           <div>
             <Tag color={color}>{status}</Tag>
-            <div style={{ fontSize: '12px', marginTop: '4px' }}>
-              {record.docExpiry ? dayjs(record.docExpiry).format('DD/MM/YYYY') : 'N/A'}
+            <div style={{ fontSize: "12px", marginTop: "4px" }}>
+              {record.docExpiry
+                ? dayjs(record.docExpiry).format("DD/MM/YYYY")
+                : "N/A"}
             </div>
           </div>
         );
       },
     },
     {
-      title: 'Manutenções',
-      key: 'maintenances',
+      title: "Manutenções",
+      key: "maintenances",
       render: (_, record) => (
         <div>
           <Text strong>{record.maintenances?.length || 0}</Text>
-          <div style={{ fontSize: '12px' }}>
-            Última: {record.maintenances?.[0]?.date ? 
-              dayjs(record.maintenances[0].date).format('DD/MM/YYYY') : 'N/A'}
+          <div style={{ fontSize: "12px" }}>
+            Última:{" "}
+            {record.maintenances?.[0]?.date
+              ? dayjs(record.maintenances[0].date).format("DD/MM/YYYY")
+              : "N/A"}
           </div>
         </div>
       ),
     },
     {
-      title: 'Viagens',
-      key: 'trips',
+      title: "Viagens",
+      key: "trips",
       render: (_, record) => (
         <div>
           <Text strong>{record.trips?.length || 0}</Text>
-          <div style={{ fontSize: '12px' }}>
-            Última: {record.trips?.[0]?.date ? 
-              dayjs(record.trips[0].date).format('DD/MM/YYYY') : 'N/A'}
+          <div style={{ fontSize: "12px" }}>
+            Última:{" "}
+            {record.trips?.[0]?.date
+              ? dayjs(record.trips[0].date).format("DD/MM/YYYY")
+              : "N/A"}
           </div>
         </div>
       ),
     },
     {
-      title: 'Ações',
-      key: 'actions',
+      title: "Ações",
+      key: "actions",
       render: (_, record) => (
         <Space>
           <Tooltip title="Ver detalhes">
-            <Button 
-              type="text" 
-              icon={<EyeOutlined />} 
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
               onClick={() => navigate(`/vehicle-maintenance/${record.id}`)}
             />
           </Tooltip>
           <Tooltip title="Manutenção">
-            <Button 
-              type="text" 
-              icon={<ToolOutlined />} 
+            <Button
+              type="text"
+              icon={<ToolOutlined />}
               onClick={() => navigate(`/vehicle-maintenance/${record.id}`)}
             />
           </Tooltip>
           <Tooltip title="Viagens">
-            <Button 
-              type="text" 
-              icon={<CarOutlined />} 
+            <Button
+              type="text"
+              icon={<CarOutlined />}
               onClick={() => navigate(`/vehicle-trip/${record.id}`)}
             />
           </Tooltip>
           <Tooltip title="Editar">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
+            <Button
+              type="text"
+              icon={<EditOutlined />}
               onClick={() => {
                 setCurrentVehicle(record);
                 setIsModalVisible(true);
@@ -223,11 +239,7 @@ export default function VehicleList() {
             cancelText="Não"
           >
             <Tooltip title="Deletar">
-              <Button 
-                type="text" 
-                danger
-                icon={<DeleteOutlined />} 
-              />
+              <Button type="text" danger icon={<DeleteOutlined />} />
             </Tooltip>
           </Popconfirm>
         </Space>
@@ -236,7 +248,7 @@ export default function VehicleList() {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: "24px" }}>
       {/* Header com estatísticas */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col span={6}>
@@ -245,7 +257,7 @@ export default function VehicleList() {
               title="Total de Caminhões"
               value={totalTrucks}
               prefix={<CarOutlined />}
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: "#1890ff" }}
             />
           </Card>
         </Col>
@@ -255,7 +267,7 @@ export default function VehicleList() {
               title="Documentação Válida"
               value={activeTrucks}
               prefix={<CalendarOutlined />}
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: "#52c41a" }}
             />
           </Card>
         </Col>
@@ -265,7 +277,7 @@ export default function VehicleList() {
               title="Documentação Expirada"
               value={expiredDocs}
               prefix={<CalendarOutlined />}
-              valueStyle={{ color: '#ff4d4f' }}
+              valueStyle={{ color: "#ff4d4f" }}
             />
           </Card>
         </Col>
@@ -273,15 +285,23 @@ export default function VehicleList() {
           <Card>
             <Statistic
               title="Taxa de Validade"
-              value={totalTrucks > 0 ? Math.round((activeTrucks / totalTrucks) * 100) : 0}
+              value={
+                totalTrucks > 0
+                  ? Math.round((activeTrucks / totalTrucks) * 100)
+                  : 0
+              }
               suffix="%"
               prefix={<DollarOutlined />}
-              valueStyle={{ color: '#faad14' }}
+              valueStyle={{ color: "#faad14" }}
             />
-            <Progress 
-              percent={totalTrucks > 0 ? Math.round((activeTrucks / totalTrucks) * 100) : 0} 
-              size="small" 
-              status={expiredDocs === 0 ? 'success' : 'exception'}
+            <Progress
+              percent={
+                totalTrucks > 0
+                  ? Math.round((activeTrucks / totalTrucks) * 100)
+                  : 0
+              }
+              size="small"
+              status={expiredDocs === 0 ? "success" : "exception"}
             />
           </Card>
         </Col>
@@ -289,18 +309,27 @@ export default function VehicleList() {
 
       {/* Tabela de caminhões */}
       <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <Title level={3} style={{ margin: 0 }}>Lista de Caminhões</Title>
-      <Button
-        type="primary"
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <Title level={3} style={{ margin: 0 }}>
+            Lista de Caminhões
+          </Title>
+          <Button
+            type="primary"
             icon={<PlusOutlined />}
-        onClick={() => {
-          setCurrentVehicle(null);
-          setIsModalVisible(true);
-        }}
-      >
-        Adicionar Caminhão
-      </Button>
+            onClick={() => {
+              setCurrentVehicle(null);
+              setIsModalVisible(true);
+            }}
+          >
+            Adicionar Caminhão
+          </Button>
         </div>
 
         <Table
@@ -312,10 +341,11 @@ export default function VehicleList() {
             pageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} caminhões`,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} de ${total} caminhões`,
           }}
-              />
-            </Card>
+        />
+      </Card>
 
       {/* Modal */}
       <AddVehicleModal
