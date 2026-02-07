@@ -23,11 +23,11 @@ export default function TripExpenses() {
   const params = useParams()
   const { hasPermission } = usePermission()
 
-  const [expenses, setExpenses] = useState<any[]>([])
-  const [trip, setTrip] = useState<any>(state || null)
+  const [expenses, setExpenses] = useState([])
+  const [trip, setTrip] = useState(state || null)
   const [form] = Form.useForm()
 
-  const tripId = (state as any)?.id || (params as any)?.id
+  const tripId = state?.id || params?.id
 
   const canView = hasPermission('tripExpenses.view')
   const canCreate = hasPermission('tripExpenses.create')
@@ -79,7 +79,7 @@ export default function TripExpenses() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [])
 
-  const handleAddExpense = async (values: any) => {
+  const handleAddExpense = async (values) => {
     try {
       const payload = {
         ...values,
@@ -100,7 +100,7 @@ export default function TripExpenses() {
     }
   }
 
-  const handleDeleteExpense = async (id: number) => {
+  const handleDeleteExpense = async (id) => {
     try {
       await api.delete(`/expenses/${id}`)
       setExpenses((prev) => prev.filter((exp) => exp.id !== id))
@@ -113,7 +113,7 @@ export default function TripExpenses() {
 
   const calculateTotal = () =>
     expenses.reduce(
-      (total, expense: any) => total + parseFloat(expense.amount || 0),
+      (total, expense) => total + parseFloat(expense.amount || 0),
       0,
     )
 
@@ -121,19 +121,19 @@ export default function TripExpenses() {
   const totalExpenses = calculateTotal()
   const profit = freightValue - totalExpenses
 
-  const columns: any[] = [
+  const columns = [
     { title: 'Descrição', dataIndex: 'description', key: 'description' },
     {
       title: 'Valor',
       dataIndex: 'amount',
       key: 'amount',
-      render: (value: any) =>
+      render: (value) =>
         `R$ ${Number(parseFloat(value || 0)).toFixed(2).replace('.', ',')}`,
     },
     {
       title: 'Ações',
       key: 'actions',
-      render: (_: any, record: any) =>
+      render: (_, record) =>
         canDelete ? (
           <Popconfirm
             title="Tem certeza de que deseja excluir?"

@@ -15,9 +15,9 @@ export default function VehicleMaintenanceList() {
   const navigate = useNavigate()
   const { hasPermission } = usePermission()
 
-  const [maintenanceData, setMaintenanceData] = useState<any[]>([])
+  const [maintenanceData, setMaintenanceData] = useState([])
   const [isModalVisible, setIsModalVisible] = useState(false)
-  const [editingMaintenance, setEditingMaintenance] = useState<any>(null)
+  const [editingMaintenance, setEditingMaintenance] = useState(null)
 
   const canView = hasPermission('maintenance.view')
   const canCreate = hasPermission('maintenance.create')
@@ -56,7 +56,7 @@ export default function VehicleMaintenanceList() {
     fetchMaintenance()
   }, [fetchMaintenance])
 
-  const handleAddMaintenance = async (values: any) => {
+  const handleAddMaintenance = async (values) => {
     try {
       const payload = {
         date: values?.data
@@ -80,7 +80,7 @@ export default function VehicleMaintenanceList() {
     }
   }
 
-  const handleEditMaintenance = async (values: any) => {
+  const handleEditMaintenance = async (values) => {
     try {
       const payload = {
         date: values?.data
@@ -113,7 +113,7 @@ export default function VehicleMaintenanceList() {
     }
   }
 
-  const handleDelete = async (maintenanceId: number) => {
+  const handleDelete = async (maintenanceId) => {
     try {
       await api.delete(`/maintenances/${maintenanceId}`)
       setMaintenanceData((prev) =>
@@ -127,17 +127,17 @@ export default function VehicleMaintenanceList() {
     }
   }
 
-  const handleEdit = (record: any) => {
+  const handleEdit = (record) => {
     setEditingMaintenance(record)
     setIsModalVisible(true)
   }
 
-  const columns: any[] = [
+  const columns = [
     {
       title: 'Data',
       dataIndex: 'date',
       key: 'date',
-      render: (date: string) => (date ? dayjs(date).format('DD/MM/YYYY') : '-'),
+      render: (date) => (date ? dayjs(date).format('DD/MM/YYYY') : '-'),
     },
     { title: 'Serviço Realizado', dataIndex: 'service', key: 'service' },
     { title: 'KM', dataIndex: 'km', key: 'km', align: 'right' },
@@ -146,13 +146,13 @@ export default function VehicleMaintenanceList() {
       dataIndex: 'value',
       key: 'value',
       align: 'right',
-      render: (value: number) =>
+      render: (value) =>
         Number(value || 0).toFixed(2).replace('.', ','),
     },
     {
       title: 'Ações',
       key: 'actions',
-      render: (_: any, record: any) => (
+      render: (_, record) => (
         <>
           {canUpdate && (
             <FaEdit

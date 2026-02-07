@@ -28,7 +28,7 @@ import { usePermission } from '../../../hooks/usePermission'
 
 const { Title } = Typography
 
-const STATUS_CONFIG: any = {
+const STATUS_CONFIG = {
   em_andamento: {
     label: 'Em andamento',
     color: 'processing',
@@ -43,9 +43,9 @@ export default function TripList() {
   const { id: truckId } = useParams()
   const { hasPermission } = usePermission()
 
-  const [trips, setTrips] = useState<any[]>([])
+  const [trips, setTrips] = useState([])
   const [isModalVisible, setIsModalVisible] = useState(false)
-  const [currentTrip, setCurrentTrip] = useState<any>(null)
+  const [currentTrip, setCurrentTrip] = useState(null)
 
   const canView = hasPermission('trips.view')
   const canCreate = hasPermission('trips.create')
@@ -118,7 +118,7 @@ export default function TripList() {
     }
   }, [])
 
-  const buildPayload = (values: any) => {
+  const buildPayload = (values) => {
     return {
       ...values,
       origin: values?.origin || undefined,
@@ -136,7 +136,7 @@ export default function TripList() {
     }
   }
 
-  const handleAddTrip = async (values: any) => {
+  const handleAddTrip = async (values) => {
     try {
       const payload = buildPayload(values)
       const response = await api.post('/trips', payload)
@@ -144,19 +144,19 @@ export default function TripList() {
       setIsModalVisible(false)
       message.success('Viagem adicionada com sucesso!')
       fetchTrips()
-    } catch (error: any) {
+    } catch (error) {
       console.error(error)
       const msg = error.response?.data?.message || 'Erro ao adicionar viagem'
       message.error(msg)
     }
   }
 
-  const handleEditTrip = (trip: any) => {
+  const handleEditTrip = (trip) => {
     setCurrentTrip(trip)
     setIsModalVisible(true)
   }
 
-  const handleEditSubmit = async (values: any) => {
+  const handleEditSubmit = async (values) => {
     try {
       const payload = buildPayload(values)
       const response = await api.put(`/trips/${currentTrip.id}`, payload)
@@ -173,7 +173,7 @@ export default function TripList() {
     }
   }
 
-  const handleDeleteTrip = async (id: number) => {
+  const handleDeleteTrip = async (id) => {
     try {
       const trip = trips.find((t) => t.id === id)
       const expenses = trip?.TripExpense ?? trip?.expenses ?? []
@@ -189,7 +189,7 @@ export default function TripList() {
       setTrips((prev) => prev.filter((trip) => trip.id !== id))
       message.success('Viagem removida com sucesso!')
       fetchTrips()
-    } catch (error: any) {
+    } catch (error) {
       console.error(error)
       if (error.response?.data?.message) {
         message.error(error.response.data.message)
@@ -199,12 +199,12 @@ export default function TripList() {
     }
   }
 
-  const columns: any[] = [
+  const columns = [
     {
       title: 'Rota',
       key: 'route',
       width: 220,
-      render: (_: any, record: any) => {
+      render: (_, record) => {
         const origin = record.origin?.trim()
         const dest = record.destination?.trim() || '-'
         const route = origin ? `${origin} → ${dest}` : dest
@@ -217,21 +217,21 @@ export default function TripList() {
       dataIndex: 'date',
       key: 'date',
       width: 110,
-      render: (date: string) => (date ? dayjs(date).format('DD/MM/YYYY') : '-'),
+      render: (date) => (date ? dayjs(date).format('DD/MM/YYYY') : '-'),
     },
     {
       title: 'Previsão chegada',
       dataIndex: 'estimatedArrival',
       key: 'estimatedArrival',
       width: 140,
-      render: (date: string) => (date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—'),
+      render: (date) => (date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—'),
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
       width: 130,
-      render: (status: string) => {
+      render: (status) => {
         const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.em_andamento
         return (
           <Tag color={cfg.color} icon={cfg.icon}>
@@ -246,7 +246,7 @@ export default function TripList() {
       key: 'freightValue',
       width: 100,
       align: 'right',
-      render: (value: any) =>
+      render: (value) =>
         value != null
           ? `R$ ${Number(value).toFixed(2).replace('.', ',')}`
           : '—',
@@ -256,7 +256,7 @@ export default function TripList() {
       key: 'actions',
       width: 140,
       fixed: 'right',
-      render: (_: any, record: any) => (
+      render: (_, record) => (
         <Space size="small">
           <Button
             type="link"

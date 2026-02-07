@@ -37,10 +37,10 @@ export default function VehicleList() {
   const navigate = useNavigate()
   const { hasPermission } = usePermission()
 
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [isModalVisible, setIsModalVisible] = useState(false)
-  const [currentVehicle, setCurrentVehicle] = useState<any>(null)
+  const [currentVehicle, setCurrentVehicle] = useState(null)
 
   const canView = hasPermission('trucks.view')
   const canCreate = hasPermission('trucks.create')
@@ -65,7 +65,7 @@ export default function VehicleList() {
         ? response.data
         : response.data?.trucks ?? []
       setData(trucks)
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao carregar os caminhões:', error)
       const msg = error.response?.data?.message || 'Erro ao carregar os caminhões'
       message.error(msg)
@@ -78,12 +78,12 @@ export default function VehicleList() {
     loadTrucks()
   }, [])
 
-  const handleSaveVehicle = async (values: any) => {
+  const handleSaveVehicle = async (values) => {
     try {
       if (currentVehicle?.id) {
         const response = await api.put(`/trucks/${currentVehicle.id}`, values)
         setData((prev) =>
-          prev.map((v: any) => (v.id === currentVehicle.id ? response.data : v)),
+          prev.map((v) => (v.id === currentVehicle.id ? response.data : v)),
         )
         message.success('Caminhão atualizado com sucesso!')
       } else {
@@ -95,25 +95,25 @@ export default function VehicleList() {
       setIsModalVisible(false)
       setCurrentVehicle(null)
       loadTrucks()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao salvar caminhão:', error)
       message.error(error.response?.data?.message || 'Erro ao salvar caminhão')
     }
   }
 
-  const handleDeleteVehicle = async (id: number) => {
+  const handleDeleteVehicle = async (id) => {
     try {
       await api.delete(`/trucks/${id}`)
       message.success('Caminhão deletado com sucesso!')
       loadTrucks()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao deletar caminhão:', error)
       message.error(error.response?.data?.message || 'Erro ao deletar caminhão')
     }
   }
 
   const totalTrucks = data.length
-  const activeTrucks = data.filter((truck: any) => {
+  const activeTrucks = data.filter((truck) => {
     const docExpiry = dayjs(truck.docExpiry)
     const today = dayjs()
     return docExpiry.isAfter(today)
@@ -123,11 +123,11 @@ export default function VehicleList() {
   const validityRate =
     totalTrucks > 0 ? Math.round((activeTrucks / totalTrucks) * 100) : 0
 
-  const columns: any[] = [
+  const columns = [
     {
       title: 'Caminhão',
       key: 'truck',
-      render: (_: any, record: any) => (
+      render: (_, record) => (
         <div>
           <div style={{ fontWeight: 500, fontSize: '16px' }}>{record.name}</div>
           <Text type="secondary">
@@ -140,7 +140,7 @@ export default function VehicleList() {
       title: 'Placa',
       dataIndex: 'plate',
       key: 'plate',
-      render: (plate: string) => (
+      render: (plate) => (
         <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }}>
           {plate}
         </Tag>
@@ -149,7 +149,7 @@ export default function VehicleList() {
     {
       title: 'Documentação',
       key: 'docExpiry',
-      render: (_: any, record: any) => {
+      render: (_, record) => {
         const docExpiry = record.docExpiry ? dayjs(record.docExpiry) : null
         const today = dayjs()
         const daysUntilExpiry = docExpiry ? docExpiry.diff(today, 'day') : null
@@ -181,37 +181,43 @@ export default function VehicleList() {
     {
       title: 'Manutenções',
       key: 'maintenances',
-      render: (_: any, record: any) => (
-        <div>
-          <Text strong>{record.maintenances?.length || 0}</Text>
-          <div style={{ fontSize: '12px' }}>
-            Última:{' '}
-            {record.maintenances?.[0]?.date
-              ? dayjs(record.maintenances[0].date).format('DD/MM/YYYY')
-              : 'N/A'}
+      render: (_, record) => {
+        const list = record.Maintenance ?? record.maintenances ?? []
+        return (
+          <div>
+            <Text strong>{list.length}</Text>
+            <div style={{ fontSize: '12px' }}>
+              Última:{' '}
+              {list[0]?.date
+                ? dayjs(list[0].date).format('DD/MM/YYYY')
+                : 'N/A'}
+            </div>
           </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       title: 'Viagens',
       key: 'trips',
-      render: (_: any, record: any) => (
-        <div>
-          <Text strong>{record.trips?.length || 0}</Text>
-          <div style={{ fontSize: '12px' }}>
-            Última:{' '}
-            {record.trips?.[0]?.date
-              ? dayjs(record.trips[0].date).format('DD/MM/YYYY')
-              : 'N/A'}
+      render: (_, record) => {
+        const list = record.Trip ?? record.trips ?? []
+        return (
+          <div>
+            <Text strong>{list.length}</Text>
+            <div style={{ fontSize: '12px' }}>
+              Última:{' '}
+              {list[0]?.date
+                ? dayjs(list[0].date).format('DD/MM/YYYY')
+                : 'N/A'}
+            </div>
           </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       title: 'Ações',
       key: 'actions',
-      render: (_: any, record: any) => (
+      render: (_, record) => (
         <Space>
           <Tooltip title="Ver detalhes">
             <Button
