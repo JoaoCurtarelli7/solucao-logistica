@@ -4,15 +4,42 @@ import dayjs from 'dayjs'
 
 const { Option } = Select
 
-const formatCurrency = (value) => {
-  if (!value) return ''
-  const cleanValue = value.toString().replace(/[^\d]/g, '').padStart(3, '0')
-  return `R$ ${cleanValue.slice(0, -2) || '0'},${cleanValue.slice(-2)}`
+// Formata número para exibição: R$ 1.234,56 (ponto milhar, vírgula decimal)
+const formatCurrencyDisplay = (value) => {
+  if (value == null || value === '') return ''
+  const num = Number(value)
+  if (isNaN(num)) return ''
+  const [intPart, decPart] = num.toFixed(2).split('.')
+  const withDots = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `R$ ${withDots},${decPart}`
 }
 
-const parseCurrency = (value) => {
-  if (!value) return 0
-  return parseFloat(value.toString().replace(/[^\d,]/g, '').replace(',', '.')) || 0
+// Digitar só números = valor em reais com 2 decimais (ex: 123456 → 1234,56)
+const parseCurrencyFromInput = (inputStr) => {
+  const digits = String(inputStr || '').replace(/\D/g, '')
+  if (!digits) return undefined
+  const cents = parseInt(digits, 10)
+  return cents / 100
+}
+
+// Input controlado: mostra formatado e interpreta digitação como centavos
+function CurrencyInput({ value, onChange, onValueChange, placeholder, readOnly, ...rest }) {
+  const display = formatCurrencyDisplay(value)
+  const handleChange = (e) => {
+    const num = parseCurrencyFromInput(e.target.value)
+    const newVal = num !== undefined ? num : undefined
+    onChange?.(newVal)
+    onValueChange?.(newVal)
+  }
+  return (
+    <Input
+      {...rest}
+      value={display}
+      onChange={handleChange}
+      placeholder={placeholder || 'R$ 0,00'}
+      readOnly={readOnly}
+    />
+  )
 }
 
 export default function CustomModalLoad({ 
@@ -174,11 +201,23 @@ export default function CustomModalLoad({
             { type: 'number', min: 0.01, message: 'O peso deve ser maior que zero' }
           ]}
         >
-          <InputNumber 
-            min={0.01} 
-            step={0.01} 
-            style={{ width: '100%' }} 
-            placeholder="Ex: 8077.07"
+          <InputNumber
+            min={0.01}
+            step={0.01}
+            style={{ width: '100%' }}
+            placeholder="Ex: 8077 ou 8077,07"
+            formatter={(value) => {
+              if (value == null || value === '') return ''
+              const num = Number(value)
+              if (isNaN(num)) return value
+              return Number.isInteger(num) ? String(num) : String(num)
+            }}
+            parser={(value) => {
+              if (value == null || value === '') return undefined
+              const str = String(value).replace(',', '.')
+              const num = parseFloat(str)
+              return isNaN(num) ? undefined : num
+            }}
           />
         </Form.Item>
 
@@ -190,14 +229,9 @@ export default function CustomModalLoad({
             { type: 'number', min: 0.01, message: 'O valor deve ser maior que zero' }
           ]}
         >
-          <InputNumber
-            min={0.01}
-            step={0.01}
+          <CurrencyInput
             style={{ width: '100%' }}
-            placeholder="R$ 0,00"
-            formatter={(value) => `R$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-            parser={(value) => value.replace(/R\$\s?|(\.*)/g, '').replace(',', '.').replace(/\s/g, '')}
-            onChange={handleValorTotalChange}
+            onValueChange={handleValorTotalChange}
           />
         </Form.Item>
 
@@ -206,14 +240,7 @@ export default function CustomModalLoad({
           label="Valor do Frete 4%"
           rules={[{ type: 'number', min: 0, message: 'O frete deve ser maior ou igual a zero' }]}
         >
-          <InputNumber
-            min={0}
-            step={0.01}
-            style={{ width: '100%' }}
-            placeholder="R$ 0,00"
-            formatter={(value) => `R$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-            parser={(value) => value.replace(/R\$\s?|(\.*)/g, '').replace(',', '.').replace(/\s/g, '')}
-          />
+          <CurrencyInput style={{ width: '100%' }} readOnly />
         </Form.Item>
 
         <Form.Item
@@ -221,14 +248,7 @@ export default function CustomModalLoad({
           label="Soma Total Frete"
           rules={[{ type: 'number', min: 0, message: 'O frete total deve ser maior ou igual a zero' }]}
         >
-          <InputNumber
-            min={0}
-            step={0.01}
-            style={{ width: '100%' }}
-            placeholder="R$ 0,00"
-            formatter={(value) => `R$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-            parser={(value) => value.replace(/R\$\s?|(\.*)/g, '').replace(',', '.').replace(/\s/g, '')}
-          />
+          <CurrencyInput style={{ width: '100%' }} readOnly />
         </Form.Item>
 
         <Form.Item name="observacoes" label="Observações">
