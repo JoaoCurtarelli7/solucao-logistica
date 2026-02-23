@@ -89,9 +89,9 @@ export default function Load() {
       }
 
       await api.post('/loads', loadData)
-      message.success('Carga criada com sucesso!')
+      message.success('Carga cadastrada! Preencha para adicionar outra ou clique em Cancelar para fechar.')
       fetchLoads()
-      setIsModalOpen(false)
+      // Mantém o modal aberto para cadastrar mais cargas
     } catch (error) {
       console.error('Erro ao criar carga:', error)
       message.error(error.response?.data?.message || 'Erro ao criar carga')

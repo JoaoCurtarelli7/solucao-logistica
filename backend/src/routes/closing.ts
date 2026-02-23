@@ -9,7 +9,10 @@ export async function closingRoutes(app: FastifyInstance) {
   // Schema para validação de fechamento
   const createClosingSchema = z.object({
     monthId: z.number(),
-    companyId: z.number().nullable().optional(),
+    companyId: z.preprocess(
+      (v) => (v === "" || v === undefined || v === "null" ? undefined : Number(v)),
+      z.number().nullable().optional()
+    ),
     name: z.string().min(1, "Nome do fechamento é obrigatório"),
     startDate: z.string().nullable().optional().transform((str) => {
       if (!str) return null;
@@ -83,21 +86,38 @@ export async function closingRoutes(app: FastifyInstance) {
               cnpj: true,
             },
           },
+          FinancialEntry: {
+            select: { type: true, amount: true },
+          },
         },
         orderBy: {
           createdAt: 'desc',
         },
       });
 
-      // Formatar resposta para manter compatibilidade com o frontend
-      const formattedClosings = closings.map(c => ({
-        ...c,
-        monthName: c.Month?.name,
-        monthYear: c.Month?.year,
-        monthNumber: c.Month?.month,
-        companyName: c.Company?.name,
-        companyCnpj: c.Company?.cnpj,
-      }));
+      // Calcular totais em tempo real a partir das entradas (para listagem sempre atualizada)
+      const formattedClosings = closings.map((c) => {
+        const entries = (c as any).FinancialEntry || [];
+        const totalEntries = entries.filter((e: any) => e.type === "entrada").reduce((s: number, e: any) => s + e.amount, 0);
+        const totalExpenses = entries.filter((e: any) => e.type === "saida").reduce((s: number, e: any) => s + e.amount, 0);
+        const totalTaxes = entries.filter((e: any) => e.type === "imposto").reduce((s: number, e: any) => s + e.amount, 0);
+        const balance = totalEntries - totalExpenses - totalTaxes;
+        const profitMargin = totalEntries > 0 ? (balance / totalEntries) * 100 : 0;
+        const { FinancialEntry, ...rest } = c as any;
+        return {
+          ...rest,
+          monthName: c.Month?.name,
+          monthYear: c.Month?.year,
+          monthNumber: c.Month?.month,
+          companyName: c.Company?.name,
+          companyCnpj: c.Company?.cnpj,
+          totalEntries,
+          totalExpenses,
+          totalTaxes,
+          balance,
+          profitMargin,
+        };
+      });
 
       return rep.send(formattedClosings);
     } catch (error: any) {
@@ -163,15 +183,23 @@ export async function closingRoutes(app: FastifyInstance) {
         return rep.code(404).send({ message: "Mês não encontrado" });
       }
 
-      // Verificar se a empresa existe (se fornecida)
+      // Verificar se a empresa existe (se fornecida) e obter dados (inclui comissão)
+      let company: { id: number; name: string; commission: number } | null = null;
       if (companyId != null) {
-        const company = await prisma.company.findUnique({
+        const foundCompany = await prisma.company.findUnique({
           where: { id: companyId },
+          select: {
+            id: true,
+            name: true,
+            commission: true,
+          },
         });
 
-        if (!company) {
+        if (!foundCompany) {
           return rep.code(404).send({ message: "Empresa não encontrada" });
         }
+
+        company = foundCompany;
       }
 
       // Criar fechamento usando Prisma ORM em vez de SQL bruto
@@ -204,6 +232,49 @@ export async function closingRoutes(app: FastifyInstance) {
           },
         },
       });
+
+      // Se o fechamento for de uma empresa específica: criar uma entrada por carga no período
+      if (company && closingData.startDate && closingData.endDate) {
+        const startOfPeriod = new Date(closingData.startDate);
+        startOfPeriod.setHours(0, 0, 0, 0);
+        const endOfPeriod = new Date(closingData.endDate);
+        endOfPeriod.setHours(23, 59, 59, 999);
+
+        const loads = await prisma.load.findMany({
+          where: {
+            companyId: company.id,
+            date: {
+              gte: startOfPeriod,
+              lte: endOfPeriod,
+            },
+          },
+        });
+
+        const formatDateBR = (d: Date) => {
+          const day = d.getDate().toString().padStart(2, "0");
+          const month = (d.getMonth() + 1).toString().padStart(2, "0");
+          const year = d.getFullYear();
+          return `${day}/${month}/${year}`;
+        };
+
+        for (const load of loads) {
+          const amount = (load as any).totalFreight ?? (load as any).freight4 ?? 0;
+          if (amount > 0) {
+            const loadDate = new Date((load as any).date);
+            await prisma.financialEntry.create({
+              data: {
+                description: `Carga: ${(load as any).loadingNumber} - ${formatDateBR(loadDate)}`,
+                amount,
+                category: "Comissões",
+                date: loadDate,
+                type: "entrada",
+                companyId: company.id,
+                closingId: newClosing.id,
+              },
+            });
+          }
+        }
+      }
 
       return rep.code(201).send(newClosing);
     } catch (error: any) {

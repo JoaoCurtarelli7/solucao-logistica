@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Modal, Form, Input, DatePicker, Select, InputNumber } from 'antd'
+import { Modal, Form, Input, DatePicker, Select, InputNumber, Button, Space } from 'antd'
 import dayjs from 'dayjs'
 
 const { Option } = Select
@@ -77,21 +77,12 @@ export default function CustomModalLoad({
     form
       .validateFields()
       .then((values) => {
-        const valorTotal = parseFloat(values.valorTotal) || 0
-        const frete4 = valorTotal * 0.04
-        const somaTotalFrete = frete4
-        const formattedValues = {
-          ...values,
-          data: values.data.format('DD/MM/YYYY'),
-          pesoCarga: parseFloat(values.pesoCarga) || 0,
-          valorTotal,
-          frete4,
-          somaTotalFrete,
-          entregas: parseInt(values.entregas) || 0,
-          companyId: values.companyId || selectedCompany
-        }
-        onSubmit(formattedValues)
+        onSubmit(buildFormattedValues(values))
         form.resetFields()
+        // Ao adicionar (não editar), mantém empresa e data para cadastrar outra carga em seguida
+        if (!editingLoad && selectedCompany) {
+          form.setFieldsValue({ companyId: selectedCompany, data: dayjs() })
+        }
       })
       .catch((info) => console.error('Validation failed:', info))
   }
@@ -99,6 +90,33 @@ export default function CustomModalLoad({
   const handleCancel = () => {
     form.resetFields()
     onClose()
+  }
+
+  const buildFormattedValues = (values) => {
+    const valorTotal = parseFloat(values.valorTotal) || 0
+    const frete4 = valorTotal * 0.04
+    const somaTotalFrete = frete4
+    return {
+      ...values,
+      data: values.data.format('DD/MM/YYYY'),
+      pesoCarga: parseFloat(values.pesoCarga) || 0,
+      valorTotal,
+      frete4,
+      somaTotalFrete,
+      entregas: parseInt(values.entregas) || 0,
+      companyId: values.companyId || selectedCompany
+    }
+  }
+
+  const handleSaveAndClose = () => {
+    form
+      .validateFields()
+      .then((values) => {
+        onSubmit(buildFormattedValues(values))
+        form.resetFields()
+        onClose()
+      })
+      .catch((info) => console.error('Validation failed:', info))
   }
 
   const calculateFrete4 = (valorTotal) => {
@@ -117,14 +135,25 @@ export default function CustomModalLoad({
 
   const isEditing = !!editingLoad
 
+  const footer = isEditing ? undefined : (
+    <Space>
+      <Button onClick={handleCancel}>Cancelar</Button>
+      <Button onClick={handleSaveAndClose}>Salvar e fechar</Button>
+      <Button type="primary" onClick={handleOk}>
+        Salvar e adicionar outro
+      </Button>
+    </Space>
+  )
+
   return (
     <Modal
       visible={isVisible}
       title={isEditing ? "Editar Carga" : "Adicionar Nova Carga"}
-      onOk={handleOk}
+      onOk={isEditing ? handleOk : undefined}
       onCancel={handleCancel}
-      okText={isEditing ? "Atualizar" : "Salvar"}
+      okText={isEditing ? "Atualizar" : undefined}
       cancelText="Cancelar"
+      footer={footer}
       width={600}
     >
       <Form form={form} layout="vertical">

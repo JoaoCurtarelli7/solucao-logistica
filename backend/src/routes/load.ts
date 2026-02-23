@@ -14,6 +14,18 @@ function parseMaybeBrDateToDate(d: unknown): Date {
   return new Date(s);
 }
 
+function formatDateBR(d: Date): string {
+  const date = d instanceof Date ? d : new Date(d);
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function loadEntryDescription(loadingNumber: string, loadDate: Date): string {
+  return `Carga: ${loadingNumber} - ${formatDateBR(loadDate)}`;
+}
+
 export async function loadRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({ id: z.coerce.number() });
   const companyParamsSchema = z.object({ companyId: z.coerce.number() });
@@ -140,6 +152,39 @@ export async function loadRoutes(app: FastifyInstance) {
         include: { Company: { select: { id: true, name: true, cnpj: true } } },
       });
 
+      // Adicionar entrada no fechamento do mês (se existir fechamento aberto para essa empresa)
+      const amount = totalFreight ?? freight4 ?? 0;
+      if (amount > 0) {
+        const loadDate = date instanceof Date ? date : new Date(date);
+        const startOfDay = new Date(loadDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(loadDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const closings = await prisma.closing.findMany({
+          where: {
+            companyId,
+            status: "aberto",
+            startDate: { lte: endOfDay },
+            endDate: { gte: startOfDay },
+          },
+        });
+
+        for (const closing of closings) {
+          await prisma.financialEntry.create({
+            data: {
+              description: loadEntryDescription(loadingNumber, loadDate),
+              amount,
+              category: "Comissões",
+              date: loadDate,
+              type: "entrada",
+              companyId,
+              closingId: closing.id,
+            },
+          });
+        }
+      }
+
       return rep.code(201).send(load);
     } catch (error: any) {
       if (error?.code === "P2025") {
@@ -205,6 +250,49 @@ export async function loadRoutes(app: FastifyInstance) {
         include: { Company: { select: { id: true, name: true, cnpj: true } } },
       });
 
+      // Sincronizar fechamento: remover entradas antigas desta carga e recriar com dados atualizados
+      const oldDesc = loadEntryDescription(existing.loadingNumber, existing.date);
+      await prisma.financialEntry.deleteMany({
+        where: {
+          companyId: existing.companyId,
+          type: "entrada",
+          category: "Comissões",
+          description: oldDesc,
+        },
+      });
+
+      const newAmount = (updated as any).totalFreight ?? (updated as any).freight4 ?? 0;
+      if (newAmount > 0) {
+        const loadDate = (updated as any).date instanceof Date ? (updated as any).date : new Date((updated as any).date);
+        const startOfDay = new Date(loadDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(loadDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const closings = await prisma.closing.findMany({
+          where: {
+            companyId: (updated as any).companyId,
+            status: "aberto",
+            startDate: { lte: endOfDay },
+            endDate: { gte: startOfDay },
+          },
+        });
+
+        for (const closing of closings) {
+          await prisma.financialEntry.create({
+            data: {
+              description: loadEntryDescription((updated as any).loadingNumber, loadDate),
+              amount: newAmount,
+              category: "Comissões",
+              date: loadDate,
+              type: "entrada",
+              companyId: (updated as any).companyId,
+              closingId: closing.id,
+            },
+          });
+        }
+      }
+
       return rep.send(updated);
     } catch (error: any) {
       if (error?.code === "P2025") {
@@ -222,6 +310,17 @@ export async function loadRoutes(app: FastifyInstance) {
     try {
       const existing = await prisma.load.findUnique({ where: { id } });
       if (!existing) return rep.code(404).send({ message: "Carregamento não encontrado" });
+
+      // Remover entradas do fechamento que referenciam esta carga
+      const desc = loadEntryDescription(existing.loadingNumber, existing.date);
+      await prisma.financialEntry.deleteMany({
+        where: {
+          companyId: existing.companyId,
+          type: "entrada",
+          category: "Comissões",
+          description: desc,
+        },
+      });
 
       await prisma.load.delete({ where: { id } });
       return rep.code(204).send();

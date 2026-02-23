@@ -793,8 +793,8 @@ export default function Closings() {
             label="Empresa"
             name="companyId"
           >
-            <Select placeholder="Selecione uma empresa (opcional)">
-              <Option value={null}>Todas as empresas</Option>
+            <Select placeholder="Selecione uma empresa (opcional)" allowClear>
+              <Option value={null}>Nenhuma (todas as empresas)</Option>
               {companies.map(company => (
                 <Option key={company.id} value={company.id}>
                   {company.name}
