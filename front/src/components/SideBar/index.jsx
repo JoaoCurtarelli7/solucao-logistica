@@ -10,12 +10,13 @@ import {
   PrinterOutlined,
   CalculatorOutlined,
   SafetyOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { useUserContext } from "../../context/userContext";
 import { usePermission } from "../../hooks/usePermission";
 import "./styles.css";
 
-export default function AppSidebar() {
+export default function AppSidebar({ open = false, onClose }) {
   const { user: userContext, logout } = useUserContext();
   const { hasPermission } = usePermission();
   const location = useLocation();
@@ -88,8 +89,16 @@ export default function AppSidebar() {
   ];
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${open ? "sidebar-open" : ""}`}>
       <div className="sidebar-header">
+        <button
+          type="button"
+          className="sidebar-close"
+          onClick={onClose}
+          aria-label="Fechar menu"
+        >
+          <CloseOutlined />
+        </button>
         <h2>🚛 Solução Logística</h2>
         <p>Olá, {userContext?.name || "Usuário"}</p>
       </div>
@@ -100,9 +109,10 @@ export default function AppSidebar() {
         defaultOpenKeys={["gestao", "operacoes"]}
         items={menuItems}
         className="sidebar-menu"
+        onClick={onClose}
       />
 
-      <div className="sidebar-footer">
+      <div className="sidebar-footer" onClick={() => onClose?.()}>
         <Link to="/user-profile" className="footer-link">
           <UserOutlined /> Perfil
         </Link>
