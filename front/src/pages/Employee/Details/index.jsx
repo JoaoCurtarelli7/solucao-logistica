@@ -21,6 +21,7 @@ import {
   DatePicker,
   Spin,
   Alert,
+  Popconfirm,
 } from "antd";
 import {
   UserOutlined,
@@ -31,9 +32,13 @@ import {
   EditOutlined,
   PlusOutlined,
   ArrowLeftOutlined,
+  DownloadOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import api from "../../../lib/api";
 import dayjs from "dayjs";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -46,6 +51,8 @@ export default function EmployeeDetails() {
   const [loading, setLoading] = useState(true);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState(dayjs());
   const [editForm] = Form.useForm();
   const [transactionForm] = Form.useForm();
 
@@ -53,7 +60,12 @@ export default function EmployeeDetails() {
   const loadEmployee = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/employees/${id}`);
+      const response = await api.get(`/employees/${id}`, {
+        params: {
+          month: selectedMonth.month() + 1,
+          year: selectedMonth.year(),
+        },
+      });
       setEmployee(response.data);
       setTransactions(response.data.Transaction || []);
     } catch (error) {
@@ -68,7 +80,7 @@ export default function EmployeeDetails() {
     if (id) {
       loadEmployee();
     }
-  }, [id]);
+  }, [id, selectedMonth]);
 
   // Atualizar funcionário
   const handleUpdateEmployee = async (values) => {
@@ -83,6 +95,7 @@ export default function EmployeeDetails() {
         role: values.role,
         baseSalary,
         status: values.status,
+        pixAccount: values.pixAccount || "",
         cpf: values.cpf || null,
         phone: values.phone || null,
         email: values.email || null,
@@ -107,31 +120,59 @@ export default function EmployeeDetails() {
   // Adicionar transação
   const handleAddTransaction = async (values) => {
     try {
-      const response = await api.post(`/employees/${id}/transactions`, {
+      const payload = {
         type: values.type,
         amount: values.amount,
+        description: values.description,
         date: values.date ? values.date.format("YYYY-MM-DD") : null,
-      });
+      };
 
-      setTransactions([response.data, ...transactions]);
+      const response = editingTransaction
+        ? await api.put(
+            `/employees/${id}/transactions/${editingTransaction.id}`,
+            payload,
+          )
+        : await api.post(`/employees/${id}/transactions`, payload);
+
+      if (editingTransaction) {
+        message.success("Transação atualizada com sucesso!");
+      } else {
+        message.success("Transação adicionada com sucesso!");
+      }
       setTransactionModalVisible(false);
+      setEditingTransaction(null);
       transactionForm.resetFields();
-      message.success("Transação adicionada com sucesso!");
+      await loadEmployee();
     } catch (error) {
       console.error("Erro ao adicionar transação:", error);
-      message.error("Erro ao adicionar transação");
+      message.error(
+        editingTransaction
+          ? "Erro ao atualizar transação"
+          : "Erro ao adicionar transação",
+      );
     }
   };
 
-  // Calcular saldo
-  const calculateBalance = () => {
-    return transactions.reduce((balance, transaction) => {
-      if (transaction.type === "Crédito") {
-        return balance + transaction.amount;
-      } else {
-        return balance - transaction.amount;
-      }
-    }, 0);
+  const handleEditTransaction = (transaction) => {
+    setEditingTransaction(transaction);
+    transactionForm.setFieldsValue({
+      type: transaction.type,
+      amount: transaction.amount,
+      description: transaction.description || "",
+      date: transaction.date ? dayjs(transaction.date) : null,
+    });
+    setTransactionModalVisible(true);
+  };
+
+  const handleDeleteTransaction = async (transactionId) => {
+    try {
+      await api.delete(`/employees/${id}/transactions/${transactionId}`);
+      await loadEmployee();
+      message.success("Transação removida com sucesso!");
+    } catch (error) {
+      console.error("Erro ao remover transação:", error);
+      message.error("Erro ao remover transação");
+    }
   };
 
   // Calcular estatísticas
@@ -147,9 +188,15 @@ export default function EmployeeDetails() {
   };
 
   const stats = calculateStats();
-  const balance = calculateBalance();
 
-  const transactionColumns = [
+  const saldoTotalSalario =
+    employee?.financialSummary?.salaryTotalBalance ??
+    (employee?.baseSalary || 0) + stats.totalCredits - stats.totalDebits;
+
+  const credits = transactions.filter((t) => t.type === "Crédito");
+  const debits = transactions.filter((t) => t.type === "Débito");
+
+  const movementColumns = [
     {
       title: "Data",
       dataIndex: "date",
@@ -158,17 +205,10 @@ export default function EmployeeDetails() {
       sorter: (a, b) => new Date(a.date) - new Date(b.date),
     },
     {
-      title: "Tipo",
-      dataIndex: "type",
-      key: "type",
-      render: (type) => (
-        <Tag color={type === "Crédito" ? "green" : "red"}>{type}</Tag>
-      ),
-      filters: [
-        { text: "Crédito", value: "Crédito" },
-        { text: "Débito", value: "Débito" },
-      ],
-      onFilter: (value, record) => record.type === value,
+      title: "Descrição",
+      dataIndex: "description",
+      key: "description",
+      render: (description) => description || "-",
     },
     {
       title: "Valor",
@@ -187,7 +227,116 @@ export default function EmployeeDetails() {
       ),
       sorter: (a, b) => a.amount - b.amount,
     },
+    {
+      title: "Ações",
+      key: "actions",
+      render: (_, record) => (
+        <Space>
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            onClick={() => handleEditTransaction(record)}
+          >
+            Editar
+          </Button>
+          <Popconfirm
+            title="Remover transação?"
+            description="Esta ação não pode ser desfeita."
+            onConfirm={() => handleDeleteTransaction(record.id)}
+            okText="Remover"
+            cancelText="Cancelar"
+            okType="danger"
+          >
+            <Button type="link" danger icon={<DeleteOutlined />}>
+              Remover
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
+
+  const exportTransactionsPdf = () => {
+    try {
+      const doc = new jsPDF();
+
+      doc.setFontSize(16);
+      doc.text("Extrato Financeiro do Funcionário", 14, 18);
+
+      doc.setFontSize(10);
+      doc.text(`Gerado em: ${dayjs().format("DD/MM/YYYY HH:mm")}`, 14, 25);
+
+      doc.setFontSize(11);
+      doc.text(`Nome: ${employee.name || "-"}`, 14, 34);
+      doc.text(`Cargo: ${employee.role || "-"}`, 14, 40);
+      doc.text(`CPF: ${employee.cpf || "-"}`, 14, 46);
+      doc.text(`Conta Pix: ${employee.pixAccount || "-"}`, 14, 52);
+      doc.text(
+        `Competência: ${selectedMonth.format("MM/YYYY")}`,
+        14,
+        58,
+      );
+
+      doc.text(
+        `Salário Base: R$ ${(employee.baseSalary || 0).toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+        })}`,
+        14,
+        66,
+      );
+      doc.text(
+        `Total Créditos: R$ ${stats.totalCredits.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+        })}`,
+        14,
+        72,
+      );
+      doc.text(
+        `Total Débitos: R$ ${stats.totalDebits.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+        })}`,
+        14,
+        78,
+      );
+
+      doc.setFontSize(12);
+      doc.text(
+        `Totalizador do Salário: R$ ${saldoTotalSalario.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+        })}`,
+        14,
+        86,
+      );
+
+      const tableRows = transactions.map((transaction) => [
+        transaction.date ? dayjs(transaction.date).format("DD/MM/YYYY") : "-",
+        transaction.type || "-",
+        transaction.description || "-",
+        `R$ ${Number(transaction.amount || 0).toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+        })}`,
+      ]);
+
+      autoTable(doc, {
+        head: [["Data", "Tipo", "Descrição", "Valor"]],
+        body: tableRows,
+        startY: 92,
+        styles: { fontSize: 9, cellPadding: 2.5 },
+        headStyles: { fillColor: [22, 119, 255], textColor: 255 },
+      });
+
+      const finalY = (doc.lastAutoTable?.finalY || 120) + 24;
+      doc.setFontSize(10);
+      doc.text("Assinatura do responsável:", 14, finalY);
+      doc.line(14, finalY + 14, 120, finalY + 14);
+
+      doc.save(`funcionario_${employee.id}_extrato_${dayjs().format("YYYY-MM-DD_HH-mm")}.pdf`);
+      message.success("PDF exportado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao exportar PDF do funcionário:", error);
+      message.error("Erro ao exportar PDF");
+    }
+  };
 
   if (loading) {
     return (
@@ -232,9 +381,21 @@ export default function EmployeeDetails() {
             <Title level={2} style={{ margin: 0 }}>
               {employee.name}
             </Title>
+            <Text type="secondary">
+              Competência selecionada: {selectedMonth.format("MM/YYYY")}
+            </Text>
           </Col>
           <Col>
             <Space>
+              <DatePicker
+                picker="month"
+                allowClear={false}
+                value={selectedMonth}
+                format="MM/YYYY"
+                onChange={(value) => {
+                  if (value) setSelectedMonth(value);
+                }}
+              />
               <Button
                 type="primary"
                 icon={<EditOutlined />}
@@ -245,6 +406,7 @@ export default function EmployeeDetails() {
                     baseSalary: employee.baseSalary,
                     status: employee.status,
                     cpf: employee.cpf || "",
+                    pixAccount: employee.pixAccount || "",
                     phone: employee.phone || "",
                     email: employee.email || "",
                     address: employee.address || "",
@@ -260,9 +422,20 @@ export default function EmployeeDetails() {
               <Button
                 type="default"
                 icon={<PlusOutlined />}
-                onClick={() => setTransactionModalVisible(true)}
+                onClick={() => {
+                  setEditingTransaction(null);
+                  transactionForm.resetFields();
+                  setTransactionModalVisible(true);
+                }}
               >
                 Adicionar Transação
+              </Button>
+              <Button
+                type="default"
+                icon={<DownloadOutlined />}
+                onClick={exportTransactionsPdf}
+              >
+                Exportar PDF
               </Button>
             </Space>
           </Col>
@@ -286,6 +459,9 @@ export default function EmployeeDetails() {
               </Descriptions.Item>
               <Descriptions.Item label="CPF">
                 {employee.cpf || "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Conta Pix" span={2}>
+                {employee.pixAccount || "-"}
               </Descriptions.Item>
               <Descriptions.Item label="Telefone">
                 {employee.phone || "-"}
@@ -319,11 +495,11 @@ export default function EmployeeDetails() {
                 valueStyle={{ color: "#3f8600" }}
               />
               <Statistic
-                title="Saldo Atual"
-                value={balance}
+                title="Saldo Total do Salário"
+                value={saldoTotalSalario}
                 precision={2}
                 prefix="R$"
-                valueStyle={{ color: balance >= 0 ? "#3f8600" : "#cf1322" }}
+                valueStyle={{ color: saldoTotalSalario >= 0 ? "#3f8600" : "#cf1322" }}
               />
               <Divider />
               <Statistic
@@ -350,24 +526,171 @@ export default function EmployeeDetails() {
         </Col>
       </Row>
 
-      {/* Tabela de Transações */}
-      <Card title="Histórico de Transações" style={{ marginTop: "20px" }}>
+      <Card title="Histórico de Salários por Mês" style={{ marginTop: "20px" }}>
         <Table
-          dataSource={transactions}
-          columns={transactionColumns}
-          rowKey="id"
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} de ${total} transações`,
-          }}
-          locale={{
-            emptyText: "Nenhuma transação encontrada",
-          }}
+          dataSource={employee?.monthlyHistory || []}
+          rowKey={(record) => `${record.year}-${record.month}`}
+          pagination={{ pageSize: 6 }}
+          columns={[
+            {
+              title: "Competência",
+              key: "monthYear",
+              render: (_, record) =>
+                `${String(record.month).padStart(2, "0")}/${record.year}`,
+            },
+            {
+              title: "Créditos",
+              dataIndex: "totalCredits",
+              align: "right",
+              render: (value) =>
+                `R$ ${Number(value || 0).toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}`,
+            },
+            {
+              title: "Débitos",
+              dataIndex: "totalDebits",
+              align: "right",
+              render: (value) =>
+                `R$ ${Number(value || 0).toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}`,
+            },
+            {
+              title: "Saldo do Salário",
+              dataIndex: "salaryTotalBalance",
+              align: "right",
+              render: (value) => (
+                <span style={{ color: value >= 0 ? "#3f8600" : "#cf1322", fontWeight: 600 }}>
+                  {`R$ ${Number(value || 0).toLocaleString("pt-BR", {
+                    minimumFractionDigits: 2,
+                  })}`}
+                </span>
+              ),
+            },
+          ]}
+          locale={{ emptyText: "Sem histórico mensal ainda" }}
         />
       </Card>
+
+      <Card style={{ marginTop: "20px", border: "2px solid #1677ff" }}>
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Title level={4} style={{ margin: 0 }}>
+              Totalizador Final do Salário
+            </Title>
+            <Text type="secondary">Salário base + créditos - débitos</Text>
+          </Col>
+          <Col>
+            <Title
+              level={3}
+              style={{
+                margin: 0,
+                color: saldoTotalSalario >= 0 ? "#3f8600" : "#cf1322",
+              }}
+            >
+              R$ {saldoTotalSalario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </Title>
+          </Col>
+        </Row>
+      </Card>
+
+      <Row gutter={[20, 20]} style={{ marginTop: "20px" }}>
+        <Col span={24}>
+          <Card title="Todas as Transações">
+            <Space direction="vertical" style={{ width: "100%" }} size="middle">
+              <Row gutter={16}>
+                <Col xs={24} md={8}>
+                  <Statistic
+                    title="Total Geral de Transações"
+                    value={stats.transactionCount}
+                    suffix="transações"
+                  />
+                </Col>
+                <Col xs={24} md={8}>
+                  <Statistic
+                    title="Total de Créditos"
+                    value={stats.totalCredits}
+                    precision={2}
+                    prefix="R$"
+                    valueStyle={{ color: "#3f8600" }}
+                  />
+                </Col>
+                <Col xs={24} md={8}>
+                  <Statistic
+                    title="Total de Débitos"
+                    value={stats.totalDebits}
+                    precision={2}
+                    prefix="R$"
+                    valueStyle={{ color: "#cf1322" }}
+                  />
+                </Col>
+              </Row>
+              <Table
+                dataSource={transactions}
+                columns={movementColumns}
+                rowKey="id"
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showQuickJumper: true,
+                }}
+                locale={{ emptyText: "Nenhuma transação encontrada" }}
+              />
+            </Space>
+          </Card>
+        </Col>
+
+        <Col xs={24} md={12}>
+          <Card title="Créditos">
+            <Space direction="vertical" style={{ width: "100%" }} size="middle">
+              <Statistic
+                title="Total de Créditos"
+                value={stats.totalCredits}
+                precision={2}
+                prefix="R$"
+                valueStyle={{ color: "#3f8600" }}
+              />
+              <Table
+                dataSource={credits}
+                columns={movementColumns}
+                rowKey="id"
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showQuickJumper: true,
+                }}
+                locale={{ emptyText: "Nenhum crédito encontrado" }}
+              />
+            </Space>
+          </Card>
+        </Col>
+
+        <Col xs={24} md={12}>
+          <Card title="Débitos">
+            <Space direction="vertical" style={{ width: "100%" }} size="middle">
+              <Statistic
+                title="Total de Débitos"
+                value={stats.totalDebits}
+                precision={2}
+                prefix="R$"
+                valueStyle={{ color: "#cf1322" }}
+              />
+              <Table
+                dataSource={debits}
+                columns={movementColumns}
+                rowKey="id"
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showQuickJumper: true,
+                }}
+                locale={{ emptyText: "Nenhum débito encontrado" }}
+              />
+            </Space>
+          </Card>
+        </Col>
+      </Row>
 
       {/* Modal de Edição */}
       <Modal
@@ -487,6 +810,10 @@ export default function EmployeeDetails() {
             </Col>
           </Row>
 
+          <Form.Item label="Conta Pix" name="pixAccount">
+            <Input placeholder="Chave Pix (email, CPF, telefone ou aleatória)" />
+          </Form.Item>
+
           <Form.Item style={{ textAlign: "right", marginTop: "20px" }}>
             <Button
               onClick={() => setEditModalVisible(false)}
@@ -502,9 +829,13 @@ export default function EmployeeDetails() {
       </Modal>
 
       <Modal
-        title="Adicionar Transação"
+        title={editingTransaction ? "Editar Transação" : "Adicionar Transação"}
         open={transactionModalVisible}
-        onCancel={() => setTransactionModalVisible(false)}
+        onCancel={() => {
+          setTransactionModalVisible(false);
+          setEditingTransaction(null);
+          transactionForm.resetFields();
+        }}
         footer={null}
         width={500}
       >
@@ -525,6 +856,14 @@ export default function EmployeeDetails() {
           </Form.Item>
 
           <Form.Item
+            label="Descrição da transação"
+            name="description"
+            rules={[{ required: true, message: "Descrição é obrigatória!" }]}
+          >
+            <Input placeholder="Ex: Adiantamento, desconto INSS, bônus, etc." />
+          </Form.Item>
+
+          <Form.Item
             label="Valor"
             name="amount"
             rules={[
@@ -540,8 +879,26 @@ export default function EmployeeDetails() {
               style={{ width: "100%" }}
               min={0.01}
               step={0.01}
-              formatter={(value) => `R$ ${value}`}
-              parser={(value) => value.replace("R$", "")}
+              formatter={(value) => {
+                const parsed = Number.parseFloat(
+                  String(value ?? "0").replace(",", "."),
+                );
+                if (Number.isNaN(parsed)) return "R$ 0,00";
+                return parsed.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                  minimumFractionDigits: 2,
+                });
+              }}
+              parser={(value) => {
+                if (value == null || value === "") return 0;
+                const cleaned = String(value)
+                  .replace(/[R$\s]/g, "")
+                  .replace(/\./g, "")
+                  .replace(",", ".");
+                const num = Number.parseFloat(cleaned);
+                return Number.isNaN(num) ? 0 : num;
+              }}
             />
           </Form.Item>
 
@@ -565,7 +922,7 @@ export default function EmployeeDetails() {
               Cancelar
             </Button>
             <Button type="primary" htmlType="submit">
-              Adicionar Transação
+              {editingTransaction ? "Salvar Alterações" : "Adicionar Transação"}
             </Button>
           </Form.Item>
         </Form>

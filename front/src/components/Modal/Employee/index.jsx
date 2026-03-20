@@ -41,6 +41,7 @@ export default function AddEmployeeModal({
         cargo: editingEmployee.role,
         salarioBase: editingEmployee.baseSalary,
         status: editingEmployee.status,
+        pixAccount: editingEmployee.pixAccount || "",
         cpf: editingEmployee.cpf || "",
         telefone: editingEmployee.phone || "",
         email: editingEmployee.email || "",
@@ -84,6 +85,7 @@ export default function AddEmployeeModal({
         role: values.cargo,
         baseSalary,
         status: values.status,
+        pixAccount: values.pixAccount || "",
         cpf: values.cpf || "",
         phone: values.telefone || "",
         email: values.email || "",
@@ -342,6 +344,10 @@ export default function AddEmployeeModal({
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item label="Conta Pix" name="pixAccount">
+            <Input placeholder="Chave Pix (email, CPF, telefone ou aleatória)" />
+          </Form.Item>
 
           <Form.Item style={{ marginTop: "20px", textAlign: "right" }}>
             <Button onClick={handleCancel} style={{ marginRight: 8 }}>

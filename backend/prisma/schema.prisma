@@ -51,6 +51,8 @@ model Employee {
   role        String
   baseSalary  Float
   status      String
+  // Conta Pix para depósito (opcional para manter compatibilidade com dados antigos)
+  pixAccount  String?
   cpf         String?
   phone       String?
   email       String?
@@ -148,6 +150,8 @@ model Transaction {
   type       String
   amount     Float
   date       DateTime @default(now()) @db.Timestamptz(6)
+  // O que é a transação (opcional no schema para não quebrar registros antigos)
+  description String?
   employeeId Int
   Employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade, map: "fk_transaction_employee")
 
