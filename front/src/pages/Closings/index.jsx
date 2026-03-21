@@ -61,6 +61,54 @@ export default function Closings() {
   const [monthForm] = Form.useForm()
   const [activeTab, setActiveTab] = useState('months')
 
+  const parseDateSafe = (value) => {
+    if (!value) return null
+    const parsed = dayjs(value)
+    if (parsed.isValid()) return parsed
+    if (typeof value === 'string' && value.includes('/')) {
+      const [dd, mm, yyyy] = value.split('/')
+      const isoLike = `${yyyy}-${mm}-${dd}`
+      const fromBr = dayjs(isoLike)
+      if (fromBr.isValid()) return fromBr
+    }
+    return null
+  }
+
+  const formatDateSafe = (value) => {
+    const d = parseDateSafe(value)
+    return d ? d.format('DD/MM/YYYY') : '-'
+  }
+
+  const resolveDatesFromForm = (values) => {
+    const type = values?.closingType
+    const monthBase = values?.monthPicker ? dayjs(values.monthPicker) : null
+
+    if (monthBase && monthBase.isValid()) {
+      if (type === 'month') {
+        return {
+          startDate: monthBase.startOf('month'),
+          endDate: monthBase.endOf('month')
+        }
+      }
+      if (type === 'first_half') {
+        return {
+          startDate: monthBase.startOf('month'),
+          endDate: monthBase.date(15)
+        }
+      }
+      if (type === 'second_half') {
+        return {
+          startDate: monthBase.date(16),
+          endDate: monthBase.endOf('month')
+        }
+      }
+    }
+
+    const startDate = parseDateSafe(values?.startDate)
+    const endDate = parseDateSafe(values?.endDate)
+    return { startDate, endDate }
+  }
+
   const canViewClosings = hasPermission('closings.view')
   const canCreateClosings = hasPermission('closings.create')
   const canUpdateClosings = hasPermission('closings.update')
@@ -177,13 +225,14 @@ export default function Closings() {
     try {
       // Remover campos que não vão para o backend
       const { closingType, monthPicker, ...closingData } = values
+      const resolved = resolveDatesFromForm(values)
       
       // Preparar dados para envio
       const submitData = {
         ...closingData,
         monthId: selectedMonth,
-        startDate: values.startDate ? values.startDate.format('DD/MM/YYYY') : null,
-        endDate: values.endDate ? values.endDate.format('DD/MM/YYYY') : null
+        startDate: resolved.startDate ? resolved.startDate.format('DD/MM/YYYY') : null,
+        endDate: resolved.endDate ? resolved.endDate.format('DD/MM/YYYY') : null
       }
       
       // Se não há datas, usar datas padrão do mês selecionado
@@ -212,12 +261,13 @@ export default function Closings() {
     try {
       // Remover campos que não vão para o backend
       const { closingType, monthPicker, ...closingData } = values
+      const resolved = resolveDatesFromForm(values)
       
       // Preparar dados para envio
       const submitData = {
         ...closingData,
-        startDate: values.startDate ? values.startDate.format('DD/MM/YYYY') : null,
-        endDate: values.endDate ? values.endDate.format('DD/MM/YYYY') : null
+        startDate: resolved.startDate ? resolved.startDate.format('DD/MM/YYYY') : null,
+        endDate: resolved.endDate ? resolved.endDate.format('DD/MM/YYYY') : null
       }
       
       await api.put(`/closings/${editingClosing.id}`, submitData)
@@ -266,27 +316,54 @@ export default function Closings() {
     setEditingClosing(closing)
     
     // Determinar o tipo de fechamento baseado nas datas
-    const startDate = dayjs(closing.startDate)
-    const endDate = dayjs(closing.endDate)
-    const startOfMonth = startDate.startOf('month')
-    const endOfMonth = endDate.endOf('month')
+    let startDate = parseDateSafe(closing.startDate)
+    let endDate = parseDateSafe(closing.endDate)
     
     let closingType = 'custom'
-    if (startDate.isSame(startOfMonth, 'day') && endDate.isSame(endOfMonth, 'day')) {
-      closingType = 'month'
-    } else if (startDate.isSame(startOfMonth, 'day') && endDate.date() === 15) {
-      closingType = 'first_half'
-    } else if (startDate.date() === 16 && endDate.isSame(endOfMonth, 'day')) {
-      closingType = 'second_half'
+    if (startDate && endDate) {
+      const startOfMonth = startDate.startOf('month')
+      const endOfMonth = endDate.endOf('month')
+      if (startDate.isSame(startOfMonth, 'day') && endDate.isSame(endOfMonth, 'day')) {
+        closingType = 'month'
+      } else if (startDate.isSame(startOfMonth, 'day') && endDate.date() === 15) {
+        closingType = 'first_half'
+      } else if (startDate.date() === 16 && endDate.isSame(endOfMonth, 'day')) {
+        closingType = 'second_half'
+      }
+    } else {
+      const lowerName = String(closing?.name || '').toLowerCase()
+      if (lowerName.includes('1ª quinzena') || lowerName.includes('1a quinzena')) {
+        closingType = 'first_half'
+      } else if (lowerName.includes('2ª quinzena') || lowerName.includes('2a quinzena')) {
+        closingType = 'second_half'
+      } else if (lowerName.includes('mês') || lowerName.includes('mes')) {
+        closingType = 'month'
+      }
+
+      const monthNum = closing?.Month?.month ?? closing?.monthNumber
+      const monthYear = closing?.Month?.year ?? closing?.monthYear
+      if (monthNum && monthYear && closingType !== 'custom') {
+        const base = dayjs(`${monthYear}-${String(monthNum).padStart(2, '0')}-01`)
+        if (closingType === 'month') {
+          startDate = base.startOf('month')
+          endDate = base.endOf('month')
+        } else if (closingType === 'first_half') {
+          startDate = base.startOf('month')
+          endDate = base.date(15)
+        } else if (closingType === 'second_half') {
+          startDate = base.date(16)
+          endDate = base.endOf('month')
+        }
+      }
     }
     
     form.setFieldsValue({
       name: closing.name,
       closingType: closingType,
-      startDate: startDate,
-      endDate: endDate,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
       companyId: closing.companyId,
-      monthPicker: closingType !== 'custom' ? startDate : null
+      monthPicker: closingType !== 'custom' && startDate ? startDate : undefined
     })
     setIsModalOpen(true)
   }
@@ -433,11 +510,11 @@ export default function Closings() {
       key: 'period',
       render: (_, record) => (
         <div>
-          <Text>{dayjs(record.startDate).format('DD/MM/YYYY')}</Text>
+          <Text>{formatDateSafe(record.startDate)}</Text>
           <br />
           <Text type="secondary">até</Text>
           <br />
-          <Text>{dayjs(record.endDate).format('DD/MM/YYYY')}</Text>
+          <Text>{formatDateSafe(record.endDate)}</Text>
         </div>
       )
     },

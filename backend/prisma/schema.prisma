@@ -132,6 +132,14 @@ model Maintenance {
   @@index([truckId], map: "idx_maintenance_truckId")
 }
 
+// Catálogo de serviços de manutenção (padrões + cadastrados pelo usuário)
+model MaintenanceServicePreset {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
 model Month {
   id        Int       @id @default(autoincrement())
   year      Int
@@ -199,6 +207,11 @@ model Truck {
   brand       String
   year        Int
   docExpiry   DateTime      @db.Timestamptz(6)
+  insuranceExpiry DateTime? @db.Timestamptz(6)
+  tachographCalibrationExpiry DateTime? @db.Timestamptz(6)
+  oilChangeEngineDate DateTime? @db.Timestamptz(6)
+  oilChangeGearboxDate DateTime? @db.Timestamptz(6)
+  oilChangeDifferentialDate DateTime? @db.Timestamptz(6)
   renavam     String
   image       String?
   Maintenance Maintenance[]

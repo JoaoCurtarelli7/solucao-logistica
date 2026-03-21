@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Card, Table, Typography, Button, message, Result } from 'antd'
+import { Card, Table, Typography, Button, message, Result, Row, Col, Tag, Space } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import VehicleMaintenanceModal from '../../../components/Modal/MainTenanceVehicle'
@@ -16,6 +16,7 @@ export default function VehicleMaintenanceList() {
   const { hasPermission } = usePermission()
 
   const [maintenanceData, setMaintenanceData] = useState([])
+  const [truck, setTruck] = useState(null)
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [editingMaintenance, setEditingMaintenance] = useState(null)
 
@@ -36,6 +37,9 @@ export default function VehicleMaintenanceList() {
 
   const fetchMaintenance = useCallback(async () => {
     try {
+      const truckResponse = await api.get(`/trucks/${id}`)
+      setTruck(truckResponse.data)
+
       const response = await api.get(`/trucks/${id}/maintenances`)
 
       const arr = Array.isArray(response.data?.maintenances)
@@ -51,6 +55,14 @@ export default function VehicleMaintenanceList() {
       setMaintenanceData([])
     }
   }, [id])
+
+  const getStatus = (dateValue) => {
+    if (!dateValue) return { label: 'Sem data', color: 'default' }
+    const days = dayjs(dateValue).startOf('day').diff(dayjs().startOf('day'), 'day')
+    if (days < 0) return { label: 'Vencido', color: 'red' }
+    if (days <= 30) return { label: `Vence em ${days}d`, color: 'orange' }
+    return { label: 'Em dia', color: 'green' }
+  }
 
   useEffect(() => {
     fetchMaintenance()
@@ -205,6 +217,33 @@ export default function VehicleMaintenanceList() {
           </Button>
         )}
       </div>
+
+      <Card title="Alertas de Vencimento da Frota" style={{ marginBottom: 16 }}>
+        <Row gutter={[12, 12]}>
+          <Col span={24}>
+            <Space size={[8, 8]} wrap>
+              <Tag color={getStatus(truck?.docExpiry).color}>
+                Documento: {getStatus(truck?.docExpiry).label}
+              </Tag>
+              <Tag color={getStatus(truck?.insuranceExpiry).color}>
+                Seguro: {getStatus(truck?.insuranceExpiry).label}
+              </Tag>
+              <Tag color={getStatus(truck?.tachographCalibrationExpiry).color}>
+                Tacógrafo: {getStatus(truck?.tachographCalibrationExpiry).label}
+              </Tag>
+              <Tag color={getStatus(truck?.oilChangeEngineDate).color}>
+                Óleo Motor: {getStatus(truck?.oilChangeEngineDate).label}
+              </Tag>
+              <Tag color={getStatus(truck?.oilChangeGearboxDate).color}>
+                Óleo Caixa: {getStatus(truck?.oilChangeGearboxDate).label}
+              </Tag>
+              <Tag color={getStatus(truck?.oilChangeDifferentialDate).color}>
+                Óleo Diferencial: {getStatus(truck?.oilChangeDifferentialDate).label}
+              </Tag>
+            </Space>
+          </Col>
+        </Row>
+      </Card>
 
       <Table
         dataSource={Array.isArray(maintenanceData) ? maintenanceData : []}

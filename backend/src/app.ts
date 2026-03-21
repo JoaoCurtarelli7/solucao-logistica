@@ -16,6 +16,7 @@ import { truckRoutes } from "./routes/truck";
 import { tripRoutes } from "./routes/trip";
 import { tripExpenseRoutes } from "./routes/tripExpense";
 import { maintenanceRoutes } from "./routes/maintenance";
+import { maintenanceServicePresetRoutes } from "./routes/maintenanceServicePreset";
 import { rbacRoutes } from "./routes/rbac";
 
 export const app = fastify({
@@ -88,6 +89,7 @@ app.register(monthRoutes);
 app.register(closingRoutes);
 app.register(truckRoutes);
 app.register(maintenanceRoutes);
+app.register(maintenanceServicePresetRoutes);
 app.register(tripRoutes);
 app.register(tripExpenseRoutes);
 app.register(rbacRoutes);

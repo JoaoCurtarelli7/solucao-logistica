@@ -30,23 +30,46 @@ function parseDateToDate(input?: string | Date | null): Date {
   throw new Error(`Formato de data inválido: ${str}. Use DD/MM/YYYY ou YYYY-MM-DD`);
 }
 
+function parseOptionalDate(input?: string | Date | null): Date | null {
+  if (input === undefined || input === null || input === "") return null;
+  try {
+    return parseDateToDate(input);
+  } catch {
+    return null;
+  }
+}
+
+/** Aceita string ISO, YYYY-MM-DD, DD/MM/YYYY, Date ou vazio (null no banco). */
+const optionalDateSchema = z.preprocess((val) => {
+  if (val === undefined || val === null || val === "") return null;
+  if (val instanceof Date) return val;
+  return val;
+}, z.union([z.string(), z.date()]).nullable().transform((val) => parseOptionalDate(val)));
+
+const truckUpdateShape = {
+  name: z.string().min(1, "Nome é obrigatório"),
+  plate: z.string().min(1, "Placa é obrigatória"),
+  brand: z.string().min(1, "Marca é obrigatória"),
+  year: z.coerce.number().min(1900, "Ano deve ser válido"),
+  docExpiry: z.union([z.string(), z.date()]).transform((val) => {
+    if (val instanceof Date) return val;
+    return parseDateToDate(val);
+  }),
+  insuranceExpiry: optionalDateSchema,
+  tachographCalibrationExpiry: optionalDateSchema,
+  oilChangeEngineDate: optionalDateSchema,
+  oilChangeGearboxDate: optionalDateSchema,
+  oilChangeDifferentialDate: optionalDateSchema,
+  renavam: z.string().min(1, "Renavam é obrigatório"),
+  image: z.union([z.string(), z.null()]).optional().transform((v) => (v === null || v === "" ? null : v)),
+} as const;
+
 export async function truckRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({
     id: z.coerce.number(),
   });
 
-  const truckBodySchema = z.object({
-    name: z.string().min(1, "Nome é obrigatório"),
-    plate: z.string().min(1, "Placa é obrigatória"),
-    brand: z.string().min(1, "Marca é obrigatória"),
-    year: z.coerce.number().min(1900, "Ano deve ser válido"),
-    docExpiry: z.union([z.string(), z.date()]).transform((val) => {
-      if (val instanceof Date) return val;
-      return parseDateToDate(val);
-    }),
-    renavam: z.string().min(1, "Renavam é obrigatório"),
-    image: z.string().optional(),
-  });
+  const truckBodySchema = z.object(truckUpdateShape);
 
   const maintenanceBodySchema = z.object({
     date: z.string().transform((str) => new Date(str)),
@@ -206,7 +229,22 @@ export async function truckRoutes(app: FastifyInstance) {
         return rep.code(400).send({ message: "Já existe um caminhão com esta placa" });
       }
 
-      const truck = await prisma.truck.create({ data });
+      const truck = await prisma.truck.create({
+        data: {
+          name: data.name,
+          plate: data.plate,
+          brand: data.brand,
+          year: data.year,
+          docExpiry: data.docExpiry,
+          renavam: data.renavam,
+          image: data.image === undefined ? null : data.image,
+          insuranceExpiry: data.insuranceExpiry,
+          tachographCalibrationExpiry: data.tachographCalibrationExpiry,
+          oilChangeEngineDate: data.oilChangeEngineDate,
+          oilChangeGearboxDate: data.oilChangeGearboxDate,
+          oilChangeDifferentialDate: data.oilChangeDifferentialDate,
+        },
+      });
       return rep.code(201).send(truck);
     } catch (error) {
       console.error("Erro ao criar caminhão:", error);
@@ -250,7 +288,23 @@ export async function truckRoutes(app: FastifyInstance) {
         return rep.code(400).send({ message: "Já existe um caminhão com esta placa" });
       }
 
-      const truck = await prisma.truck.update({ where: { id }, data });
+      const truck = await prisma.truck.update({
+        where: { id },
+        data: {
+          name: data.name,
+          plate: data.plate,
+          brand: data.brand,
+          year: data.year,
+          docExpiry: data.docExpiry,
+          renavam: data.renavam,
+          ...(data.image !== undefined ? { image: data.image } : {}),
+          insuranceExpiry: data.insuranceExpiry,
+          tachographCalibrationExpiry: data.tachographCalibrationExpiry,
+          oilChangeEngineDate: data.oilChangeEngineDate,
+          oilChangeGearboxDate: data.oilChangeGearboxDate,
+          oilChangeDifferentialDate: data.oilChangeDifferentialDate,
+        },
+      });
       return truck;
     } catch (error) {
       console.error("Erro ao atualizar caminhão:", error);

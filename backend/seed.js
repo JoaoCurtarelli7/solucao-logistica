@@ -329,6 +329,29 @@ async function main() {
       },
     });
 
+    // Catálogo padrão de serviços de manutenção (frota)
+    const defaultMaintenanceServices = [
+      "Troca de óleo do motor",
+      "Troca de óleo da caixa",
+      "Troca de óleo do diferencial",
+      "Troca de filtros (ar, óleo, combustível)",
+      "Revisão geral / preventiva",
+      "Freios (pastilhas / lonas / discos)",
+      "Pneus (troca / alinhamento / balanceamento)",
+      "Suspensão e direção",
+      "Elétrica e bateria",
+      "Arrefecimento (radiador / bomba d'água)",
+      "Embreagem",
+      "Injeção eletrônica / diagnóstico",
+    ];
+    for (const name of defaultMaintenanceServices) {
+      await prisma.maintenanceServicePreset.upsert({
+        where: { name },
+        create: { name, isDefault: true },
+        update: {},
+      });
+    }
+
     console.log("✅ Banco de dados populado com sucesso!");
   } catch (error) {
     console.error("❌ Erro ao popular banco de dados:", error);

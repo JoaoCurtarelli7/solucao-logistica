@@ -113,12 +113,31 @@ export default function VehicleList() {
   }
 
   const totalTrucks = data.length
+  const getStatus = (dateValue) => {
+    if (!dateValue) return { label: 'Sem data', color: 'default', critical: false }
+    const days = dayjs(dateValue).startOf('day').diff(dayjs().startOf('day'), 'day')
+    if (days < 0) return { label: 'Vencido', color: 'red', critical: true }
+    if (days <= 30) return { label: `Vence em ${days}d`, color: 'orange', critical: true }
+    return { label: 'Em dia', color: 'green', critical: false }
+  }
+
   const activeTrucks = data.filter((truck) => {
     const docExpiry = dayjs(truck.docExpiry)
     const today = dayjs()
     return docExpiry.isAfter(today)
   }).length
   const expiredDocs = totalTrucks - activeTrucks
+  const dueAlerts = data.filter((truck) => {
+    const checks = [
+      getStatus(truck.docExpiry),
+      getStatus(truck.insuranceExpiry),
+      getStatus(truck.tachographCalibrationExpiry),
+      getStatus(truck.oilChangeEngineDate),
+      getStatus(truck.oilChangeGearboxDate),
+      getStatus(truck.oilChangeDifferentialDate),
+    ]
+    return checks.some((item) => item.critical)
+  }).length
 
   const validityRate =
     totalTrucks > 0 ? Math.round((activeTrucks / totalTrucks) * 100) : 0
@@ -175,6 +194,32 @@ export default function VehicleList() {
               {record.docExpiry ? dayjs(record.docExpiry).format('DD/MM/YYYY') : 'N/A'}
             </div>
           </div>
+        )
+      },
+    },
+    {
+      title: 'Alertas de Vencimento',
+      key: 'alerts',
+      render: (_, record) => {
+        const items = [
+          { label: 'Doc', date: record.docExpiry },
+          { label: 'Seguro', date: record.insuranceExpiry },
+          { label: 'Tacógrafo', date: record.tachographCalibrationExpiry },
+          { label: 'Óleo Motor', date: record.oilChangeEngineDate },
+          { label: 'Óleo Caixa', date: record.oilChangeGearboxDate },
+          { label: 'Óleo Diferencial', date: record.oilChangeDifferentialDate },
+        ]
+        return (
+          <Space size={[4, 4]} wrap>
+            {items.map((item) => {
+              const status = getStatus(item.date)
+              return (
+                <Tag key={item.label} color={status.color}>
+                  {item.label}: {status.label}
+                </Tag>
+              )
+            })}
+          </Space>
         )
       },
     },
@@ -322,6 +367,16 @@ export default function VehicleList() {
               percent={validityRate}
               size="small"
               status={expiredDocs === 0 ? 'success' : 'exception'}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="Veículos com Alerta"
+              value={dueAlerts}
+              prefix={<ToolOutlined />}
+              valueStyle={{ color: dueAlerts > 0 ? '#ff4d4f' : '#52c41a' }}
             />
           </Card>
         </Col>

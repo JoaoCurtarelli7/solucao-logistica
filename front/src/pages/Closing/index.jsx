@@ -57,6 +57,11 @@ export default function Closing() {
   const [closingId, setClosingId] = useState(null)
   const [closingData, setClosingData] = useState(null)
 
+  const formatDateSafe = (date) => {
+    const d = dayjs(date)
+    return d.isValid() ? d.format('DD/MM/YYYY') : '-'
+  }
+
   const canView = hasPermission('financial.view')
   const canCreate = hasPermission('financial.create')
   const canUpdate = hasPermission('financial.update')
@@ -131,12 +136,17 @@ export default function Closing() {
 
       switch (periodType) {
         case 'week':
-          startDate = selectedPeriod[0].format('YYYY-MM-DD')
-          endDate = selectedPeriod[1].format('YYYY-MM-DD')
+          startDate = selectedPeriod.startOf('week').format('YYYY-MM-DD')
+          endDate = selectedPeriod.endOf('week').format('YYYY-MM-DD')
           break
         case 'biweekly':
-          startDate = selectedPeriod[0].format('YYYY-MM-DD')
-          endDate = selectedPeriod[1].format('YYYY-MM-DD')
+          if (selectedPeriod.date() <= 15) {
+            startDate = selectedPeriod.startOf('month').format('YYYY-MM-DD')
+            endDate = selectedPeriod.date(15).format('YYYY-MM-DD')
+          } else {
+            startDate = selectedPeriod.date(16).format('YYYY-MM-DD')
+            endDate = selectedPeriod.endOf('month').format('YYYY-MM-DD')
+          }
           break
         case 'month':
           startDate = selectedPeriod.startOf('month').format('YYYY-MM-DD')
@@ -152,6 +162,11 @@ export default function Closing() {
           }
           break
         case 'period':
+          if (!Array.isArray(selectedPeriod) || !selectedPeriod[0] || !selectedPeriod[1]) {
+            message.warning('Selecione data inicial e final para o período personalizado')
+            setLoading(false)
+            return
+          }
           startDate = selectedPeriod[0].format('YYYY-MM-DD')
           endDate = selectedPeriod[1].format('YYYY-MM-DD')
           break
@@ -253,15 +268,21 @@ export default function Closing() {
     
     switch (periodType) {
       case 'week':
-        return `Semana: ${selectedPeriod[0].format('DD/MM')} a ${selectedPeriod[1].format('DD/MM/YYYY')}`
+        return `Semana: ${selectedPeriod.startOf('week').format('DD/MM')} a ${selectedPeriod.endOf('week').format('DD/MM/YYYY')}`
       case 'biweekly':
-        return `Quinzena: ${selectedPeriod[0].format('DD/MM')} a ${selectedPeriod[1].format('DD/MM/YYYY')}`
+        if (selectedPeriod.date() <= 15) {
+          return `Quinzena: ${selectedPeriod.startOf('month').format('DD/MM')} a ${selectedPeriod.date(15).format('DD/MM/YYYY')}`
+        }
+        return `Quinzena: ${selectedPeriod.date(16).format('DD/MM')} a ${selectedPeriod.endOf('month').format('DD/MM/YYYY')}`
       case 'month':
         return `Mês: ${selectedPeriod.format('MMMM/YYYY')}`
       case 'api-month':
         const month = months.find(m => m.id === selectedPeriod)
         return month ? `Mês: ${month.name}` : 'Mês não encontrado'
       case 'period':
+        if (!Array.isArray(selectedPeriod) || !selectedPeriod[0] || !selectedPeriod[1]) {
+          return 'Período personalizado inválido'
+        }
         return `Período: ${selectedPeriod[0].format('DD/MM/YYYY')} a ${selectedPeriod[1].format('DD/MM/YYYY')}`
       default:
         return 'Período selecionado'
@@ -306,7 +327,7 @@ export default function Closing() {
       ...entradas.map(({ description, category, date, amount, company }) => [
         description, 
         category, 
-        dayjs(date).format('DD/MM/YYYY'), 
+        formatDateSafe(date), 
         `R$ ${amount.toFixed(2).replace('.', ',')}`,
         company?.name || 'N/A'
       ]),
@@ -316,7 +337,7 @@ export default function Closing() {
       ...saidas.map(({ description, category, date, amount, company }) => [
         description, 
         category, 
-        dayjs(date).format('DD/MM/YYYY'), 
+        formatDateSafe(date), 
         `R$ ${amount.toFixed(2).replace('.', ',')}`,
         company?.name || 'N/A'
       ]),
@@ -326,7 +347,7 @@ export default function Closing() {
       ...impostos.map(({ description, category, date, amount, company }) => [
         description, 
         category, 
-        dayjs(date).format('DD/MM/YYYY'), 
+        formatDateSafe(date), 
         `R$ ${amount.toFixed(2).replace('.', ',')}`,
         company?.name || 'N/A'
       ]),
@@ -357,7 +378,7 @@ export default function Closing() {
       dataIndex: 'date',
       key: 'date',
       width: '20%',
-      render: (date) => dayjs(date).format('DD/MM/YYYY')
+      render: (date) => formatDateSafe(date)
     },
     {
       title: 'Valor',

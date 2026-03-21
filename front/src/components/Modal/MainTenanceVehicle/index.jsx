@@ -1,6 +1,20 @@
-import React, { useEffect } from 'react'
-import { Modal, Form, Input, InputNumber, Button, DatePicker } from 'antd'
+import React, { useEffect, useMemo, useState } from 'react'
+import {
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  Button,
+  DatePicker,
+  AutoComplete,
+  Divider,
+  Space,
+  message,
+  Typography,
+} from 'antd'
 import dayjs from 'dayjs'
+import { api } from '../../../lib'
+import { usePermission } from '../../../hooks/usePermission'
 
 export default function VehicleMaintenanceModal({
   visible,
@@ -10,8 +24,42 @@ export default function VehicleMaintenanceModal({
   editingMaintenance,
 }) {
   const [form] = Form.useForm()
+  const [presets, setPresets] = useState([])
+  const [loadingPresets, setLoadingPresets] = useState(false)
+  const [newPresetName, setNewPresetName] = useState('')
 
-  // Prefill form when editing mapping API -> form fields
+  const { hasPermission } = usePermission()
+  const canCreatePreset = hasPermission('maintenance.create')
+
+  const loadPresets = async () => {
+    try {
+      setLoadingPresets(true)
+      const { data } = await api.get('/maintenance-service-presets')
+      setPresets(Array.isArray(data) ? data : [])
+    } catch (e) {
+      console.error(e)
+      const apiMsg = e.response?.data?.message
+      const net =
+        e.code === 'ERR_NETWORK' || e.message === 'Network Error'
+          ? ' Não foi possível conectar ao servidor (verifique se o backend está rodando e a URL em VITE_API_URL).'
+          : ''
+      message.error(
+        apiMsg ||
+          (net ? `Erro de rede.${net}` : null) ||
+          e.message ||
+          'Não foi possível carregar o catálogo de serviços',
+      )
+    } finally {
+      setLoadingPresets(false)
+    }
+  }
+
+  useEffect(() => {
+    if (visible) {
+      loadPresets()
+    }
+  }, [visible])
+
   useEffect(() => {
     if (editingMaintenance) {
       form.setFieldsValue({
@@ -19,10 +67,46 @@ export default function VehicleMaintenanceModal({
         servico: editingMaintenance.service,
         km: editingMaintenance.km,
         valor: editingMaintenance.value,
-        observacao: editingMaintenance.notes || ''
+        observacao: editingMaintenance.notes || '',
       })
+    } else if (visible) {
+      form.resetFields()
     }
-  }, [editingMaintenance, form])
+  }, [editingMaintenance, form, visible])
+
+  const autoCompleteOptions = useMemo(() => {
+    const base = presets.map((p) => ({ value: p.name, label: p.name }))
+    const names = new Set(base.map((o) => o.value))
+    if (editingMaintenance?.service && !names.has(editingMaintenance.service)) {
+      return [
+        { value: editingMaintenance.service, label: editingMaintenance.service },
+        ...base,
+      ]
+    }
+    return base
+  }, [presets, editingMaintenance])
+
+  const handleAddPreset = async () => {
+    const n = newPresetName.trim()
+    if (n.length < 2) {
+      message.warning('Digite pelo menos 2 caracteres para o novo serviço')
+      return
+    }
+    if (!canCreatePreset) {
+      message.warning('Você não tem permissão para adicionar serviços ao catálogo')
+      return
+    }
+    try {
+      await api.post('/maintenance-service-presets', { name: n })
+      message.success('Serviço salvo no catálogo')
+      setNewPresetName('')
+      await loadPresets()
+      form.setFieldsValue({ servico: n })
+    } catch (error) {
+      console.error(error)
+      message.error(error.response?.data?.message || 'Erro ao salvar serviço no catálogo')
+    }
+  }
 
   const handleOk = () => {
     form
@@ -30,30 +114,35 @@ export default function VehicleMaintenanceModal({
       .then((values) => {
         const formattedValues = {
           ...values,
-          data: values.data ? values.data.format('DD/MM/YYYY') : null
+          data: values.data ? values.data.format('DD/MM/YYYY') : null,
         }
         if (editingMaintenance) {
-          onEditMaintenance(formattedValues) // Call edit function
+          onEditMaintenance(formattedValues)
         } else {
-          onAddMaintenance(formattedValues) // Call add function
+          onAddMaintenance(formattedValues)
         }
         form.resetFields()
+        setNewPresetName('')
       })
-      .catch(() => {
-        // validação falhou
-      })
+      .catch(() => {})
+  }
+
+  const handleModalCancel = () => {
+    form.resetFields()
+    setNewPresetName('')
+    onCancel()
   }
 
   return (
     <Modal
       title={editingMaintenance ? 'Editar Manutenção' : 'Adicionar Manutenção'}
-      visible={visible}
+      open={visible}
       onOk={handleOk}
-      onCancel={onCancel}
+      onCancel={handleModalCancel}
       okText={editingMaintenance ? 'Salvar' : 'Adicionar'}
       cancelText="Cancelar"
       footer={[
-        <Button key="back" onClick={onCancel}>
+        <Button key="back" onClick={handleModalCancel}>
           Cancelar
         </Button>,
         <Button key="submit" type="primary" onClick={handleOk}>
@@ -72,23 +161,68 @@ export default function VehicleMaintenanceModal({
             },
           ]}
         >
-          <DatePicker 
-            style={{ width: '100%' }} 
+          <DatePicker
+            style={{ width: '100%' }}
             format="DD/MM/YYYY"
             placeholder="Selecione a data"
           />
         </Form.Item>
         <Form.Item
           name="servico"
-          label="Serviço Realizado"
+          label="Serviço realizado"
           rules={[
             {
               required: true,
-              message: 'Por favor, insira o serviço realizado',
+              message: 'Selecione, busque ou digite o serviço realizado',
             },
           ]}
         >
-          <Input placeholder="Ex: Troca de óleo e filtros" />
+          <AutoComplete
+            style={{ width: '100%' }}
+            allowClear
+            options={autoCompleteOptions}
+            placeholder={
+              loadingPresets
+                ? 'Carregando catálogo...'
+                : 'Escolha da lista, busque ou digite outro serviço'
+            }
+            filterOption={(inputValue, option) =>
+              (option?.label ?? option?.value ?? '')
+                .toString()
+                .toLowerCase()
+                .includes(inputValue.toLowerCase())
+            }
+            notFoundContent={loadingPresets ? 'Carregando...' : null}
+            dropdownRender={(menu) => (
+              <>
+                {menu}
+                {canCreatePreset && (
+                  <>
+                    <Divider style={{ margin: '8px 0' }} />
+                    <div
+                      style={{ padding: '0 8px 8px' }}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+                        Salvar novo serviço no catálogo (aparece na lista depois)
+                      </Typography.Text>
+                      <Space.Compact style={{ width: '100%' }}>
+                        <Input
+                          placeholder="Ex: Troca do cardan"
+                          value={newPresetName}
+                          onChange={(e) => setNewPresetName(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        />
+                        <Button type="primary" onClick={handleAddPreset}>
+                          Salvar no catálogo
+                        </Button>
+                      </Space.Compact>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          />
         </Form.Item>
         <Form.Item
           name="km"
