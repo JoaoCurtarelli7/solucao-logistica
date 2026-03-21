@@ -49,21 +49,26 @@ export default function Load() {
       }
       
       const response = await api.get(url)
-      const formattedData = response.data.map(load => ({
+      const formattedData = response.data.map(load => {
+        const totalValue = Number(load.totalValue || 0)
+        const companyCommission = Number(load.Company?.commission || 0)
+        const commissionValue = Number(((totalValue * companyCommission) / 100).toFixed(2))
+        return ({
         key: load.id,
         id: load.id,
         data: dayjs(load.date).format('DD/MM/YYYY'),
         numeroCarregamento: load.loadingNumber,
         entregas: load.deliveries,
         pesoCarga: load.cargoWeight,
-        valorTotal: load.totalValue,
-        frete4: load.freight4,
-        somaTotalFrete: load.totalFreight,
+        valorTotal: totalValue,
+        frete4: commissionValue,
+        somaTotalFrete: Number(load.totalFreight || 0),
+        commissionRate: companyCommission,
         observacoes: load.observations || '',
         companyId: load.companyId,
-        companyName: load.company?.name || '',
+        companyName: load.Company?.name || '',
         rawData: load
-      }))
+      })})
       setData(formattedData)
     } catch (error) {
       console.error('Erro ao buscar cargas:', error)
@@ -176,21 +181,26 @@ export default function Load() {
         companyId: selectedCompany
       }
     }).then(response => {
-      const formattedData = response.data.map(load => ({
+      const formattedData = response.data.map(load => {
+        const totalValue = Number(load.totalValue || 0)
+        const companyCommission = Number(load.Company?.commission || 0)
+        const commissionValue = Number(((totalValue * companyCommission) / 100).toFixed(2))
+        return ({
         key: load.id,
         id: load.id,
         data: dayjs(load.date).format('DD/MM/YYYY'),
         numeroCarregamento: load.loadingNumber,
         entregas: load.deliveries,
         pesoCarga: load.cargoWeight,
-        valorTotal: load.totalValue,
-        frete4: load.freight4,
-        somaTotalFrete: load.totalFreight,
+        valorTotal: totalValue,
+        frete4: commissionValue,
+        somaTotalFrete: Number(load.totalFreight || 0),
+        commissionRate: companyCommission,
         observacoes: load.observations || '',
         companyId: load.companyId,
-        companyName: load.company?.name || '',
+        companyName: load.Company?.name || '',
         rawData: load
-      }))
+      })})
       setData(formattedData)
       message.success(`${formattedData.length} cargas encontradas no período selecionado`)
     }).catch(error => {
@@ -236,12 +246,20 @@ export default function Load() {
       render: (value) => `R$ ${value.toFixed(2).replace('.', ',')}`,
     },
     {
-      title: 'Valor do Frete 4%',
+      title: 'Comissão',
       dataIndex: 'frete4',
       key: 'frete4',
       align: 'right',
       width: 120,
       render: (value) => `R$ ${value.toFixed(2).replace('.', ',')}`,
+    },
+    {
+      title: 'Comissão (%)',
+      dataIndex: 'commissionRate',
+      key: 'commissionRate',
+      align: 'center',
+      width: 110,
+      render: (value) => `${Number(value || 0).toFixed(2)}%`,
     },
     {
       title: 'Soma Total Frete',

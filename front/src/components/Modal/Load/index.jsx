@@ -52,6 +52,20 @@ export default function CustomModalLoad({
 }) {
   const [form] = Form.useForm()
 
+  const getCompanyCommissionRate = (companyId) => {
+    const id = Number(companyId)
+    if (!id || !Array.isArray(companies)) return 0
+    const company = companies.find((c) => Number(c.id) === id)
+    return Number(company?.commission || 0)
+  }
+
+  const calcCommissionValue = (valorTotal, rate) => {
+    const base = Number(valorTotal || 0)
+    const pct = Number(rate || 0)
+    const value = base * (pct / 100)
+    return Math.round(value * 100) / 100
+  }
+
   useEffect(() => {
     if (editingLoad && isVisible) {
       form.setFieldsValue({
@@ -94,7 +108,9 @@ export default function CustomModalLoad({
 
   const buildFormattedValues = (values) => {
     const valorTotal = parseFloat(values.valorTotal) || 0
-    const frete4 = valorTotal * 0.04
+    const companyId = values.companyId || selectedCompany
+    const rate = getCompanyCommissionRate(companyId)
+    const frete4 = calcCommissionValue(valorTotal, rate)
     const somaTotalFrete = frete4
     return {
       ...values,
@@ -103,8 +119,9 @@ export default function CustomModalLoad({
       valorTotal,
       frete4,
       somaTotalFrete,
+      commissionRate: rate,
       entregas: parseInt(values.entregas) || 0,
-      companyId: values.companyId || selectedCompany
+      companyId
     }
   }
 
@@ -119,19 +136,30 @@ export default function CustomModalLoad({
       .catch((info) => console.error('Validation failed:', info))
   }
 
-  const calculateFrete4 = (valorTotal) => {
-    if (!valorTotal) return 0
-    const num = parseFloat(valorTotal) * 0.04
-    return Math.round(num * 100) / 100
-  }
-
   const handleValorTotalChange = (value) => {
-    const frete4 = calculateFrete4(value)
+    const currentCompanyId = form.getFieldValue('companyId') || selectedCompany
+    const rate = getCompanyCommissionRate(currentCompanyId)
+    const frete4 = calcCommissionValue(value, rate)
     form.setFieldsValue({ 
       frete4: frete4,
       somaTotalFrete: frete4 
     })
   }
+
+  const handleCompanyChange = (companyId) => {
+    const valorTotal = form.getFieldValue('valorTotal')
+    if (valorTotal !== undefined) {
+      const rate = getCompanyCommissionRate(companyId)
+      const frete4 = calcCommissionValue(valorTotal, rate)
+      form.setFieldsValue({
+        frete4,
+        somaTotalFrete: frete4,
+      })
+    }
+  }
+
+  const selectedCompanyId = form.getFieldValue('companyId') || selectedCompany
+  const currentRate = getCompanyCommissionRate(selectedCompanyId)
 
   const isEditing = !!editingLoad
 
@@ -165,6 +193,7 @@ export default function CustomModalLoad({
           <Select
             placeholder="Selecione a empresa"
             disabled={!!selectedCompany}
+            onChange={handleCompanyChange}
             showSearch
             filterOption={(input, option) =>
               option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
@@ -266,7 +295,7 @@ export default function CustomModalLoad({
 
         <Form.Item
           name="frete4"
-          label="Valor do Frete 4%"
+          label={`Valor da Comissão (${currentRate.toFixed(2)}%)`}
           rules={[{ type: 'number', min: 0, message: 'O frete deve ser maior ou igual a zero' }]}
         >
           <CurrencyInput style={{ width: '100%' }} readOnly />

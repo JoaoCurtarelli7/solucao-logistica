@@ -40,6 +40,7 @@ model Company {
   responsible      String
   commission       Float
   Closing          Closing[]
+  LoadBillingClosing LoadBillingClosing[]
   FinancialEntry   FinancialEntry[]
   FinancialPeriod  FinancialPeriod[]
   Load             Load[]
@@ -149,8 +150,32 @@ model Month {
   createdAt DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt DateTime  @default(now()) @db.Timestamptz(6)
   Closing   Closing[]
+  LoadBillingClosing LoadBillingClosing[]
 
   @@unique([year, month], map: "uq_month_year_month")
+}
+
+model LoadBillingClosing {
+  id               Int      @id @default(autoincrement())
+  monthId          Int
+  companyId        Int
+  name             String
+  startDate        DateTime @db.Timestamptz(6)
+  endDate          DateTime @db.Timestamptz(6)
+  status           String   @default("aberto")
+  totalLoads       Int      @default(0)
+  totalGrossValue  Float    @default(0)
+  totalFreight     Float    @default(0)
+  commissionRate   Float    @default(0)
+  totalCommission  Float    @default(0)
+  billingTotal     Float    @default(0)
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @db.Timestamptz(6)
+  Month            Month    @relation(fields: [monthId], references: [id], onDelete: Cascade, map: "fk_loadBillingClosing_month")
+  Company          Company  @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_loadBillingClosing_company")
+
+  @@index([monthId], map: "idx_loadBillingClosing_monthId")
+  @@index([companyId], map: "idx_loadBillingClosing_companyId")
 }
 
 model Transaction {

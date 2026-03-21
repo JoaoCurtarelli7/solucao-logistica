@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fas
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middlewares/authMiddleware";
+import { requirePermission } from "../middlewares/permissionMiddleware";
 
 export async function monthRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -16,7 +17,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Listar meses
-  app.get("/months", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.get("/months", { preHandler: requirePermission("months.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const querySchema = z.object({
         year: z.string().optional(),
@@ -37,6 +38,9 @@ export async function monthRoutes(app: FastifyInstance) {
 
       const months = await prisma.month.findMany({
         where: whereClause,
+        include: {
+          Closing: { select: { id: true, status: true } },
+        },
         orderBy: [
           { year: 'desc' },
           { month: 'desc' },
@@ -50,7 +54,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Obter mês por ID
-  app.get("/months/:id", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.get("/months/:id", { preHandler: requirePermission("months.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -79,7 +83,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Criar novo mês
-  app.post("/months", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.post("/months", { preHandler: requirePermission("months.create") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const body = req.body;
       const { year, month: monthNumber } = createMonthSchema.parse(body);
@@ -129,7 +133,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Atualizar mês
-  app.put("/months/:id", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.put("/months/:id", { preHandler: requirePermission("months.update") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       const data = updateMonthSchema.parse(req.body);
@@ -155,7 +159,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Deletar mês
-  app.delete("/months/:id", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.delete("/months/:id", { preHandler: requirePermission("months.delete") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -183,7 +187,7 @@ export async function monthRoutes(app: FastifyInstance) {
   });
 
   // Estatísticas do mês
-  app.get("/months/:id/stats", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.get("/months/:id/stats", { preHandler: requirePermission("months.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 

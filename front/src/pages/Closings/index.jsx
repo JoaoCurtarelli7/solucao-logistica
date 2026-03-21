@@ -13,11 +13,10 @@ import {
   Modal,
   Form,
   Input,
-  InputNumber,
   Select,
   DatePicker,
-  Statistic, Alert,
-  Tabs,
+  Statistic,
+  Alert,
   Result
 } from 'antd'
 import {
@@ -33,7 +32,7 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import 'dayjs/locale/pt-br'
 import api from '../../lib/api'
-import { usePermission } from '@/hooks/usePermission'
+import { usePermission } from '../../hooks/usePermission'
 import './styles.css'
 
 // Configurar dayjs para português
@@ -54,12 +53,6 @@ export default function Closings() {
   const [editingClosing, setEditingClosing] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(null)
   const [form] = Form.useForm()
-  
-  // Estados para gestão de meses
-  const [isMonthModalOpen, setIsMonthModalOpen] = useState(false)
-  const [editingMonth, setEditingMonth] = useState(null)
-  const [monthForm] = Form.useForm()
-  const [activeTab, setActiveTab] = useState('months')
 
   const parseDateSafe = (value) => {
     if (!value) return null
@@ -114,16 +107,13 @@ export default function Closings() {
   const canUpdateClosings = hasPermission('closings.update')
   const canDeleteClosings = hasPermission('closings.delete')
   const canViewMonths = hasPermission('months.view')
-  const canCreateMonths = hasPermission('months.create')
-  const canUpdateMonths = hasPermission('months.update')
-  const canDeleteMonths = hasPermission('months.delete')
 
-  if (!canViewClosings && !canViewMonths) {
+  if (!canViewClosings) {
     return (
       <Result
         status="403"
         title="Acesso negado"
-        subTitle="Você não tem permissão para acessar esta página."
+        subTitle="Você não tem permissão para acessar o fechamento de caixa."
       />
     )
   }
@@ -140,11 +130,19 @@ export default function Closings() {
   }, [selectedMonth])
 
   const loadMonths = async () => {
+    if (!canViewMonths) {
+      setMonths([])
+      return
+    }
     try {
       const response = await api.get('/months')
-      setMonths(response.data)
+      setMonths(response.data || [])
     } catch (error) {
-      message.error('Erro ao carregar meses')
+      if (error?.response?.status === 403) {
+        setMonths([])
+      } else {
+        message.error('Erro ao carregar meses')
+      }
     }
   }
 
@@ -155,56 +153,6 @@ export default function Closings() {
     } catch (error) {
       message.error('Erro ao carregar empresas')
     }
-  }
-
-  // Funções para gestão de meses
-  const handleCreateMonth = async (values) => {
-    try {
-      await api.post('/months', values)
-      message.success('Mês criado com sucesso!')
-      setIsMonthModalOpen(false)
-      monthForm.resetFields()
-      loadMonths()
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Erro ao criar mês')
-    }
-  }
-
-  const handleUpdateMonth = async (values) => {
-    try {
-      await api.put(`/months/${editingMonth.id}`, values)
-      message.success('Mês atualizado com sucesso!')
-      setIsMonthModalOpen(false)
-      setEditingMonth(null)
-      monthForm.resetFields()
-      loadMonths()
-    } catch (error) {
-      message.error('Erro ao atualizar mês')
-    }
-  }
-
-  const handleDeleteMonth = async (id) => {
-    try {
-      await api.delete(`/months/${id}`)
-      message.success('Mês deletado com sucesso!')
-      loadMonths()
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Erro ao deletar mês')
-    }
-  }
-
-  const handleEditMonth = (month) => {
-    setEditingMonth(month)
-    monthForm.setFieldsValue({
-      status: month.status
-    })
-    setIsMonthModalOpen(true)
-  }
-
-  const openMonthModal = () => {
-    setEditingMonth(null)
-    monthForm.resetFields()
-    setIsMonthModalOpen(true)
   }
 
   const loadClosings = async () => {
@@ -399,97 +347,6 @@ export default function Closings() {
     }).format(value || 0)
   }
 
-  // Colunas para tabela de meses
-  const monthColumns = [
-    {
-      title: 'Mês/Ano',
-      dataIndex: 'name',
-      key: 'name',
-      render: (text, record) => (
-        <div>
-          <Text strong>{text}</Text>
-          <br />
-          <Text type="secondary">{record.year}/{record.month.toString().padStart(2, '0')}</Text>
-        </div>
-      )
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={getStatusColor(status)}>
-          {getStatusText(status)}
-        </Tag>
-      )
-    },
-    {
-      title: 'Fechamentos',
-      key: 'closings',
-      render: (_, record) => (
-        <div>
-          <Text strong>{record.closings?.length || 0}</Text>
-          <br />
-          <Text type="secondary">
-            {record.closings?.filter(c => c.status === 'fechado').length || 0} fechados
-          </Text>
-        </div>
-      )
-    },
-    {
-      title: 'Criado em',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date) => dayjs(date).format('DD/MM/YYYY HH:mm')
-    },
-    {
-      title: 'Ações',
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            size="small"
-            onClick={() => {
-              setSelectedMonth(record.id)
-              setActiveTab('closings')
-            }}
-            title="Ver fechamentos"
-          />
-          {canUpdateMonths && (
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              size="small"
-              onClick={() => handleEditMonth(record)}
-              title="Editar"
-            />
-          )}
-          {canDeleteMonths && (
-            <Popconfirm
-              title="Tem certeza que deseja deletar este mês?"
-              description="Esta ação não pode ser desfeita."
-              onConfirm={() => handleDeleteMonth(record.id)}
-              okText="Sim"
-              cancelText="Não"
-              disabled={record.closings?.length > 0}
-            >
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                size="small"
-                disabled={record.closings?.length > 0}
-                title={record.closings?.length > 0 ? "Não é possível deletar mês com fechamentos" : "Deletar"}
-              />
-            </Popconfirm>
-          )}
-        </Space>
-      )
-    }
-  ]
-
   const columns = [
     {
       title: 'Nome',
@@ -641,190 +498,112 @@ export default function Closings() {
 
   const selectedMonthData = months.find(m => m.id === selectedMonth)
 
-  const tabItems = [
-    {
-      key: 'months',
-      label: (
-        <span>
-          <CalendarOutlined />
-         {' '}Meses
-        </span>
-      ),
-      children: (
-        <div>
-          <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-            <Col>
-              <Title level={3} style={{ margin: 0 }}>
-                Gerenciar Meses
-              </Title>
-              <Text type="secondary">
-                Cadastre e gerencie os meses para o sistema de fechamento
-              </Text>
-            </Col>
-            <Col>
-              {canCreateMonths && (
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={openMonthModal}
-                >
-                  Novo Mês
-                </Button>
-              )}
-            </Col>
-          </Row>
-
-          <Table
-            columns={monthColumns}
-            dataSource={months}
-            rowKey="id"
-            loading={loading}
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} meses`
-            }}
-          />
-        </div>
-      )
-    },
-    {
-      key: 'closings',
-      label: (
-        <span>
-          <CalculatorOutlined />
-          {' '}Fechamentos
-        </span>
-      ),
-      children: (
-        <div>
-          <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-            <Col>
-              <Title level={3} style={{ margin: 0 }}>
-                Fechamentos
-              </Title>
-              <Text type="secondary">
-                Gerencie os fechamentos financeiros por período
-              </Text>
-            </Col>
-            <Col>
-              <Space>
-                <Select
-                  placeholder="Selecione um mês"
-                  value={selectedMonth}
-                  onChange={setSelectedMonth}
-                  style={{ width: 200 }}
-                >
-                  {months.map(month => (
-                    <Option key={month.id} value={month.id}>
-                      {month.name}
-                    </Option>
-                  ))}
-                </Select>
-                {selectedMonth && (
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={openModal}
-                  >
-                    Novo Fechamento
-                  </Button>
-                )}
-              </Space>
-            </Col>
-          </Row>
-
-          {!selectedMonth && (
-            <Alert
-              message="Selecione um mês"
-              description="Escolha um mês para visualizar e gerenciar os fechamentos."
-              type="info"
-              showIcon
-              style={{ marginBottom: 24 }}
-            />
-          )}
-
-          {selectedMonth && selectedMonthData && (
-            <>
-              <Row gutter={16} style={{ marginBottom: 24 }}>
-                <Col span={6}>
-                  <Card>
-                    <Statistic
-                      title="Mês Selecionado"
-                      value={selectedMonthData.name}
-                      prefix={<CalendarOutlined />}
-                    />
-                  </Card>
-                </Col>
-                <Col span={6}>
-                  <Card>
-                    <Statistic
-                      title="Total Fechamentos"
-                      value={closings.length}
-                      prefix={<CalculatorOutlined />}
-                    />
-                  </Card>
-                </Col>
-                <Col span={6}>
-                  <Card>
-                    <Statistic
-                      title="Fechados"
-                      value={closings.filter(c => c.status === 'fechado').length}
-                      valueStyle={{ color: '#52c41a' }}
-                    />
-                  </Card>
-                </Col>
-                <Col span={6}>
-                  <Card>
-                    <Statistic
-                      title="Abertos"
-                      value={closings.filter(c => c.status === 'aberto').length}
-                      valueStyle={{ color: '#1890ff' }}
-                    />
-                  </Card>
-                </Col>
-              </Row>
-
-              <Table
-                columns={columns}
-                dataSource={closings}
-                rowKey="id"
-                loading={loading}
-                pagination={{
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                  showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} fechamentos`
-                }}
-              />
-            </>
-          )}
-        </div>
-      )
-    }
-  ]
-
   return (
     <div className="closings-container">
       <Card>
         <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
           <Col>
-            <Title level={2} style={{ margin: 0 }}>
-              <CalculatorOutlined style={{ marginRight: 8 }} />
-              Sistema de Fechamento
+            <Title level={3} style={{ margin: 0 }}>
+              Fechamentos
             </Title>
             <Text type="secondary">
-              Gerencie meses e fechamentos financeiros
+              Gerencie os fechamentos financeiros por período
             </Text>
+          </Col>
+          <Col>
+            <Space>
+              <Select
+                placeholder="Selecione um mês"
+                value={selectedMonth}
+                onChange={setSelectedMonth}
+                style={{ width: 220 }}
+              >
+                {months.map(month => (
+                  <Option key={month.id} value={month.id}>
+                    {month.name}
+                  </Option>
+                ))}
+              </Select>
+              {selectedMonth && canCreateClosings && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={openModal}
+                >
+                  Novo Fechamento
+                </Button>
+              )}
+            </Space>
           </Col>
         </Row>
 
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={tabItems}
-        />
+        {!selectedMonth && (
+          <Alert
+            message="Selecione um mês"
+            description={canViewMonths
+              ? "Cadastre os meses em Manutenção → Cadastro de Meses. Depois escolha um mês aqui para visualizar e gerenciar os fechamentos."
+              : "Você precisa da permissão 'Visualizar meses' para listar os meses. Cadastre os meses em Manutenção → Cadastro de Meses (se tiver permissão)."}
+            type="info"
+            showIcon
+            style={{ marginBottom: 24 }}
+          />
+        )}
+
+        {selectedMonth && selectedMonthData && (
+          <>
+            <Row gutter={16} style={{ marginBottom: 24 }}>
+              <Col span={6}>
+                <Card>
+                  <Statistic
+                    title="Mês Selecionado"
+                    value={selectedMonthData.name}
+                    prefix={<CalendarOutlined />}
+                  />
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card>
+                  <Statistic
+                    title="Total Fechamentos"
+                    value={closings.length}
+                    prefix={<CalculatorOutlined />}
+                  />
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card>
+                  <Statistic
+                    title="Fechados"
+                    value={closings.filter(c => c.status === 'fechado').length}
+                    valueStyle={{ color: '#52c41a' }}
+                  />
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card>
+                  <Statistic
+                    title="Abertos"
+                    value={closings.filter(c => c.status === 'aberto').length}
+                    valueStyle={{ color: '#1890ff' }}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            <Table
+              columns={columns}
+              dataSource={closings}
+              rowKey="id"
+              loading={loading}
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} fechamentos`
+              }}
+            />
+          </>
+        )}
       </Card>
 
       {(canCreateClosings || canUpdateClosings) && (
@@ -1025,93 +804,6 @@ export default function Closings() {
         </Modal>
       )}
 
-      {/* Modal para gerenciar meses */}
-      {(canCreateMonths || canUpdateMonths) && (
-        <Modal
-          title={editingMonth ? 'Editar Mês' : 'Novo Mês'}
-          open={isMonthModalOpen}
-        onCancel={() => {
-          setIsMonthModalOpen(false)
-          setEditingMonth(null)
-          monthForm.resetFields()
-        }}
-        footer={null}
-        width={500}
-      >
-        <Form
-          form={monthForm}
-          layout="vertical"
-          onFinish={editingMonth ? handleUpdateMonth : handleCreateMonth}
-        >
-          {!editingMonth && (
-            <>
-              <Form.Item
-                label="Ano"
-                name="year"
-                rules={[{ required: true, message: 'Ano é obrigatório' }]}
-              >
-                <InputNumber
-                  min={2020}
-                  max={2030}
-                  style={{ width: '100%' }}
-                  placeholder="Ex: 2024"
-                />
-              </Form.Item>
-
-              <Form.Item
-                label="Mês"
-                name="month"
-                rules={[{ required: true, message: 'Mês é obrigatório' }]}
-              >
-                <Select placeholder="Selecione o mês">
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const monthNumber = i + 1
-                    const monthNames = [
-                      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-                    ]
-                    return (
-                      <Option key={monthNumber} value={monthNumber}>
-                        {monthNames[i]} ({monthNumber})
-                      </Option>
-                    )
-                  })}
-                </Select>
-              </Form.Item>
-            </>
-          )}
-
-          {editingMonth && (
-            <Form.Item
-              label="Status"
-              name="status"
-              rules={[{ required: true, message: 'Status é obrigatório' }]}
-            >
-              <Select>
-                <Option value="aberto">Aberto</Option>
-                <Option value="fechado">Fechado</Option>
-                <Option value="cancelado">Cancelado</Option>
-              </Select>
-            </Form.Item>
-          )}
-
-          <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                {editingMonth ? 'Atualizar' : 'Criar'}
-              </Button>
-              <Button onClick={() => {
-                setIsMonthModalOpen(false)
-                setEditingMonth(null)
-                monthForm.resetFields()
-              }}>
-                Cancelar
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-        </Modal>
-      )}
     </div>
   )
 }

@@ -401,7 +401,7 @@ export default function Closing() {
       width: '20%',
       render: (_, record) => (
         <Space>
-          {canUpdate && (
+          {canUpdate && !record._isComputed && (
             <Tooltip title="Editar">
               <Button 
                 type="text" 
@@ -411,7 +411,7 @@ export default function Closing() {
               />
             </Tooltip>
           )}
-          {canDelete && (
+          {canDelete && !record._isComputed && (
             <Popconfirm
               title="Tem certeza que deseja deletar esta entrada?"
               onConfirm={() => handleDelete(record.id)}

@@ -65,22 +65,29 @@ export default function LoadCompanies() {
     }
   };
 
-  const mapLoadRow = (load: any) => ({
-    key: load.id,
-    id: load.id,
-    data: dayjs(load.date).format("DD/MM/YYYY"),
-    numeroCarregamento: load.loadingNumber,
-    entregas: load.deliveries,
-    pesoCarga: load.cargoWeight,
-    valorTotal: load.totalValue,
-    frete4: load.freight4,
-    somaTotalFrete: load.totalFreight,
-    observacoes: load.observations || "",
-    companyId: load.companyId,
-    companyName: load.Company?.name || "",
-    companyCnpj: load.Company?.cnpj || "",
-    rawData: load,
-  });
+  const mapLoadRow = (load: any) => {
+    const totalValue = Number(load.totalValue || 0);
+    const companyCommission = Number(load.Company?.commission || 0);
+    const commissionValue = Number(((totalValue * companyCommission) / 100).toFixed(2));
+
+    return {
+      key: load.id,
+      id: load.id,
+      data: dayjs(load.date).format("DD/MM/YYYY"),
+      numeroCarregamento: load.loadingNumber,
+      entregas: load.deliveries,
+      pesoCarga: load.cargoWeight,
+      valorTotal: totalValue,
+      frete4: commissionValue,
+      somaTotalFrete: Number(load.totalFreight || 0),
+      commissionRate: companyCommission,
+      observacoes: load.observations || "",
+      companyId: load.companyId,
+      companyName: load.Company?.name || "",
+      companyCnpj: load.Company?.cnpj || "",
+      rawData: load,
+    };
+  };
 
   const fetchAllLoads = async () => {
     setLoading(true);
@@ -313,7 +320,7 @@ export default function LoadCompanies() {
       sorter: (a: any, b: any) => a.valorTotal - b.valorTotal,
     },
     {
-      title: "Frete 4%",
+      title: "Comissão",
       dataIndex: "frete4",
       key: "frete4",
       align: "right",
@@ -324,16 +331,12 @@ export default function LoadCompanies() {
           .replace(".", ",")}`,
     },
     {
-      title: "Total Frete",
-      dataIndex: "somaTotalFrete",
-      key: "somaTotalFrete",
-      align: "right",
-      width: 120,
-      render: (value: number) =>
-        `R$ ${Number(value || 0)
-          .toFixed(2)
-          .replace(".", ",")}`,
-      sorter: (a: any, b: any) => a.somaTotalFrete - b.somaTotalFrete,
+      title: "Comissão (%)",
+      dataIndex: "commissionRate",
+      key: "commissionRate",
+      align: "center",
+      width: 110,
+      render: (value: number) => `${Number(value || 0).toFixed(2)}%`,
     },
     {
       title: "Observações",
@@ -458,10 +461,6 @@ export default function LoadCompanies() {
         0,
       ),
       totalFreight: filteredData.reduce(
-        (sum, item) => sum + Number(item.somaTotalFrete || 0),
-        0,
-      ),
-      totalFrete4: filteredData.reduce(
         (sum, item) => sum + Number(item.frete4 || 0),
         0,
       ),
@@ -615,7 +614,7 @@ export default function LoadCompanies() {
             >
               R$ {totals.totalFreight.toFixed(2).replace(".", ",")}
             </div>
-            <div style={{ fontSize: "14px", color: "#666" }}>Total Frete</div>
+            <div style={{ fontSize: "14px", color: "#666" }}>Comissão Total</div>
           </div>
 
           <div style={{ textAlign: "center" }}>
@@ -667,17 +666,11 @@ export default function LoadCompanies() {
 
             <Table.Summary.Cell index={6} align="right">
               <strong>
-                R$ {totals.totalFrete4.toFixed(2).replace(".", ",")}
-              </strong>
-            </Table.Summary.Cell>
-
-            <Table.Summary.Cell index={7} align="right">
-              <strong>
                 R$ {totals.totalFreight.toFixed(2).replace(".", ",")}
               </strong>
             </Table.Summary.Cell>
 
-            <Table.Summary.Cell index={8} colSpan={2} />
+            <Table.Summary.Cell index={7} colSpan={2} />
           </Table.Summary.Row>
         )}
       />

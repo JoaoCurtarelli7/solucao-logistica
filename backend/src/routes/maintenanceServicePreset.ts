@@ -45,6 +45,91 @@ export async function maintenanceServicePresetRoutes(app: FastifyInstance) {
     },
   );
 
+  // Obter serviço por ID
+  app.get(
+    "/maintenance-service-presets/:id",
+    { preHandler: requirePermission("maintenance.view") },
+    async (req: FastifyRequest, rep: FastifyReply) => {
+      try {
+        const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+        const preset = await prisma.maintenanceServicePreset.findUnique({ where: { id } });
+        if (!preset) return rep.code(404).send({ message: "Serviço não encontrado" });
+        return rep.send(preset);
+      } catch (error) {
+        console.error("Erro ao buscar serviço:", error);
+        const hint = prismaCatalogErrorMessage(error);
+        return rep.code(500).send({ message: hint ?? "Erro ao buscar serviço" });
+      }
+    },
+  );
+
+  // Atualizar serviço
+  app.put(
+    "/maintenance-service-presets/:id",
+    { preHandler: requirePermission("maintenance.update") },
+    async (req: FastifyRequest, rep: FastifyReply) => {
+      try {
+        const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+        const bodySchema = z.object({
+          name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres").max(200),
+        });
+        const { name } = bodySchema.parse(req.body);
+        const trimmed = name.trim();
+
+        const existing = await prisma.maintenanceServicePreset.findFirst({
+          where: { name: trimmed, id: { not: id } },
+        });
+        if (existing) {
+          return rep.code(400).send({ message: "Já existe um serviço com este nome" });
+        }
+
+        const preset = await prisma.maintenanceServicePreset.findUnique({ where: { id } });
+        if (!preset) return rep.code(404).send({ message: "Serviço não encontrado" });
+        if (preset.isDefault) {
+          return rep.code(400).send({ message: "Não é possível editar serviços padrão do sistema" });
+        }
+
+        const updated = await prisma.maintenanceServicePreset.update({
+          where: { id },
+          data: { name: trimmed },
+        });
+        return rep.send(updated);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return rep.code(400).send({
+            message: "Dados inválidos",
+            errors: error.errors.map((e) => ({ field: e.path.join("."), message: e.message })),
+          });
+        }
+        console.error("Erro ao atualizar serviço:", error);
+        const hint = prismaCatalogErrorMessage(error);
+        return rep.code(500).send({ message: hint ?? "Erro ao atualizar serviço" });
+      }
+    },
+  );
+
+  // Deletar serviço
+  app.delete(
+    "/maintenance-service-presets/:id",
+    { preHandler: requirePermission("maintenance.delete") },
+    async (req: FastifyRequest, rep: FastifyReply) => {
+      try {
+        const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+        const preset = await prisma.maintenanceServicePreset.findUnique({ where: { id } });
+        if (!preset) return rep.code(404).send({ message: "Serviço não encontrado" });
+        if (preset.isDefault) {
+          return rep.code(400).send({ message: "Não é possível deletar serviços padrão do sistema" });
+        }
+        await prisma.maintenanceServicePreset.delete({ where: { id } });
+        return rep.send({ message: "Serviço deletado com sucesso" });
+      } catch (error) {
+        console.error("Erro ao deletar serviço:", error);
+        const hint = prismaCatalogErrorMessage(error);
+        return rep.code(500).send({ message: hint ?? "Erro ao deletar serviço" });
+      }
+    },
+  );
+
   // Adicionar novo serviço ao catálogo (fica salvo para todos)
   app.post(
     "/maintenance-service-presets",

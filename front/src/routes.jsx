@@ -16,6 +16,9 @@ import Closings from "./pages/Closings";
 import TripExpenses from "./pages/Vehicle/TripExpenses";
 import Reports from "./pages/Reports";
 import UsersPermissions from "./pages/UsersPermissions";
+import LoadBillingClosing from "./pages/LoadBillingClosing";
+import MaintenanceMonths from "./pages/Maintenance/Months";
+import MaintenanceServices from "./pages/Maintenance/Services";
 import { UserProvider } from "./context/userContext";
 
 const router = createBrowserRouter([
@@ -40,6 +43,9 @@ const router = createBrowserRouter([
       { path: "/vehicle/trip-expenses/:id", element: <TripExpenses /> },
       { path: "/reports", element: <Reports /> },
       { path: "/users-permissions", element: <UsersPermissions /> },
+      { path: "/load-billing-closings", element: <LoadBillingClosing /> },
+      { path: "/maintenance/months", element: <MaintenanceMonths /> },
+      { path: "/maintenance/services", element: <MaintenanceServices /> },
     ],
   },
 ]);

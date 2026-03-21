@@ -11,6 +11,7 @@ import { dashboardRoutes } from "./routes/dashboard";
 import { reportRoutes } from "./routes/reports";
 import { monthRoutes } from "./routes/month";
 import { closingRoutes } from "./routes/closing";
+import { loadBillingClosingRoutes } from "./routes/loadBillingClosing";
 
 import { truckRoutes } from "./routes/truck";
 import { tripRoutes } from "./routes/trip";
@@ -87,6 +88,7 @@ app.register(dashboardRoutes);
 app.register(reportRoutes);
 app.register(monthRoutes);
 app.register(closingRoutes);
+app.register(loadBillingClosingRoutes);
 app.register(truckRoutes);
 app.register(maintenanceRoutes);
 app.register(maintenanceServicePresetRoutes);

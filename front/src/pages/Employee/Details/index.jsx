@@ -38,7 +38,7 @@ import {
 import api from "../../../lib/api";
 import dayjs from "dayjs";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { createStandardPdf, addCompactTable } from "../../../utils/pdfTheme";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -258,55 +258,11 @@ export default function EmployeeDetails() {
 
   const exportTransactionsPdf = () => {
     try {
-      const doc = new jsPDF();
-
-      doc.setFontSize(16);
-      doc.text("Extrato Financeiro do Funcionário", 14, 18);
-
-      doc.setFontSize(10);
-      doc.text(`Gerado em: ${dayjs().format("DD/MM/YYYY HH:mm")}`, 14, 25);
-
-      doc.setFontSize(11);
-      doc.text(`Nome: ${employee.name || "-"}`, 14, 34);
-      doc.text(`Cargo: ${employee.role || "-"}`, 14, 40);
-      doc.text(`CPF: ${employee.cpf || "-"}`, 14, 46);
-      doc.text(`Conta Pix: ${employee.pixAccount || "-"}`, 14, 52);
-      doc.text(
-        `Competência: ${selectedMonth.format("MM/YYYY")}`,
-        14,
-        58,
-      );
-
-      doc.text(
-        `Salário Base: R$ ${(employee.baseSalary || 0).toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-        })}`,
-        14,
-        66,
-      );
-      doc.text(
-        `Total Créditos: R$ ${stats.totalCredits.toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-        })}`,
-        14,
-        72,
-      );
-      doc.text(
-        `Total Débitos: R$ ${stats.totalDebits.toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-        })}`,
-        14,
-        78,
-      );
-
-      doc.setFontSize(12);
-      doc.text(
-        `Totalizador do Salário: R$ ${saldoTotalSalario.toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-        })}`,
-        14,
-        86,
-      );
+      const { doc } = createStandardPdf({
+        title: "Extrato Financeiro do Funcionário",
+        companyName: "Solução Logística",
+        subtitle: `Funcionário: ${employee.name || "-"} | Competência: ${selectedMonth.format("MM/YYYY")}`,
+      });
 
       const tableRows = transactions.map((transaction) => [
         transaction.date ? dayjs(transaction.date).format("DD/MM/YYYY") : "-",
@@ -317,12 +273,24 @@ export default function EmployeeDetails() {
         })}`,
       ]);
 
-      autoTable(doc, {
-        head: [["Data", "Tipo", "Descrição", "Valor"]],
+      const y1 = addCompactTable(doc, {
+        startY: 45,
+        head: ["Campo", "Valor"],
+        body: [
+          ["Cargo", employee.role || "-"],
+          ["CPF", employee.cpf || "-"],
+          ["Conta Pix", employee.pixAccount || "-"],
+          ["Salário Base", `R$ ${(employee.baseSalary || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Total Créditos", `R$ ${stats.totalCredits.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Total Débitos", `R$ ${stats.totalDebits.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Totalizador do Salário", `R$ ${saldoTotalSalario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+        ],
+      });
+
+      addCompactTable(doc, {
+        startY: y1 + 6,
+        head: ["Data", "Tipo", "Descrição", "Valor"],
         body: tableRows,
-        startY: 92,
-        styles: { fontSize: 9, cellPadding: 2.5 },
-        headStyles: { fillColor: [22, 119, 255], textColor: 255 },
       });
 
       const finalY = (doc.lastAutoTable?.finalY || 120) + 24;

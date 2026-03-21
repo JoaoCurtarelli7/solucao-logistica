@@ -61,7 +61,7 @@ export async function loadRoutes(app: FastifyInstance) {
   app.get("/loads", async (_req: FastifyRequest, rep: FastifyReply) => {
     try {
       const loads = await prisma.load.findMany({
-        include: { Company: { select: { id: true, name: true, cnpj: true } } },
+        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
         orderBy: { date: "desc" },
       });
       return rep.send(loads);
@@ -80,7 +80,7 @@ export async function loadRoutes(app: FastifyInstance) {
 
       const loads = await prisma.load.findMany({
         where: { companyId },
-        include: { Company: { select: { id: true, name: true, cnpj: true } } },
+        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
         orderBy: { date: "desc" },
       });
 
@@ -101,7 +101,7 @@ export async function loadRoutes(app: FastifyInstance) {
     try {
       const load = await prisma.load.findUnique({
         where: { id },
-        include: { Company: { select: { id: true, name: true, cnpj: true } } },
+        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
       });
 
       if (!load) return rep.code(404).send({ message: "Carregamento não encontrado" });
@@ -149,41 +149,8 @@ export async function loadRoutes(app: FastifyInstance) {
           observations: observations?.trim() ? observations : null,
           Company: { connect: { id: companyId } },
         },
-        include: { Company: { select: { id: true, name: true, cnpj: true } } },
+        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
       });
-
-      // Adicionar entrada no fechamento do mês (se existir fechamento aberto para essa empresa)
-      const amount = totalFreight ?? freight4 ?? 0;
-      if (amount > 0) {
-        const loadDate = date instanceof Date ? date : new Date(date);
-        const startOfDay = new Date(loadDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(loadDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const closings = await prisma.closing.findMany({
-          where: {
-            companyId,
-            status: "aberto",
-            startDate: { lte: endOfDay },
-            endDate: { gte: startOfDay },
-          },
-        });
-
-        for (const closing of closings) {
-          await prisma.financialEntry.create({
-            data: {
-              description: loadEntryDescription(loadingNumber, loadDate),
-              amount,
-              category: "Comissões",
-              date: loadDate,
-              type: "entrada",
-              companyId,
-              closingId: closing.id,
-            },
-          });
-        }
-      }
 
       return rep.code(201).send(load);
     } catch (error: any) {
@@ -247,51 +214,8 @@ export async function loadRoutes(app: FastifyInstance) {
       const updated = await prisma.load.update({
         where: { id },
         data,
-        include: { Company: { select: { id: true, name: true, cnpj: true } } },
+        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
       });
-
-      // Sincronizar fechamento: remover entradas antigas desta carga e recriar com dados atualizados
-      const oldDesc = loadEntryDescription(existing.loadingNumber, existing.date);
-      await prisma.financialEntry.deleteMany({
-        where: {
-          companyId: existing.companyId,
-          type: "entrada",
-          category: "Comissões",
-          description: oldDesc,
-        },
-      });
-
-      const newAmount = (updated as any).totalFreight ?? (updated as any).freight4 ?? 0;
-      if (newAmount > 0) {
-        const loadDate = (updated as any).date instanceof Date ? (updated as any).date : new Date((updated as any).date);
-        const startOfDay = new Date(loadDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(loadDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const closings = await prisma.closing.findMany({
-          where: {
-            companyId: (updated as any).companyId,
-            status: "aberto",
-            startDate: { lte: endOfDay },
-            endDate: { gte: startOfDay },
-          },
-        });
-
-        for (const closing of closings) {
-          await prisma.financialEntry.create({
-            data: {
-              description: loadEntryDescription((updated as any).loadingNumber, loadDate),
-              amount: newAmount,
-              category: "Comissões",
-              date: loadDate,
-              type: "entrada",
-              companyId: (updated as any).companyId,
-              closingId: closing.id,
-            },
-          });
-        }
-      }
 
       return rep.send(updated);
     } catch (error: any) {
@@ -348,7 +272,7 @@ export async function loadRoutes(app: FastifyInstance) {
 
       const loads = await prisma.load.findMany({
         where,
-        include: { Company: { select: { id: true, name: true, cnpj: true } } },
+        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
         orderBy: { date: "desc" },
       });
 

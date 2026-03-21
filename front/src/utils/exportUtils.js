@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable'   // 👈 esta é a linha correta
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 import dayjs from 'dayjs'
+import { createStandardPdf, addCompactTable } from './pdfTheme'
 
 // Verificar se jsPDF está disponível
 if (typeof window !== 'undefined' && !window.jsPDF) {
@@ -55,16 +56,10 @@ export const exportToPDF = (data, columns, title, filename) => {
       throw new Error('jsPDF não está disponível. Verifique se a biblioteca está instalada.')
     }
 
-    const doc = new jsPDF()
-
-    // Cabeçalho do documento
-    doc.setFontSize(20)
-    doc.text(title, 14, 22)
-
-    // Informações do relatório
-    doc.setFontSize(10)
-    doc.text(`Gerado em: ${dayjs().format('DD/MM/YYYY HH:mm')}`, 14, 30)
-    doc.text(`Total de registros: ${data ? data.length : 0}`, 14, 35)
+    const { doc } = createStandardPdf({
+      title,
+      subtitle: `Total de registros: ${data ? data.length : 0}`,
+    })
 
     // Verificar se há dados
     if (!data || data.length === 0) {
@@ -112,15 +107,7 @@ export const exportToPDF = (data, columns, title, filename) => {
       const tableColumns = columns.map(col => col.title)
 
       // Adicionar tabela
-      autoTable(doc, {
-        head: [tableColumns],
-        body: tableData,
-        startY: 45,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [24, 144, 255], textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        margin: { top: 45 }
-      })
+      addCompactTable(doc, { head: tableColumns, body: tableData, startY: 45 })
     }
 
     // Rodapé

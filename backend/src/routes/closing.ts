@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fas
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middlewares/authMiddleware";
+import { requirePermission } from "../middlewares/permissionMiddleware";
 
 export async function closingRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -46,7 +47,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Listar fechamentos
-  app.get("/closings", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.get("/closings", { preHandler: requirePermission("closings.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { monthId, companyId, status } = req.query as { 
         monthId?: string; 
@@ -129,7 +130,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Obter fechamento específico
-  app.get("/closings/:id", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.get("/closings/:id", { preHandler: requirePermission("closings.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -168,7 +169,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Criar novo fechamento
-  app.post("/closings", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.post("/closings", { preHandler: requirePermission("closings.create") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = createClosingSchema.parse(req.body);
       // Garantir companyId null quando não informado (Todas as empresas)
@@ -233,49 +234,6 @@ export async function closingRoutes(app: FastifyInstance) {
         },
       });
 
-      // Se o fechamento for de uma empresa específica: criar uma entrada por carga no período
-      if (company && closingData.startDate && closingData.endDate) {
-        const startOfPeriod = new Date(closingData.startDate);
-        startOfPeriod.setHours(0, 0, 0, 0);
-        const endOfPeriod = new Date(closingData.endDate);
-        endOfPeriod.setHours(23, 59, 59, 999);
-
-        const loads = await prisma.load.findMany({
-          where: {
-            companyId: company.id,
-            date: {
-              gte: startOfPeriod,
-              lte: endOfPeriod,
-            },
-          },
-        });
-
-        const formatDateBR = (d: Date) => {
-          const day = d.getDate().toString().padStart(2, "0");
-          const month = (d.getMonth() + 1).toString().padStart(2, "0");
-          const year = d.getFullYear();
-          return `${day}/${month}/${year}`;
-        };
-
-        for (const load of loads) {
-          const amount = (load as any).totalFreight ?? (load as any).freight4 ?? 0;
-          if (amount > 0) {
-            const loadDate = new Date((load as any).date);
-            await prisma.financialEntry.create({
-              data: {
-                description: `Carga: ${(load as any).loadingNumber} - ${formatDateBR(loadDate)}`,
-                amount,
-                category: "Comissões",
-                date: loadDate,
-                type: "entrada",
-                companyId: company.id,
-                closingId: newClosing.id,
-              },
-            });
-          }
-        }
-      }
-
       return rep.code(201).send(newClosing);
     } catch (error: any) {
       console.error("Erro ao criar fechamento:", error);
@@ -293,7 +251,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Atualizar fechamento
-  app.put("/closings/:id", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.put("/closings/:id", { preHandler: requirePermission("closings.update") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       const data = updateClosingSchema.parse(req.body);
@@ -337,7 +295,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Deletar fechamento
-  app.delete("/closings/:id", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.delete("/closings/:id", { preHandler: requirePermission("closings.delete") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -440,7 +398,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Reabrir fechamento
-  app.post("/closings/:id/reopen", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.post("/closings/:id/reopen", { preHandler: requirePermission("closings.update") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
@@ -497,13 +455,14 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Obter entradas financeiras de um fechamento
-  app.get("/closings/:id/entries", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.get("/closings/:id/entries", { preHandler: requirePermission("closings.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
       const closing = await prisma.closing.findUnique({
         where: { id },
         include: {
+          Month: { select: { id: true, year: true, month: true } },
           FinancialEntry: {
             include: {
               Company: {
@@ -523,6 +482,58 @@ export async function closingRoutes(app: FastifyInstance) {
         return rep.code(404).send({ message: "Fechamento não encontrado" });
       }
 
+      // Salários: usar o mês do fechamento (Month) para pegar créditos/débitos corretos
+      const salaryEntries: any[] = [];
+      const monthData = (closing as any).Month;
+      const targetYear = monthData?.year;
+      const targetMonth = monthData?.month;
+
+      if (targetYear != null && targetMonth != null) {
+        const startOfMonth = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0);
+        const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+
+        const employees = await prisma.employee.findMany({
+          where: { status: "Ativo" },
+          include: {
+            Transaction: {
+              where: {
+                date: { gte: startOfMonth, lte: endOfMonth },
+              },
+            },
+          },
+        });
+
+        for (const emp of employees) {
+          const credits = (emp.Transaction ?? [])
+            .filter((t) => t.type === "Crédito")
+            .reduce((s, t) => s + t.amount, 0);
+          const debits = (emp.Transaction ?? [])
+            .filter((t) => t.type === "Débito")
+            .reduce((s, t) => s + t.amount, 0);
+          const finalSalary = emp.baseSalary + credits - debits;
+          if (finalSalary > 0) {
+            salaryEntries.push({
+              id: `salary-${emp.id}`,
+              description: `Salário - ${emp.name} (${targetMonth.toString().padStart(2, "0")}/${targetYear})`,
+              amount: finalSalary,
+              category: "Salários",
+              date: endOfMonth,
+              type: "saida",
+              observations: null,
+              closingId: closing.id,
+              companyId: null,
+              _isComputed: true,
+              Company: null,
+            });
+          }
+        }
+      }
+
+      const allEntries = [
+        ...closing.FinancialEntry,
+        ...salaryEntries,
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
       return rep.send({
         closing: {
           id: closing.id,
@@ -536,7 +547,7 @@ export async function closingRoutes(app: FastifyInstance) {
           balance: closing.balance,
           profitMargin: closing.profitMargin,
         },
-        entries: closing.FinancialEntry,
+        entries: allEntries,
       });
     } catch (error) {
       console.error("Erro ao buscar entradas do fechamento:", error);
@@ -545,7 +556,7 @@ export async function closingRoutes(app: FastifyInstance) {
   });
 
   // Obter estatísticas do fechamento
-  app.get("/closings/:id/stats", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.get("/closings/:id/stats", { preHandler: requirePermission("closings.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
 
