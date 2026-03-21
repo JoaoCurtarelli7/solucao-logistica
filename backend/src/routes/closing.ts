@@ -96,11 +96,49 @@ export async function closingRoutes(app: FastifyInstance) {
         },
       });
 
-      // Calcular totais em tempo real a partir das entradas (para listagem sempre atualizada)
+      // Calcular total de salários por mês (base + créditos - débitos) para incluir nas saídas
+      const salaryByMonth = new Map<string, number>();
+      const uniqueMonths = new Map<string, { year: number; month: number }>();
+      for (const c of closings) {
+        const m = (c as any).Month;
+        if (m?.year != null && m?.month != null) {
+          uniqueMonths.set(`${m.year}-${m.month}`, { year: m.year, month: m.month });
+        }
+      }
+      for (const [, { year, month }] of uniqueMonths) {
+        const startOfMonth = new Date(year, month - 1, 1, 0, 0, 0, 0);
+        const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+        const employees = await prisma.employee.findMany({
+          where: { status: "Ativo" },
+          include: {
+            Transaction: {
+              where: { date: { gte: startOfMonth, lte: endOfMonth } },
+            },
+          },
+        });
+        let total = 0;
+        for (const emp of employees) {
+          const credits = (emp.Transaction ?? [])
+            .filter((t) => t.type === "Crédito" || t.type === "Credito")
+            .reduce((s, t) => s + Number(t.amount || 0), 0);
+          const debits = (emp.Transaction ?? [])
+            .filter((t) => t.type === "Débito" || t.type === "Debito")
+            .reduce((s, t) => s + Number(t.amount || 0), 0);
+          const finalSalary = Number(emp.baseSalary || 0) + credits - debits;
+          if (finalSalary > 0) total += finalSalary;
+        }
+        salaryByMonth.set(`${year}-${month}`, total);
+      }
+
       const formattedClosings = closings.map((c) => {
         const entries = (c as any).FinancialEntry || [];
+        const entriesSaida = entries.filter((e: any) => e.category !== "Salários");
         const totalEntries = entries.filter((e: any) => e.type === "entrada").reduce((s: number, e: any) => s + e.amount, 0);
-        const totalExpenses = entries.filter((e: any) => e.type === "saida").reduce((s: number, e: any) => s + e.amount, 0);
+        let totalExpenses = entriesSaida.filter((e: any) => e.type === "saida").reduce((s: number, e: any) => s + e.amount, 0);
+        const m = (c as any).Month;
+        if (m?.year != null && m?.month != null) {
+          totalExpenses += salaryByMonth.get(`${m.year}-${m.month}`) ?? 0;
+        }
         const totalTaxes = entries.filter((e: any) => e.type === "imposto").reduce((s: number, e: any) => s + e.amount, 0);
         const balance = totalEntries - totalExpenses - totalTaxes;
         const profitMargin = totalEntries > 0 ? (balance / totalEntries) * 100 : 0;
@@ -505,12 +543,12 @@ export async function closingRoutes(app: FastifyInstance) {
 
         for (const emp of employees) {
           const credits = (emp.Transaction ?? [])
-            .filter((t) => t.type === "Crédito")
-            .reduce((s, t) => s + t.amount, 0);
+            .filter((t) => (t.type === "Crédito" || t.type === "Credito"))
+            .reduce((s, t) => s + Number(t.amount || 0), 0);
           const debits = (emp.Transaction ?? [])
-            .filter((t) => t.type === "Débito")
-            .reduce((s, t) => s + t.amount, 0);
-          const finalSalary = emp.baseSalary + credits - debits;
+            .filter((t) => (t.type === "Débito" || t.type === "Debito"))
+            .reduce((s, t) => s + Number(t.amount || 0), 0);
+          const finalSalary = Number(emp.baseSalary || 0) + credits - debits;
           if (finalSalary > 0) {
             salaryEntries.push({
               id: `salary-${emp.id}`,
@@ -529,8 +567,11 @@ export async function closingRoutes(app: FastifyInstance) {
         }
       }
 
+      const manualEntries = (closing.FinancialEntry ?? []).filter(
+        (e) => e.category !== "Salários"
+      );
       const allEntries = [
-        ...closing.FinancialEntry,
+        ...manualEntries,
         ...salaryEntries,
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 

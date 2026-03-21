@@ -67,16 +67,6 @@ export default function Closing() {
   const canUpdate = hasPermission('financial.update')
   const canDelete = hasPermission('financial.delete')
 
-  if (!canView) {
-    return (
-      <Result
-        status="403"
-        title="Acesso negado"
-        subTitle="Você não tem permissão para visualizar entradas financeiras."
-      />
-    )
-  }
-
   useEffect(() => {
     fetchCompanies()
     fetchMonths()
@@ -295,9 +285,9 @@ export default function Closing() {
   const impostos = entries.filter(entry => entry.type === 'imposto')
 
   // Calcular totais
-  const totalEntradas = entradas.reduce((sum, item) => sum + item.amount, 0)
-  const totalSaidas = saidas.reduce((sum, item) => sum + item.amount, 0)
-  const totalImpostos = impostos.reduce((sum, item) => sum + item.amount, 0)
+  const totalEntradas = entradas.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const totalSaidas = saidas.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const totalImpostos = impostos.reduce((sum, item) => sum + Number(item.amount || 0), 0)
   const saldo = totalEntradas - totalSaidas - totalImpostos
   const margemLucro = totalEntradas > 0 ? ((saldo / totalEntradas) * 100) : 0
 
@@ -432,6 +422,16 @@ export default function Closing() {
       )
     }
   ]
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar entradas financeiras."
+      />
+    )
+  }
 
   return (
     <div className="closing-container">
