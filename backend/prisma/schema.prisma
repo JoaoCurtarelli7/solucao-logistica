@@ -111,6 +111,9 @@ model Load {
   totalValue    Float
   freight4      Float
   totalFreight  Float
+  /// Custos extras cobrados junto com a comissão (descarga, pedágio, etc.)
+  additionalCosts     Float   @default(0)
+  additionalCostsNote String?
   observations  String?
   companyId     Int
   Company       Company  @relation(fields: [companyId], references: [id], map: "fk_load_company")
@@ -167,7 +170,10 @@ model LoadBillingClosing {
   totalGrossValue  Float    @default(0)
   totalFreight     Float    @default(0)
   commissionRate   Float    @default(0)
-  totalCommission  Float    @default(0)
+  /// Comissão calculada só sobre o valor bruto (percentual da empresa)
+  totalCommission      Float    @default(0)
+  /// Soma dos custos adicionais das cargas no período
+  totalAdditionalCosts Float    @default(0)
   billingTotal     Float    @default(0)
   createdAt        DateTime @default(now()) @db.Timestamptz(6)
   updatedAt        DateTime @default(now()) @db.Timestamptz(6)

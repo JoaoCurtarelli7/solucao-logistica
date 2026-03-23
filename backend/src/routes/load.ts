@@ -1,4 +1,8 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fastify";
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+} from "../types/fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middlewares/authMiddleware";
@@ -31,25 +35,34 @@ export async function loadRoutes(app: FastifyInstance) {
   const companyParamsSchema = z.object({ companyId: z.coerce.number() });
 
   const bodySchema = z.object({
-    date: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate),
+    date: z
+      .union([z.coerce.date(), z.string()])
+      .transform(parseMaybeBrDateToDate),
     loadingNumber: z.string().min(1),
     deliveries: z.coerce.number(),
     cargoWeight: z.coerce.number(),
     totalValue: z.coerce.number(),
     freight4: z.coerce.number(),
     totalFreight: z.coerce.number(),
+    additionalCosts: z.coerce.number().optional().default(0),
+    additionalCostsNote: z.string().optional(),
     observations: z.string().optional(),
     companyId: z.coerce.number(),
   });
 
   const updateBodySchema = z.object({
-    date: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate).optional(),
+    date: z
+      .union([z.coerce.date(), z.string()])
+      .transform(parseMaybeBrDateToDate)
+      .optional(),
     loadingNumber: z.string().min(1).optional(),
     deliveries: z.coerce.number().optional(),
     cargoWeight: z.coerce.number().optional(),
     totalValue: z.coerce.number().optional(),
     freight4: z.coerce.number().optional(),
     totalFreight: z.coerce.number().optional(),
+    additionalCosts: z.coerce.number().optional(),
+    additionalCostsNote: z.string().optional(),
     observations: z.string().optional(),
     companyId: z.coerce.number().optional(),
   });
@@ -61,38 +74,55 @@ export async function loadRoutes(app: FastifyInstance) {
   app.get("/loads", async (_req: FastifyRequest, rep: FastifyReply) => {
     try {
       const loads = await prisma.load.findMany({
-        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
+        include: {
+          Company: {
+            select: { id: true, name: true, cnpj: true, commission: true },
+          },
+        },
         orderBy: { date: "desc" },
       });
       return rep.send(loads);
     } catch (error) {
       app.log.error(error);
-      return rep.code(500).send({ message: "Erro interno ao buscar os carregamentos" });
+      return rep
+        .code(500)
+        .send({ message: "Erro interno ao buscar os carregamentos" });
     }
   });
 
   // LISTAR POR EMPRESA
-  app.get("/loads/company/:companyId", async (req: FastifyRequest, rep: FastifyReply) => {
-    const { companyId } = companyParamsSchema.parse(req.params);
+  app.get(
+    "/loads/company/:companyId",
+    async (req: FastifyRequest, rep: FastifyReply) => {
+      const { companyId } = companyParamsSchema.parse(req.params);
 
-    try {
-      await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+      try {
+        await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
 
-      const loads = await prisma.load.findMany({
-        where: { companyId },
-        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
-        orderBy: { date: "desc" },
-      });
+        const loads = await prisma.load.findMany({
+          where: { companyId },
+          include: {
+            Company: {
+              select: { id: true, name: true, cnpj: true, commission: true },
+            },
+          },
+          orderBy: { date: "desc" },
+        });
 
-      return rep.send(loads);
-    } catch (error: any) {
-      if (error?.code === "P2025") {
-        return rep.code(404).send({ message: "Empresa não encontrada" });
+        return rep.send(loads);
+      } catch (error: any) {
+        if (error?.code === "P2025") {
+          return rep.code(404).send({ message: "Empresa não encontrada" });
+        }
+        app.log.error(error);
+        return rep
+          .code(500)
+          .send({
+            message: "Erro interno ao buscar os carregamentos da empresa",
+          });
       }
-      app.log.error(error);
-      return rep.code(500).send({ message: "Erro interno ao buscar os carregamentos da empresa" });
-    }
-  });
+    },
+  );
 
   // POR ID
   app.get("/loads/:id", async (req: FastifyRequest, rep: FastifyReply) => {
@@ -101,14 +131,21 @@ export async function loadRoutes(app: FastifyInstance) {
     try {
       const load = await prisma.load.findUnique({
         where: { id },
-        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
+        include: {
+          Company: {
+            select: { id: true, name: true, cnpj: true, commission: true },
+          },
+        },
       });
 
-      if (!load) return rep.code(404).send({ message: "Carregamento não encontrado" });
+      if (!load)
+        return rep.code(404).send({ message: "Carregamento não encontrado" });
       return rep.send(load);
     } catch (error) {
       app.log.error(error);
-      return rep.code(500).send({ message: "Erro interno ao buscar o carregamento" });
+      return rep
+        .code(500)
+        .send({ message: "Erro interno ao buscar o carregamento" });
     }
   });
 
@@ -122,6 +159,8 @@ export async function loadRoutes(app: FastifyInstance) {
       totalValue,
       freight4,
       totalFreight,
+      additionalCosts,
+      additionalCostsNote,
       observations,
       companyId,
     } = bodySchema.parse(req.body);
@@ -134,7 +173,12 @@ export async function loadRoutes(app: FastifyInstance) {
         select: { id: true },
       });
       if (existing) {
-        return rep.code(400).send({ message: "Já existe um carregamento com este número para esta empresa" });
+        return rep
+          .code(400)
+          .send({
+            message:
+              "Já existe um carregamento com este número para esta empresa",
+          });
       }
 
       const load = await prisma.load.create({
@@ -146,10 +190,18 @@ export async function loadRoutes(app: FastifyInstance) {
           totalValue,
           freight4,
           totalFreight,
+          additionalCosts: Math.max(0, additionalCosts ?? 0),
+          additionalCostsNote: additionalCostsNote?.trim()
+            ? additionalCostsNote.trim()
+            : null,
           observations: observations?.trim() ? observations : null,
           Company: { connect: { id: companyId } },
         },
-        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
+        include: {
+          Company: {
+            select: { id: true, name: true, cnpj: true, commission: true },
+          },
+        },
       });
 
       return rep.code(201).send(load);
@@ -173,13 +225,19 @@ export async function loadRoutes(app: FastifyInstance) {
 
     try {
       const existing = await prisma.load.findUnique({ where: { id } });
-      if (!existing) return rep.code(404).send({ message: "Carregamento não encontrado" });
+      if (!existing)
+        return rep.code(404).send({ message: "Carregamento não encontrado" });
 
       if (updateData.companyId) {
-        await prisma.company.findUniqueOrThrow({ where: { id: updateData.companyId } });
+        await prisma.company.findUniqueOrThrow({
+          where: { id: updateData.companyId },
+        });
       }
 
-      if (updateData.loadingNumber && (updateData.companyId ?? existing.companyId)) {
+      if (
+        updateData.loadingNumber &&
+        (updateData.companyId ?? existing.companyId)
+      ) {
         const targetCompanyId = updateData.companyId ?? existing.companyId;
         const duplicate = await prisma.load.findFirst({
           where: {
@@ -190,20 +248,51 @@ export async function loadRoutes(app: FastifyInstance) {
           select: { id: true },
         });
         if (duplicate) {
-          return rep.code(400).send({ message: "Já existe um carregamento com este número para esta empresa" });
+          return rep
+            .code(400)
+            .send({
+              message:
+                "Já existe um carregamento com este número para esta empresa",
+            });
         }
       }
 
       const data: any = {
         ...(updateData.date !== undefined ? { date: updateData.date } : {}),
-        ...(updateData.loadingNumber !== undefined ? { loadingNumber: updateData.loadingNumber } : {}),
-        ...(updateData.deliveries !== undefined ? { deliveries: updateData.deliveries } : {}),
-        ...(updateData.cargoWeight !== undefined ? { cargoWeight: updateData.cargoWeight } : {}),
-        ...(updateData.totalValue !== undefined ? { totalValue: updateData.totalValue } : {}),
-        ...(updateData.freight4 !== undefined ? { freight4: updateData.freight4 } : {}),
-        ...(updateData.totalFreight !== undefined ? { totalFreight: updateData.totalFreight } : {}),
+        ...(updateData.loadingNumber !== undefined
+          ? { loadingNumber: updateData.loadingNumber }
+          : {}),
+        ...(updateData.deliveries !== undefined
+          ? { deliveries: updateData.deliveries }
+          : {}),
+        ...(updateData.cargoWeight !== undefined
+          ? { cargoWeight: updateData.cargoWeight }
+          : {}),
+        ...(updateData.totalValue !== undefined
+          ? { totalValue: updateData.totalValue }
+          : {}),
+        ...(updateData.freight4 !== undefined
+          ? { freight4: updateData.freight4 }
+          : {}),
+        ...(updateData.totalFreight !== undefined
+          ? { totalFreight: updateData.totalFreight }
+          : {}),
+        ...(updateData.additionalCosts !== undefined
+          ? { additionalCosts: Math.max(0, updateData.additionalCosts) }
+          : {}),
+        ...(updateData.additionalCostsNote !== undefined
+          ? {
+              additionalCostsNote: updateData.additionalCostsNote?.trim()
+                ? updateData.additionalCostsNote
+                : null,
+            }
+          : {}),
         ...(updateData.observations !== undefined
-          ? { observations: updateData.observations?.trim() ? updateData.observations : null }
+          ? {
+              observations: updateData.observations?.trim()
+                ? updateData.observations
+                : null,
+            }
           : {}),
       };
 
@@ -214,7 +303,11 @@ export async function loadRoutes(app: FastifyInstance) {
       const updated = await prisma.load.update({
         where: { id },
         data,
-        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
+        include: {
+          Company: {
+            select: { id: true, name: true, cnpj: true, commission: true },
+          },
+        },
       });
 
       return rep.send(updated);
@@ -223,7 +316,9 @@ export async function loadRoutes(app: FastifyInstance) {
         return rep.code(404).send({ message: "Empresa não encontrada" });
       }
       app.log.error(error);
-      return rep.code(500).send({ message: "Erro interno ao atualizar o carregamento" });
+      return rep
+        .code(500)
+        .send({ message: "Erro interno ao atualizar o carregamento" });
     }
   });
 
@@ -233,7 +328,8 @@ export async function loadRoutes(app: FastifyInstance) {
 
     try {
       const existing = await prisma.load.findUnique({ where: { id } });
-      if (!existing) return rep.code(404).send({ message: "Carregamento não encontrado" });
+      if (!existing)
+        return rep.code(404).send({ message: "Carregamento não encontrado" });
 
       // Remover entradas do fechamento que referenciam esta carga
       const desc = loadEntryDescription(existing.loadingNumber, existing.date);
@@ -250,15 +346,21 @@ export async function loadRoutes(app: FastifyInstance) {
       return rep.code(204).send();
     } catch (error) {
       app.log.error(error);
-      return rep.code(500).send({ message: "Erro interno ao deletar o carregamento" });
+      return rep
+        .code(500)
+        .send({ message: "Erro interno ao deletar o carregamento" });
     }
   });
 
   // POR PERÍODO
   app.get("/loads/period", async (req: FastifyRequest, rep: FastifyReply) => {
     const querySchema = z.object({
-      startDate: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate),
-      endDate: z.union([z.coerce.date(), z.string()]).transform(parseMaybeBrDateToDate),
+      startDate: z
+        .union([z.coerce.date(), z.string()])
+        .transform(parseMaybeBrDateToDate),
+      endDate: z
+        .union([z.coerce.date(), z.string()])
+        .transform(parseMaybeBrDateToDate),
       companyId: z.coerce.number().optional(),
     });
 
@@ -272,14 +374,20 @@ export async function loadRoutes(app: FastifyInstance) {
 
       const loads = await prisma.load.findMany({
         where,
-        include: { Company: { select: { id: true, name: true, cnpj: true, commission: true } } },
+        include: {
+          Company: {
+            select: { id: true, name: true, cnpj: true, commission: true },
+          },
+        },
         orderBy: { date: "desc" },
       });
 
       return rep.send(loads);
     } catch (error) {
       app.log.error(error);
-      return rep.code(500).send({ message: "Erro interno ao buscar carregamentos por período" });
+      return rep
+        .code(500)
+        .send({ message: "Erro interno ao buscar carregamentos por período" });
     }
   });
 }
