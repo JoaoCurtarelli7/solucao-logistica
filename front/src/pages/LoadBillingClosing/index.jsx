@@ -19,7 +19,12 @@ import {
   message,
   Result,
 } from "antd";
-import { CalculatorOutlined, CheckOutlined, EyeOutlined, FilePdfOutlined } from "@ant-design/icons";
+import {
+  CalculatorOutlined,
+  CheckOutlined,
+  EyeOutlined,
+  FilePdfOutlined,
+} from "@ant-design/icons";
 import dayjs from "dayjs";
 import { createStandardPdf, addCompactTable } from "../../utils/pdfTheme";
 import { api } from "../../lib";
@@ -28,7 +33,10 @@ import { usePermission } from "../../hooks/usePermission";
 const { Text, Title } = Typography;
 
 const formatCurrency = (value) =>
-  Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  Number(value || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 const toMoney = (value) => Number(value || 0).toFixed(2);
 
 export default function LoadBillingClosing() {
@@ -60,12 +68,17 @@ export default function LoadBillingClosing() {
 
   const loadBaseData = async () => {
     try {
-      const [monthsRes, companiesRes] = await Promise.all([api.get("/months"), api.get("/companies")]);
+      const [monthsRes, companiesRes] = await Promise.all([
+        api.get("/months"),
+        api.get("/companies"),
+      ]);
       const monthList = Array.isArray(monthsRes.data) ? monthsRes.data : [];
       setMonths(monthList);
       setCompanies(companiesRes.data || []);
       if (!selectedMonth && monthList.length > 0) {
-        const sorted = [...monthList].sort((a, b) => b.year - a.year || b.month - a.month);
+        const sorted = [...monthList].sort(
+          (a, b) => b.year - a.year || b.month - a.month,
+        );
         setSelectedMonth(sorted[0].id);
       }
     } catch {
@@ -76,10 +89,15 @@ export default function LoadBillingClosing() {
   const loadClosings = async (monthId) => {
     try {
       setLoading(true);
-      const { data } = await api.get(`/load-billing-closings?monthId=${monthId}`);
+      const { data } = await api.get(
+        `/load-billing-closings?monthId=${monthId}`,
+      );
       setRows(Array.isArray(data) ? data : []);
     } catch (error) {
-      message.error(error.response?.data?.message || "Erro ao carregar fechamentos de carga");
+      message.error(
+        error.response?.data?.message ||
+          "Erro ao carregar fechamentos de carga",
+      );
     } finally {
       setLoading(false);
     }
@@ -89,7 +107,10 @@ export default function LoadBillingClosing() {
     form.resetFields();
     const monthData = months.find((m) => m.id === selectedMonth);
     if (monthData) {
-      form.setFieldsValue({ name: `Faturamento ${monthData.name}`, closingType: "month" });
+      form.setFieldsValue({
+        name: `Faturamento ${monthData.name}`,
+        closingType: "month",
+      });
     }
     setIsModalOpen(true);
   };
@@ -135,7 +156,9 @@ export default function LoadBillingClosing() {
       form.resetFields();
       loadClosings(selectedMonth);
     } catch (error) {
-      message.error(error.response?.data?.message || "Erro ao criar fechamento de carga");
+      message.error(
+        error.response?.data?.message || "Erro ao criar fechamento de carga",
+      );
     } finally {
       setCreating(false);
     }
@@ -168,11 +191,15 @@ export default function LoadBillingClosing() {
   const finalize = async (id) => {
     try {
       await api.post(`/load-billing-closings/${id}/finalize`);
-      message.success("Fechamento de carga finalizado. O valor foi registrado como entrada no caixa.");
+      message.success(
+        "Fechamento de carga finalizado. O valor foi registrado como entrada no caixa.",
+      );
       loadClosings(selectedMonth);
       setDetailOpen(false);
     } catch (err) {
-      message.error(err.response?.data?.message || "Erro ao finalizar fechamento de carga");
+      message.error(
+        err.response?.data?.message || "Erro ao finalizar fechamento de carga",
+      );
     }
   };
 
@@ -190,29 +217,59 @@ export default function LoadBillingClosing() {
 
     const y1 = addCompactTable(doc, {
       startY: 45,
-      head: ["Total Cargas", "Valor Bruto (Base Comissão)", "Frete Total", "Comissão a Cobrar", "Taxa (%)"],
-      body: [[
-        String(detail.totalLoads || 0),
-        formatCurrency(detail.totalGrossValue),
-        formatCurrency(detail.totalFreight),
-        formatCurrency(detail.totalCommission),
-        `${Number(detail.commissionRate || 0).toFixed(2)}%`,
-      ]],
+      head: [
+        "Total Cargas",
+        "Valor Bruto",
+        "Comissão s/ bruto",
+        "Custos adicionais",
+        "Valor a cobrar",
+        "Taxa (%)",
+      ],
+      body: [
+        [
+          String(detail.totalLoads || 0),
+          formatCurrency(detail.totalGrossValue),
+          formatCurrency(detail.totalCommission),
+          formatCurrency(detail.totalAdditionalCosts),
+          formatCurrency(detail.billingTotal),
+          `${Number(detail.commissionRate || 0).toFixed(2)}%`,
+        ],
+      ],
     });
     addCompactTable(doc, {
       startY: y1 + 6,
-      head: ["Data", "Carga", "Entregas", "Peso (kg)", "Valor Total", "Frete"],
-      body: (loads || []).map((l) => [
-        dayjs(l.date).format("DD/MM/YYYY"),
-        l.loadingNumber || "-",
-        String(l.deliveries || 0),
-        Number(l.cargoWeight || 0).toLocaleString("pt-BR"),
-        formatCurrency(l.totalValue),
-        formatCurrency(l.totalFreight),
-      ]),
+      head: [
+        "Data",
+        "Carga",
+        "Entregas",
+        "Peso (kg)",
+        "Valor Total",
+        "Comissão",
+        "Adicionais",
+        "Total a cobrar",
+      ],
+      body: (loads || []).map((l) => {
+        const rate = Number(detail.commissionRate || 0);
+        const tv = Number(l.totalValue || 0);
+        const com = (tv * rate) / 100;
+        const add = Number(l.additionalCosts || 0);
+        return [
+          dayjs(l.date).format("DD/MM/YYYY"),
+          l.loadingNumber || "-",
+          String(l.deliveries || 0),
+          Number(l.cargoWeight || 0).toLocaleString("pt-BR"),
+          formatCurrency(l.totalValue),
+          formatCurrency(com),
+          formatCurrency(add),
+          formatCurrency(l.totalFreight ?? com + add),
+        ];
+      }),
     });
 
-    const safeName = String(detail.name || "fechamento").replace(/[^\w\d-_]+/g, "_");
+    const safeName = String(detail.name || "fechamento").replace(
+      /[^\w\d-_]+/g,
+      "_",
+    );
     doc.save(`fechamento_cargas_${safeName}.pdf`);
   };
 
@@ -238,7 +295,8 @@ export default function LoadBillingClosing() {
         width: 170,
         render: (_, record) => (
           <Text>
-            {dayjs(record.startDate).format("DD/MM/YYYY")} até {dayjs(record.endDate).format("DD/MM/YYYY")}
+            {dayjs(record.startDate).format("DD/MM/YYYY")} até{" "}
+            {dayjs(record.endDate).format("DD/MM/YYYY")}
           </Text>
         ),
       },
@@ -258,13 +316,22 @@ export default function LoadBillingClosing() {
         render: (v) => <Text>{formatCurrency(v)}</Text>,
       },
       {
+        title: "Custos adicionais",
+        dataIndex: "totalAdditionalCosts",
+        key: "totalAdditionalCosts",
+        align: "right",
+        width: 120,
+        render: (v) => <Text>{formatCurrency(v)}</Text>,
+      },
+      {
         title: "Comissão a Cobrar",
         key: "commission",
         align: "right",
         width: 150,
         render: (_, record) => (
           <Text>
-            {record.commissionRate?.toFixed(2)}% ({formatCurrency(record.totalCommission)})
+            {record.commissionRate?.toFixed(2)}% (
+            {formatCurrency(record.totalCommission)})
           </Text>
         ),
       },
@@ -281,7 +348,9 @@ export default function LoadBillingClosing() {
         dataIndex: "status",
         key: "status",
         width: 90,
-        render: (s) => <Tag color={s === "fechado" ? "green" : "blue"}>{s}</Tag>,
+        render: (s) => (
+          <Tag color={s === "fechado" ? "green" : "blue"}>{s}</Tag>
+        ),
       },
       {
         title: "Ações",
@@ -289,7 +358,11 @@ export default function LoadBillingClosing() {
         width: 120,
         render: (_, record) => (
           <Space>
-            <Button icon={<EyeOutlined />} size="small" onClick={() => openDetail(record)} />
+            <Button
+              icon={<EyeOutlined />}
+              size="small"
+              onClick={() => openDetail(record)}
+            />
             {canUpdate && record.status === "aberto" && (
               <Popconfirm
                 title="Finalizar este fechamento?"
@@ -311,9 +384,27 @@ export default function LoadBillingClosing() {
   );
 
   const loadColumns = [
-    { title: "Data da Carga", dataIndex: "date", key: "date", width: 120, render: (d) => dayjs(d).format("DD/MM/YYYY") },
-    { title: "Nº Carga", dataIndex: "loadingNumber", key: "loadingNumber", width: 120, ellipsis: true },
-    { title: "Entregas", dataIndex: "deliveries", key: "deliveries", width: 90, align: "right" },
+    {
+      title: "Data da Carga",
+      dataIndex: "date",
+      key: "date",
+      width: 120,
+      render: (d) => dayjs(d).format("DD/MM/YYYY"),
+    },
+    {
+      title: "Nº Carga",
+      dataIndex: "loadingNumber",
+      key: "loadingNumber",
+      width: 120,
+      ellipsis: true,
+    },
+    {
+      title: "Entregas",
+      dataIndex: "deliveries",
+      key: "deliveries",
+      width: 90,
+      align: "right",
+    },
     {
       title: "Peso (kg)",
       dataIndex: "cargoWeight",
@@ -326,14 +417,14 @@ export default function LoadBillingClosing() {
       title: "Valor Total",
       dataIndex: "totalValue",
       key: "totalValue",
-      width: 130,
+      width: 120,
       align: "right",
       render: (v) => formatCurrency(v),
     },
     {
       title: "Comissão",
       key: "commissionValue",
-      width: 120,
+      width: 110,
       align: "right",
       render: (_, row) => {
         const rate = Number(detail?.commissionRate || 0);
@@ -342,10 +433,37 @@ export default function LoadBillingClosing() {
         return formatCurrency(value);
       },
     },
+    {
+      title: "Adicionais",
+      dataIndex: "additionalCosts",
+      key: "additionalCosts",
+      width: 100,
+      align: "right",
+      render: (v) => formatCurrency(v),
+    },
+    {
+      title: "Total a cobrar",
+      key: "lineTotal",
+      width: 120,
+      align: "right",
+      render: (_, row) => {
+        const rate = Number(detail?.commissionRate || 0);
+        const totalValue = Number(row?.totalValue || 0);
+        const com = (totalValue * rate) / 100;
+        const add = Number(row?.additionalCosts || 0);
+        return formatCurrency(Number(row?.totalFreight ?? com + add));
+      },
+    },
   ];
 
   if (!canView) {
-    return <Result status="403" title="Acesso negado" subTitle="Você não tem permissão para visualizar fechamentos de carga." />;
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar fechamentos de carga."
+      />
+    );
   }
 
   const totals = rows.reduce(
@@ -353,10 +471,11 @@ export default function LoadBillingClosing() {
       acc.loads += Number(r.totalLoads || 0);
       acc.gross += Number(r.totalGrossValue || 0);
       acc.commission += Number(r.totalCommission || 0);
+      acc.additional += Number(r.totalAdditionalCosts || 0);
       acc.billing += Number(r.billingTotal || 0);
       return acc;
     },
-    { loads: 0, gross: 0, commission: 0, billing: 0 },
+    { loads: 0, gross: 0, commission: 0, additional: 0, billing: 0 },
   );
 
   return (
@@ -367,7 +486,10 @@ export default function LoadBillingClosing() {
             <Title level={3} style={{ margin: 0 }}>
               <CalculatorOutlined /> Fechamento de Cargas (Faturamento)
             </Title>
-            <Text type="secondary">Módulo separado para cobrança de cliente baseado em cargas e comissão.</Text>
+            <Text type="secondary">
+              Módulo separado para cobrança de cliente baseado em cargas e
+              comissão.
+            </Text>
           </Col>
           <Col>
             <Space>
@@ -384,7 +506,11 @@ export default function LoadBillingClosing() {
                 ))}
               </Select>
               {canCreate && (
-                <Button type="primary" onClick={openCreate} disabled={!selectedMonth}>
+                <Button
+                  type="primary"
+                  onClick={openCreate}
+                  disabled={!selectedMonth}
+                >
                   Novo Fechamento de Carga
                 </Button>
               )}
@@ -394,21 +520,50 @@ export default function LoadBillingClosing() {
       </Card>
 
       <Card style={{ marginTop: 16 }}>
-        {!selectedMonth && <Alert type="info" showIcon message="Selecione um mês para visualizar os fechamentos." />}
+        {!selectedMonth && (
+          <Alert
+            type="info"
+            showIcon
+            message="Selecione um mês para visualizar os fechamentos."
+          />
+        )}
         {selectedMonth && (
           <>
             <Row gutter={12} style={{ marginBottom: 12 }}>
-              <Col span={6}>
+              <Col span={4}>
                 <Statistic title="Total de Cargas" value={totals.loads} />
               </Col>
-              <Col span={6}>
-                <Statistic title="Valor Bruto" value={totals.gross} precision={2} suffix="R$" />
+              <Col span={5}>
+                <Statistic
+                  title="Valor Bruto"
+                  value={totals.gross}
+                  precision={2}
+                  suffix="R$"
+                />
               </Col>
-              <Col span={6}>
-                <Statistic title="Comissão a Cobrar" value={totals.commission} precision={2} suffix="R$" />
+              <Col span={5}>
+                <Statistic
+                  title="Comissão (s/ bruto)"
+                  value={totals.commission}
+                  precision={2}
+                  suffix="R$"
+                />
               </Col>
-              <Col span={6}>
-                <Statistic title="Valor a Cobrar" value={totals.billing} precision={2} suffix="R$" />
+              <Col span={5}>
+                <Statistic
+                  title="Custos adicionais"
+                  value={totals.additional}
+                  precision={2}
+                  suffix="R$"
+                />
+              </Col>
+              <Col span={5}>
+                <Statistic
+                  title="Valor a Cobrar"
+                  value={totals.billing}
+                  precision={2}
+                  suffix="R$"
+                />
               </Col>
             </Row>
             <Table
@@ -416,7 +571,9 @@ export default function LoadBillingClosing() {
               dataSource={rows}
               columns={columns}
               loading={loading}
-              locale={{ emptyText: "Nenhum fechamento de carga para o mês selecionado." }}
+              locale={{
+                emptyText: "Nenhum fechamento de carga para o mês selecionado.",
+              }}
               size="small"
               tableLayout="fixed"
               scroll={{ x: 900 }}
@@ -433,11 +590,23 @@ export default function LoadBillingClosing() {
         footer={null}
       >
         <Form form={form} layout="vertical" onFinish={onCreate}>
-          <Form.Item name="name" label="Nome" rules={[{ required: true, message: "Nome obrigatório" }]}>
+          <Form.Item
+            name="name"
+            label="Nome"
+            rules={[{ required: true, message: "Nome obrigatório" }]}
+          >
             <Input placeholder="Ex: Faturamento 1ª quinzena fev/2026" />
           </Form.Item>
-          <Form.Item name="companyId" label="Empresa" rules={[{ required: true, message: "Empresa obrigatória" }]}>
-            <Select placeholder="Selecione a empresa" showSearch optionFilterProp="children">
+          <Form.Item
+            name="companyId"
+            label="Empresa"
+            rules={[{ required: true, message: "Empresa obrigatória" }]}
+          >
+            <Select
+              placeholder="Selecione a empresa"
+              showSearch
+              optionFilterProp="children"
+            >
               {companies.map((c) => (
                 <Select.Option key={c.id} value={c.id}>
                   {c.name}
@@ -449,13 +618,17 @@ export default function LoadBillingClosing() {
             name="closingType"
             label="Tipo de Fechamento"
             initialValue="month"
-            rules={[{ required: true, message: "Selecione o tipo de fechamento" }]}
+            rules={[
+              { required: true, message: "Selecione o tipo de fechamento" },
+            ]}
           >
             <Select>
               <Select.Option value="month">Mês Completo</Select.Option>
               <Select.Option value="first_half">1ª Quinzena</Select.Option>
               <Select.Option value="second_half">2ª Quinzena</Select.Option>
-              <Select.Option value="custom">Período Personalizado</Select.Option>
+              <Select.Option value="custom">
+                Período Personalizado
+              </Select.Option>
             </Select>
           </Form.Item>
 
@@ -467,9 +640,17 @@ export default function LoadBillingClosing() {
                   <Form.Item
                     name="range"
                     label="Período Personalizado"
-                    rules={[{ required: true, message: "Selecione data inicial e final" }]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Selecione data inicial e final",
+                      },
+                    ]}
                   >
-                    <DatePicker.RangePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                    <DatePicker.RangePicker
+                      style={{ width: "100%" }}
+                      format="DD/MM/YYYY"
+                    />
                   </Form.Item>
                 );
               }
@@ -527,38 +708,90 @@ export default function LoadBillingClosing() {
         width={1100}
       >
         <Row justify="end" style={{ marginBottom: 10 }}>
-          <Button icon={<FilePdfOutlined />} type="primary" onClick={exportDetailPdf} disabled={!detail}>
+          <Button
+            icon={<FilePdfOutlined />}
+            type="primary"
+            onClick={exportDetailPdf}
+            disabled={!detail}
+          >
             Exportar PDF
           </Button>
         </Row>
-        <Card size="small" style={{ marginBottom: 12, background: "#fafcff", borderColor: "#e6f0ff" }}>
+        <Card
+          size="small"
+          style={{
+            marginBottom: 12,
+            background: "#fafcff",
+            borderColor: "#e6f0ff",
+          }}
+        >
           <Row gutter={12} align="middle">
             <Col span={24}>
               <Text type="secondary">
-                Empresa: <Text strong>{detail?.Company?.name || "-"}</Text> | Período:{" "}
+                Empresa: <Text strong>{detail?.Company?.name || "-"}</Text> |
+                Período:{" "}
                 <Text strong>
-                  {detail?.startDate ? dayjs(detail.startDate).format("DD/MM/YYYY") : "-"} até{" "}
-                  {detail?.endDate ? dayjs(detail.endDate).format("DD/MM/YYYY") : "-"}
+                  {detail?.startDate
+                    ? dayjs(detail.startDate).format("DD/MM/YYYY")
+                    : "-"}{" "}
+                  até{" "}
+                  {detail?.endDate
+                    ? dayjs(detail.endDate).format("DD/MM/YYYY")
+                    : "-"}
                 </Text>
               </Text>
             </Col>
           </Row>
           <Row gutter={12} style={{ marginTop: 12 }}>
-            <Col span={8}>
+            <Col span={6}>
               <Statistic title="Total Cargas" value={detail?.totalLoads || 0} />
             </Col>
-            <Col span={8}>
-              <Statistic title="Valor Bruto" value={detail?.totalGrossValue || 0} precision={2} suffix="R$" />
+            <Col span={6}>
+              <Statistic
+                title="Valor Bruto"
+                value={detail?.totalGrossValue || 0}
+                precision={2}
+                suffix="R$"
+              />
             </Col>
-            <Col span={8}>
-              <Statistic title="Comissão a Cobrar" value={detail?.billingTotal || 0} precision={2} suffix="R$" />
+            <Col span={6}>
+              <Statistic
+                title="Comissão (s/ bruto)"
+                value={detail?.totalCommission || 0}
+                precision={2}
+                suffix="R$"
+              />
+            </Col>
+            <Col span={6}>
+              <Statistic
+                title="Custos adicionais"
+                value={detail?.totalAdditionalCosts || 0}
+                precision={2}
+                suffix="R$"
+              />
+            </Col>
+          </Row>
+          <Row gutter={12} style={{ marginTop: 8 }}>
+            <Col span={24}>
+              <Statistic
+                title="Valor a cobrar (comissão + adicionais)"
+                value={detail?.billingTotal || 0}
+                precision={2}
+                suffix="R$"
+              />
             </Col>
           </Row>
           <Row style={{ marginTop: 8 }}>
             <Col span={24}>
               <Tag color="blue" style={{ padding: "4px 8px" }}>
-                Comissão: {toMoney(detail?.totalGrossValue)} x {toMoney(detail?.commissionRate)}% ={" "}
+                Comissão: {toMoney(detail?.totalGrossValue)} ×{" "}
+                {toMoney(detail?.commissionRate)}% ={" "}
                 <strong>{formatCurrency(detail?.totalCommission)}</strong>
+                {" · "}
+                Adicionais:{" "}
+                <strong>{formatCurrency(detail?.totalAdditionalCosts)}</strong>
+                {" · "}
+                Total: <strong>{formatCurrency(detail?.billingTotal)}</strong>
               </Tag>
             </Col>
           </Row>
@@ -572,7 +805,9 @@ export default function LoadBillingClosing() {
           tableLayout="fixed"
           scroll={{ x: 980, y: 420 }}
           pagination={{ pageSize: 12, showSizeChanger: false }}
-          locale={{ emptyText: "Nenhuma carga encontrada para este fechamento." }}
+          locale={{
+            emptyText: "Nenhuma carga encontrada para este fechamento.",
+          }}
         />
       </Modal>
     </div>

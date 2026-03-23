@@ -68,7 +68,14 @@ export default function LoadCompanies() {
   const mapLoadRow = (load: any) => {
     const totalValue = Number(load.totalValue || 0);
     const companyCommission = Number(load.Company?.commission || 0);
-    const commissionValue = Number(((totalValue * companyCommission) / 100).toFixed(2));
+    const commissionValue = Number(
+      ((totalValue * companyCommission) / 100).toFixed(2),
+    );
+    const frete4 = Number(load.freight4 ?? commissionValue);
+    const additionalCosts = Number(load.additionalCosts ?? 0);
+    const somaTotalFrete = Number(
+      load.totalFreight ?? frete4 + additionalCosts,
+    );
 
     return {
       key: load.id,
@@ -78,8 +85,9 @@ export default function LoadCompanies() {
       entregas: load.deliveries,
       pesoCarga: load.cargoWeight,
       valorTotal: totalValue,
-      frete4: commissionValue,
-      somaTotalFrete: Number(load.totalFreight || 0),
+      frete4,
+      additionalCosts,
+      somaTotalFrete,
       commissionRate: companyCommission,
       observacoes: load.observations || "",
       companyId: load.companyId,
@@ -114,11 +122,15 @@ export default function LoadCompanies() {
         totalValue: Number(newLoad.valorTotal),
         freight4: Number(newLoad.frete4),
         totalFreight: Number(newLoad.somaTotalFrete),
+        additionalCosts: Number(newLoad.additionalCosts ?? 0),
+        additionalCostsNote: newLoad.additionalCostsNote?.trim() || undefined,
         observations: newLoad.observacoes?.trim() || undefined,
       };
 
       await api.post("/loads", loadData);
-      message.success("Carga cadastrada! Preencha para adicionar outra ou clique em Cancelar para fechar.");
+      message.success(
+        "Carga cadastrada! Preencha para adicionar outra ou clique em Cancelar para fechar.",
+      );
       fetchAllLoads();
       // Mantém o modal aberto para cadastrar mais cargas
     } catch (error: any) {
@@ -138,6 +150,9 @@ export default function LoadCompanies() {
         totalValue: Number(updatedLoad.valorTotal),
         freight4: Number(updatedLoad.frete4),
         totalFreight: Number(updatedLoad.somaTotalFrete),
+        additionalCosts: Number(updatedLoad.additionalCosts ?? 0),
+        additionalCostsNote:
+          updatedLoad.additionalCostsNote?.trim() || undefined,
         observations: updatedLoad.observacoes?.trim() || undefined,
       };
 
@@ -331,6 +346,28 @@ export default function LoadCompanies() {
           .replace(".", ",")}`,
     },
     {
+      title: "Custos adicionais",
+      dataIndex: "additionalCosts",
+      key: "additionalCosts",
+      align: "right",
+      width: 110,
+      render: (value: number) =>
+        `R$ ${Number(value || 0)
+          .toFixed(2)
+          .replace(".", ",")}`,
+    },
+    {
+      title: "Total a cobrar",
+      dataIndex: "somaTotalFrete",
+      key: "somaTotalFrete",
+      align: "right",
+      width: 110,
+      render: (value: number) =>
+        `R$ ${Number(value || 0)
+          .toFixed(2)
+          .replace(".", ",")}`,
+    },
+    {
       title: "Comissão (%)",
       dataIndex: "commissionRate",
       key: "commissionRate",
@@ -462,6 +499,14 @@ export default function LoadCompanies() {
       ),
       totalFreight: filteredData.reduce(
         (sum, item) => sum + Number(item.frete4 || 0),
+        0,
+      ),
+      totalAdditional: filteredData.reduce(
+        (sum, item) => sum + Number(item.additionalCosts || 0),
+        0,
+      ),
+      totalToBill: filteredData.reduce(
+        (sum, item) => sum + Number(item.somaTotalFrete || 0),
         0,
       ),
       totalPeso: filteredData.reduce(
@@ -614,7 +659,31 @@ export default function LoadCompanies() {
             >
               R$ {totals.totalFreight.toFixed(2).replace(".", ",")}
             </div>
-            <div style={{ fontSize: "14px", color: "#666" }}>Comissão Total</div>
+            <div style={{ fontSize: "14px", color: "#666" }}>
+              Comissão (s/ valor)
+            </div>
+          </div>
+
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{ fontSize: "24px", fontWeight: "bold", color: "#eb2f96" }}
+            >
+              R$ {totals.totalAdditional.toFixed(2).replace(".", ",")}
+            </div>
+            <div style={{ fontSize: "14px", color: "#666" }}>
+              Custos adicionais
+            </div>
+          </div>
+
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{ fontSize: "24px", fontWeight: "bold", color: "#13c2c2" }}
+            >
+              R$ {totals.totalToBill.toFixed(2).replace(".", ",")}
+            </div>
+            <div style={{ fontSize: "14px", color: "#666" }}>
+              Total a cobrar
+            </div>
           </div>
 
           <div style={{ textAlign: "center" }}>
@@ -642,7 +711,7 @@ export default function LoadCompanies() {
             `${range[0]}-${range[1]} de ${total} cargas`,
         }}
         loading={loading}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1680 }}
         summary={() => (
           <Table.Summary.Row>
             <Table.Summary.Cell index={0} colSpan={4}>
@@ -670,7 +739,19 @@ export default function LoadCompanies() {
               </strong>
             </Table.Summary.Cell>
 
-            <Table.Summary.Cell index={7} colSpan={2} />
+            <Table.Summary.Cell index={7} align="right">
+              <strong>
+                R$ {totals.totalAdditional.toFixed(2).replace(".", ",")}
+              </strong>
+            </Table.Summary.Cell>
+
+            <Table.Summary.Cell index={8} align="right">
+              <strong>
+                R$ {totals.totalToBill.toFixed(2).replace(".", ",")}
+              </strong>
+            </Table.Summary.Cell>
+
+            <Table.Summary.Cell index={9} colSpan={2} />
           </Table.Summary.Row>
         )}
       />

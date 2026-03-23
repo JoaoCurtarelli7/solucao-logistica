@@ -1,4 +1,8 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fastify";
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+} from "../types/fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { Prisma } from "@prisma/client";
@@ -21,7 +25,11 @@ function dateRangeFromMonth(month: { year: number; month: number }) {
   return { start, end };
 }
 
-async function summarizeLoads(companyId: number, startDate: Date, endDate: Date) {
+async function summarizeLoads(
+  companyId: number,
+  startDate: Date,
+  endDate: Date,
+) {
   const company = await prisma.company.findUniqueOrThrow({
     where: { id: companyId },
     select: { id: true, commission: true, name: true, cnpj: true },
@@ -33,13 +41,24 @@ async function summarizeLoads(companyId: number, startDate: Date, endDate: Date)
   });
 
   const totalLoads = loads.length;
-  const totalGrossValue = loads.reduce((sum, l) => sum + (l.totalValue || 0), 0);
-  const totalFreight = loads.reduce((sum, l) => sum + (l.totalFreight || l.freight4 || 0), 0);
+  const totalGrossValue = loads.reduce(
+    (sum, l) => sum + (l.totalValue || 0),
+    0,
+  );
+  const totalFreight = loads.reduce(
+    (sum, l) => sum + (l.totalFreight || l.freight4 || 0),
+    0,
+  );
   const commissionRate = company.commission || 0;
-  // Regra comercial: comissão cobrada sobre o valor total das cargas no período.
+  // Comissão percentual sobre o valor bruto das cargas.
   const totalCommission = (totalGrossValue * commissionRate) / 100;
-  // Valor a cobrar do cliente neste módulo é a própria comissão.
-  const billingTotal = totalCommission;
+  const totalAdditionalCosts = loads.reduce(
+    (sum, l) =>
+      sum + ((l as { additionalCosts?: number }).additionalCosts || 0),
+    0,
+  );
+  // Valor total a cobrar: comissão + custos adicionais repassados (descarga, etc.).
+  const billingTotal = totalCommission + totalAdditionalCosts;
 
   return {
     company,
@@ -50,6 +69,7 @@ async function summarizeLoads(companyId: number, startDate: Date, endDate: Date)
       totalFreight,
       commissionRate,
       totalCommission,
+      totalAdditionalCosts,
       billingTotal,
     },
   };
@@ -58,19 +78,28 @@ async function summarizeLoads(companyId: number, startDate: Date, endDate: Date)
 export async function loadBillingClosingRoutes(app: FastifyInstance) {
   const normalizeClosingRow = (row: any) => ({
     ...row,
-    startDate: row?.startDate instanceof Date ? row.startDate : new Date(row?.startDate),
-    endDate: row?.endDate instanceof Date ? row.endDate : new Date(row?.endDate),
+    startDate:
+      row?.startDate instanceof Date ? row.startDate : new Date(row?.startDate),
+    endDate:
+      row?.endDate instanceof Date ? row.endDate : new Date(row?.endDate),
   });
 
   const tableHint =
     "Módulo de fechamento de cargas ainda não está migrado. Execute no backend: npx prisma migrate deploy && npx prisma generate";
 
   const resolveDbErrorMessage = (error: unknown, fallback: string) => {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2021") {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2021"
+    ) {
       return tableHint;
     }
     const msg = error instanceof Error ? error.message : String(error);
-    if (/relation .* does not exist|table .* does not exist|unknown table/i.test(msg)) {
+    if (
+      /relation .* does not exist|table .* does not exist|unknown table/i.test(
+        msg,
+      )
+    ) {
       return tableHint;
     }
     return fallback;
@@ -80,13 +109,23 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
 
   const withRelations = async (row: any) => {
     const [month, company] = await Promise.all([
-      prisma.month.findUnique({ where: { id: row.monthId }, select: { id: true, name: true, month: true, year: true } }),
-      prisma.company.findUnique({ where: { id: row.companyId }, select: { id: true, name: true, cnpj: true, commission: true } }),
+      prisma.month.findUnique({
+        where: { id: row.monthId },
+        select: { id: true, name: true, month: true, year: true },
+      }),
+      prisma.company.findUnique({
+        where: { id: row.companyId },
+        select: { id: true, name: true, cnpj: true, commission: true },
+      }),
     ]);
     return { ...row, Month: month, Company: company };
   };
 
-  const listClosings = async (filters: { monthId?: number; companyId?: number; status?: string }) => {
+  const listClosings = async (filters: {
+    monthId?: number;
+    companyId?: number;
+    status?: string;
+  }) => {
     if (hasGeneratedModel()) {
       return (prisma as any).loadBillingClosing.findMany({
         where: {
@@ -96,7 +135,9 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
         },
         include: {
           Month: { select: { id: true, name: true, month: true, year: true } },
-          Company: { select: { id: true, name: true, cnpj: true, commission: true } },
+          Company: {
+            select: { id: true, name: true, cnpj: true, commission: true },
+          },
         },
         orderBy: { createdAt: "desc" },
       });
@@ -120,8 +161,8 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     }
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `INSERT INTO "LoadBillingClosing"
-       ("monthId","companyId","name","startDate","endDate","status","totalLoads","totalGrossValue","totalFreight","commissionRate","totalCommission","billingTotal")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       ("monthId","companyId","name","startDate","endDate","status","totalLoads","totalGrossValue","totalFreight","commissionRate","totalCommission","totalAdditionalCosts","billingTotal")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING *`,
       data.monthId,
       data.companyId,
@@ -134,6 +175,7 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
       data.totalFreight ?? 0,
       data.commissionRate ?? 0,
       data.totalCommission ?? 0,
+      data.totalAdditionalCosts ?? 0,
       data.billingTotal ?? 0,
     );
     return normalizeClosingRow(rows[0]);
@@ -141,20 +183,26 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
 
   const findClosingOrThrow = async (id: number) => {
     if (hasGeneratedModel()) {
-      const row = await (prisma as any).loadBillingClosing.findUniqueOrThrow({ where: { id } });
+      const row = await (prisma as any).loadBillingClosing.findUniqueOrThrow({
+        where: { id },
+      });
       return normalizeClosingRow(row);
     }
-    const rows = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "LoadBillingClosing" WHERE "id" = $1 LIMIT 1`, id);
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT * FROM "LoadBillingClosing" WHERE "id" = $1 LIMIT 1`,
+      id,
+    );
     if (!rows[0]) throw new Error("NOT_FOUND");
     return normalizeClosingRow(rows[0]);
   };
 
   const updateClosing = async (id: number, data: any) => {
-    if (hasGeneratedModel()) return (prisma as any).loadBillingClosing.update({ where: { id }, data });
+    if (hasGeneratedModel())
+      return (prisma as any).loadBillingClosing.update({ where: { id }, data });
     const statusVal = data.status ?? null;
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `UPDATE "LoadBillingClosing"
-       SET "totalLoads"=$2,"totalGrossValue"=$3,"totalFreight"=$4,"commissionRate"=$5,"totalCommission"=$6,"billingTotal"=$7,"status"=COALESCE($8::text,"status"),"updatedAt"=CURRENT_TIMESTAMP
+       SET "totalLoads"=$2,"totalGrossValue"=$3,"totalFreight"=$4,"commissionRate"=$5,"totalCommission"=$6,"totalAdditionalCosts"=$7,"billingTotal"=$8,"status"=COALESCE($9::text,"status"),"updatedAt"=CURRENT_TIMESTAMP
        WHERE "id"=$1
        RETURNING *`,
       id,
@@ -163,6 +211,7 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
       data.totalFreight ?? 0,
       data.commissionRate ?? 0,
       data.totalCommission ?? 0,
+      data.totalAdditionalCosts ?? 0,
       data.billingTotal ?? 0,
       statusVal,
     );
@@ -197,7 +246,14 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
         return rep.send(rows);
       } catch (error) {
         app.log.error(error);
-        return rep.code(500).send({ message: resolveDbErrorMessage(error, "Erro ao listar fechamentos de carga") });
+        return rep
+          .code(500)
+          .send({
+            message: resolveDbErrorMessage(
+              error,
+              "Erro ao listar fechamentos de carga",
+            ),
+          });
       }
     },
   );
@@ -214,10 +270,18 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
         });
 
         const defaultRange = dateRangeFromMonth(month);
-        const startDate = data.startDate ? parseBrOrIsoDate(data.startDate) : defaultRange.start;
-        const endDate = data.endDate ? parseBrOrIsoDate(data.endDate) : defaultRange.end;
+        const startDate = data.startDate
+          ? parseBrOrIsoDate(data.startDate)
+          : defaultRange.start;
+        const endDate = data.endDate
+          ? parseBrOrIsoDate(data.endDate)
+          : defaultRange.end;
 
-        const { summary } = await summarizeLoads(data.companyId, startDate, endDate);
+        const { summary } = await summarizeLoads(
+          data.companyId,
+          startDate,
+          endDate,
+        );
 
         const createdBase = await createClosing({
           monthId: data.monthId,
@@ -233,9 +297,18 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
       } catch (error: any) {
         app.log.error(error);
         if (error?.code === "P2025") {
-          return rep.code(404).send({ message: "Mês ou empresa não encontrado" });
+          return rep
+            .code(404)
+            .send({ message: "Mês ou empresa não encontrado" });
         }
-        return rep.code(500).send({ message: resolveDbErrorMessage(error, "Erro ao criar fechamento de carga") });
+        return rep
+          .code(500)
+          .send({
+            message: resolveDbErrorMessage(
+              error,
+              "Erro ao criar fechamento de carga",
+            ),
+          });
       }
     },
   );
@@ -249,34 +322,42 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
         const closing = await findClosingOrThrow(id);
 
         if (closing.status === "fechado") {
-          return rep.code(400).send({ message: "Este fechamento de carga já foi finalizado" });
+          return rep
+            .code(400)
+            .send({ message: "Este fechamento de carga já foi finalizado" });
         }
 
-        const endDate = closing.endDate instanceof Date ? closing.endDate : new Date(closing.endDate);
+        const endDate =
+          closing.endDate instanceof Date
+            ? closing.endDate
+            : new Date(closing.endDate);
 
         // Buscar fechamento de caixa (Closing) para o mesmo mês e empresa
         const closings = await prisma.closing.findMany({
           where: {
             monthId: closing.monthId,
-            OR: [
-              { companyId: closing.companyId },
-              { companyId: null },
-            ],
+            OR: [{ companyId: closing.companyId }, { companyId: null }],
           },
           orderBy: { createdAt: "desc" },
         });
-        const targetClosing = closings.find((c) => c.companyId === closing.companyId)
-          ?? closings.find((c) => c.companyId === null);
+        const targetClosing =
+          closings.find((c) => c.companyId === closing.companyId) ??
+          closings.find((c) => c.companyId === null);
 
         if (!targetClosing) {
           return rep.code(400).send({
-            message: "Não existe fechamento de caixa para este mês/empresa. Crie um fechamento de caixa antes de finalizar.",
+            message:
+              "Não existe fechamento de caixa para este mês/empresa. Crie um fechamento de caixa antes de finalizar.",
           });
         }
 
         const amount = Number(closing.billingTotal ?? 0);
         if (amount <= 0) {
-          return rep.code(400).send({ message: "O valor a cobrar é zero. Não é possível finalizar." });
+          return rep
+            .code(400)
+            .send({
+              message: "O valor a cobrar é zero. Não é possível finalizar.",
+            });
         }
 
         // Atualizar status para fechado
@@ -287,6 +368,7 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
           totalFreight: closing.totalFreight,
           commissionRate: closing.commissionRate,
           totalCommission: closing.totalCommission,
+          totalAdditionalCosts: closing.totalAdditionalCosts ?? 0,
           billingTotal: closing.billingTotal,
         });
 
@@ -308,10 +390,15 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
       } catch (error: any) {
         app.log.error(error);
         if (error?.message === "NOT_FOUND") {
-          return rep.code(404).send({ message: "Fechamento de carga não encontrado" });
+          return rep
+            .code(404)
+            .send({ message: "Fechamento de carga não encontrado" });
         }
         return rep.code(500).send({
-          message: resolveDbErrorMessage(error, "Erro ao finalizar fechamento de carga"),
+          message: resolveDbErrorMessage(
+            error,
+            "Erro ao finalizar fechamento de carga",
+          ),
         });
       }
     },
@@ -324,16 +411,29 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
       try {
         const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
         const closing = await findClosingOrThrow(id);
-        const { summary } = await summarizeLoads(closing.companyId, closing.startDate, closing.endDate);
+        const { summary } = await summarizeLoads(
+          closing.companyId,
+          closing.startDate,
+          closing.endDate,
+        );
         const updatedBase = await updateClosing(id, summary);
         const updated = await withRelations(updatedBase);
         return rep.send(updated);
       } catch (error) {
         app.log.error(error);
         if (error instanceof Error && error.message === "NOT_FOUND") {
-          return rep.code(404).send({ message: "Fechamento de carga não encontrado" });
+          return rep
+            .code(404)
+            .send({ message: "Fechamento de carga não encontrado" });
         }
-        return rep.code(500).send({ message: resolveDbErrorMessage(error, "Erro ao recalcular fechamento de carga") });
+        return rep
+          .code(500)
+          .send({
+            message: resolveDbErrorMessage(
+              error,
+              "Erro ao recalcular fechamento de carga",
+            ),
+          });
       }
     },
   );
@@ -346,7 +446,11 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
         const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
         const closing = await withRelations(await findClosingOrThrow(id));
 
-        const { loads, summary } = await summarizeLoads(closing.companyId, closing.startDate, closing.endDate);
+        const { loads, summary } = await summarizeLoads(
+          closing.companyId,
+          closing.startDate,
+          closing.endDate,
+        );
         return rep.send({
           closing: {
             ...closing,
@@ -356,7 +460,14 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
         });
       } catch (error) {
         app.log.error(error);
-        return rep.code(500).send({ message: resolveDbErrorMessage(error, "Erro ao buscar dados do fechamento de carga") });
+        return rep
+          .code(500)
+          .send({
+            message: resolveDbErrorMessage(
+              error,
+              "Erro ao buscar dados do fechamento de carga",
+            ),
+          });
       }
     },
   );
