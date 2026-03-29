@@ -5,7 +5,6 @@ import type {
 } from "../types/fastify";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
-import crypto from "crypto";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { requirePermission } from "../middlewares/permissionMiddleware";
 import { hashPassword } from "../lib/auth";
@@ -307,24 +306,29 @@ export async function rbacRoutes(app: FastifyInstance) {
       const schema = z.object({
         name: z.string().min(2),
         email: z.string().email(),
-        roleId: z.number().optional(),
+        roleId: z.number(),
         status: z.enum(["active", "inactive"]).default("active"),
-        password: z.string().min(6).optional(),
+        password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
       });
       const body = schema.parse(req.body);
 
-      let roleId = body.roleId;
-      if (roleId == null) {
-        const adminRole = await prisma.role.findFirst({
-          where: { name: "Admin" },
-          select: { id: true },
-        });
-        roleId = adminRole?.id ?? body.roleId;
+      const emailTaken = await prisma.user.findUnique({
+        where: { email: body.email },
+        select: { id: true },
+      });
+      if (emailTaken) {
+        return rep.code(400).send({ message: "E-mail já está em uso" });
       }
 
-      const tempPassword =
-        body.password ?? crypto.randomBytes(9).toString("base64url"); // ~12 chars
-      const hashed = await hashPassword(tempPassword);
+      const role = await prisma.role.findUnique({
+        where: { id: body.roleId },
+        select: { id: true },
+      });
+      if (!role) {
+        return rep.code(400).send({ message: "Perfil (role) inválido" });
+      }
+
+      const hashed = await hashPassword(body.password);
 
       const user = await prisma.user.create({
         data: {
@@ -332,7 +336,7 @@ export async function rbacRoutes(app: FastifyInstance) {
           email: body.email,
           password: hashed,
           status: body.status,
-          roleId: roleId!,
+          roleId: body.roleId,
         },
         select: {
           id: true,
@@ -347,11 +351,9 @@ export async function rbacRoutes(app: FastifyInstance) {
       await logAudit(req.user?.id, "users.create", {
         userId: user.id,
         email: user.email,
-        roleId: roleId,
+        roleId: body.roleId,
       });
-      return rep
-        .code(201)
-        .send({ user, tempPassword: body.password ? undefined : tempPassword });
+      return rep.code(201).send({ user });
     },
   );
 

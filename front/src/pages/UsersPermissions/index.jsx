@@ -320,10 +320,13 @@ export default function UsersPermissions() {
   const openCreateUser = () => {
     setEditingUser(null);
     userForm.resetFields();
-    const adminRole = roles.find((r) => r.name === "Admin");
+    const userRole = roles.find((r) => r.name === "User");
     userForm.setFieldsValue({
       status: "active",
-      roleId: adminRole?.id ?? roles[0]?.id,
+      roleId:
+        userRole?.id ??
+        roles.find((r) => r.name !== "Admin")?.id ??
+        roles[0]?.id,
     });
     setUserModalOpen(true);
   };
@@ -346,28 +349,11 @@ export default function UsersPermissions() {
         await api.put(`/admin/users/${editingUser.id}`, values);
         message.success("Usuário atualizado com sucesso");
       } else {
-        const res = await api.post("/admin/users", values);
-        message.success("Usuário criado com sucesso");
-        if (res.data?.tempPassword) {
-          Modal.info({
-            title: "Senha temporária do novo usuário",
-            content: (
-              <Descriptions column={1} size="small" bordered>
-                <Descriptions.Item label="E-mail">
-                  {res.data.user.email}
-                </Descriptions.Item>
-                <Descriptions.Item label="Senha temporária">
-                  <Text code copyable>
-                    {res.data.tempPassword}
-                  </Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="Observação">
-                  Envie essa senha ao usuário e peça para ele trocar depois.
-                </Descriptions.Item>
-              </Descriptions>
-            ),
-          });
-        }
+        const { confirmPassword, ...payload } = values;
+        await api.post("/admin/users", payload);
+        message.success(
+          "Usuário criado com sucesso. Ele já pode entrar com o e-mail e a senha definidos.",
+        );
       }
       setUserModalOpen(false);
       await loadUsers();
@@ -1034,6 +1020,40 @@ export default function UsersPermissions() {
               ]}
             />
           </Form.Item>
+          {!editingUser && (
+            <>
+              <Form.Item
+                name="password"
+                label="Senha inicial"
+                rules={[
+                  { required: true, message: "Defina a senha de acesso" },
+                  { min: 6, message: "Mínimo 6 caracteres" },
+                ]}
+              >
+                <Input.Password placeholder="Senha para o primeiro login" />
+              </Form.Item>
+              <Form.Item
+                name="confirmPassword"
+                label="Confirmar senha"
+                dependencies={["password"]}
+                rules={[
+                  { required: true, message: "Confirme a senha" },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue("password") === value) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(
+                        new Error("As senhas não coincidem"),
+                      );
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password placeholder="Repita a senha" />
+              </Form.Item>
+            </>
+          )}
         </Form>
       </Modal>
 

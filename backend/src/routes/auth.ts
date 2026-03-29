@@ -114,12 +114,28 @@ async function ensureUserRoleExists(): Promise<{ id: number }> {
   return { id: userRole.id };
 }
 
+/** Garante Admin completo e perfil User básico (para o admin criar demais usuários). */
+async function ensureDefaultRolesForBootstrap(): Promise<void> {
+  await ensureAdminRoleExists();
+  await ensureUserRoleExists();
+}
+
 export async function authRoutes(app: FastifyInstance) {
   const loginSchema = z.object({
     email: z.string().email(),
     password: z.string(),
   });
 
+  /** Indica se ainda não existe usuário (permite apenas o cadastro do primeiro admin). */
+  app.get("/auth/bootstrap-status", async (_req: FastifyRequest, rep: FastifyReply) => {
+    const count = await prisma.user.count();
+    return rep.send({ firstUserSetup: count === 0 });
+  });
+
+  /**
+   * Cadastro público desativado.
+   * Só permitido quando não existe nenhum usuário (bootstrap do primeiro administrador).
+   */
   app.post("/register", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const bodySchema = z.object({
@@ -130,14 +146,24 @@ export async function authRoutes(app: FastifyInstance) {
 
       const { name, email, password } = bodySchema.parse(req.body);
 
+      const userCount = await prisma.user.count();
+      if (userCount > 0) {
+        return rep.code(403).send({
+          message:
+            "Cadastro público desativado. Peça a um administrador para criar sua conta.",
+        });
+      }
+
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         return rep.code(400).send({ message: "E-mail já está em uso" });
       }
 
-      await ensureAdminRoleExists();
+      await ensureDefaultRolesForBootstrap();
       const adminRole = await prisma.role.findFirst({ where: { name: "Admin" } });
-      const roleToAssign = adminRole!;
+      if (!adminRole) {
+        return rep.code(500).send({ message: "Perfil Admin não encontrado após bootstrap" });
+      }
 
       const hashedPassword = await hashPassword(password);
 
@@ -146,18 +172,18 @@ export async function authRoutes(app: FastifyInstance) {
           name,
           email,
           password: hashedPassword,
-          roleId: roleToAssign.id,
+          roleId: adminRole.id,
           status: "active",
         },
       });
 
-      console.log("✅ Usuário criado com perfil Admin:", {
+      console.log("✅ Primeiro usuário do sistema (Admin):", {
         id: newUser.id,
         email: newUser.email,
       });
 
       return rep.code(201).send({
-        message: "Cadastro realizado! Você foi criado com perfil Admin.",
+        message: "Primeiro administrador criado. Você pode fazer login.",
         user: {
           id: newUser.id,
           name: newUser.name,
