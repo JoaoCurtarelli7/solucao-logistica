@@ -5,6 +5,14 @@
   position: relative;
 }
 
+/* Login em tela cheia (evita coluna “vazia” no flex) */
+.layout--login {
+  display: block;
+  width: 100%;
+  min-height: 100vh;
+  height: auto;
+}
+
 .layout-content {
   flex: 1;
   margin-left: 0;

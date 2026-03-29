@@ -10,7 +10,7 @@ export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="layout">
+    <div className={`layout${isLoginPage ? ' layout--login' : ''}`}>
       {!isLoginPage ? (
         <>
           <button

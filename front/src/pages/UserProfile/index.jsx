@@ -1,31 +1,31 @@
 import React, { useState, useEffect } from 'react'
 import {
-    Card,
-    Row,
-    Col,
-    Form,
-    Input,
-    Button,
-    Typography,
-    message, Divider,
-    Statistic,
-    Space,
-    Alert,
-    Spin,
-    Tag
+  Card,
+  Row,
+  Col,
+  Form,
+  Input,
+  Button,
+  Typography,
+  message, Divider,
+  Statistic,
+  Space,
+  Alert,
+  Spin,
+  Tag
 } from 'antd'
 import {
-    UserOutlined,
-    MailOutlined,
-    PhoneOutlined,
-    HomeOutlined,
-    CalendarOutlined,
-    EditOutlined,
-    SaveOutlined,
-    CloseOutlined,
-    LockOutlined,
-    CheckCircleOutlined,
-    InfoCircleOutlined
+  UserOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  HomeOutlined,
+  CalendarOutlined,
+  EditOutlined,
+  SaveOutlined,
+  CloseOutlined,
+  LockOutlined,
+  CheckCircleOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons'
 import { useUserContext } from '../../context/userContext'
 import api from '../../lib/api'
@@ -222,7 +222,7 @@ export default function UserProfile() {
                     >
                       <Input 
                         prefix={<MailOutlined />}
-                        placeholder="seu@email.com"
+                        placeholder="E-mail"
                         size="large"
                       />
                     </Form.Item>

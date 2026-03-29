@@ -14,6 +14,8 @@ import {
   ToolOutlined,
   CalendarOutlined,
   SettingOutlined,
+  LogoutOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import { useUserContext } from "../../context/userContext";
 import { usePermission } from "../../hooks/usePermission";
@@ -36,7 +38,7 @@ export default function AppSidebar({ open = false, onClose }) {
     },
     {
       key: "gestao",
-      icon: <UserOutlined />,
+      icon: <TeamOutlined />,
       label: "Gestão",
       children: [
         ...(hasPermission("users.manage")
@@ -45,7 +47,7 @@ export default function AppSidebar({ open = false, onClose }) {
                 key: "/users-permissions",
                 icon: <SafetyOutlined />,
                 label: (
-                  <Link to="/users-permissions">Usuários & Permissões</Link>
+                  <Link to="/users-permissions">Usuários &amp; Permissões</Link>
                 ),
               },
             ]
@@ -60,7 +62,9 @@ export default function AppSidebar({ open = false, onClose }) {
               {
                 key: "/load-billing-closings",
                 icon: <CalculatorOutlined />,
-                label: <Link to="/load-billing-closings">Fechamento de Cargas</Link>,
+                label: (
+                  <Link to="/load-billing-closings">Fechamento de Cargas</Link>
+                ),
               },
             ]
           : []),
@@ -94,7 +98,7 @@ export default function AppSidebar({ open = false, onClose }) {
               {
                 key: "/load",
                 icon: <ShoppingCartOutlined />,
-                label: <Link to="/load">Cargas/Pedidos</Link>,
+                label: <Link to="/load">Cargas / Pedidos</Link>,
               },
             ]
           : []),
@@ -119,7 +123,9 @@ export default function AppSidebar({ open = false, onClose }) {
               {
                 key: "/maintenance/months",
                 icon: <CalendarOutlined />,
-                label: <Link to="/maintenance/months">Cadastro de Meses</Link>,
+                label: (
+                  <Link to="/maintenance/months">Cadastro de Meses</Link>
+                ),
               },
             ]
           : []),
@@ -128,7 +134,11 @@ export default function AppSidebar({ open = false, onClose }) {
               {
                 key: "/maintenance/services",
                 icon: <SettingOutlined />,
-                label: <Link to="/maintenance/services">Cadastro de Serviços</Link>,
+                label: (
+                  <Link to="/maintenance/services">
+                    Cadastro de Serviços
+                  </Link>
+                ),
               },
             ]
           : []),
@@ -152,6 +162,7 @@ export default function AppSidebar({ open = false, onClose }) {
 
   return (
     <div className={`sidebar ${open ? "sidebar-open" : ""}`}>
+      {/* ── Header ── */}
       <div className="sidebar-header">
         <button
           type="button"
@@ -161,24 +172,46 @@ export default function AppSidebar({ open = false, onClose }) {
         >
           <CloseOutlined />
         </button>
-        <h2>🚛 Solução Logística</h2>
-        <p>Olá, {userContext?.name || "Usuário"}</p>
+
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-mark">
+            <TruckOutlined />
+          </div>
+          <div>
+            <span className="sidebar-eyebrow">Gestão operacional</span>
+            <p className="sidebar-brand-name">Solução Logística</p>
+          </div>
+        </div>
+
+        <div className="sidebar-user-row">
+          <div className="sidebar-user-avatar">
+            <UserOutlined />
+          </div>
+          <span className="sidebar-user-name">
+            {userContext?.name || "Usuário"}
+          </span>
+        </div>
       </div>
 
-      <Menu
-        mode="inline"
-        selectedKeys={[location.pathname]}
-        defaultOpenKeys={["gestao", "operacoes", "manutencao"]}
-        items={menuItems}
-        className="sidebar-menu"
-        onClick={onClose}
-      />
+      {/* ── Menu ── */}
+      <div className="sidebar-menu">
+        <Menu
+          mode="inline"
+          selectedKeys={[location.pathname]}
+          defaultOpenKeys={["gestao", "operacoes", "manutencao"]}
+          items={menuItems}
+          onClick={onClose}
+        />
+      </div>
 
-      <div className="sidebar-footer" onClick={() => onClose?.()}>
-        <Link to="/user-profile" className="footer-link">
-          <UserOutlined /> Perfil
+      {/* ── Footer ── */}
+      <div className="sidebar-footer">
+        <Link to="/user-profile" className="footer-link" onClick={onClose}>
+          <UserOutlined />
+          Meu Perfil
         </Link>
         <button onClick={handleLogout} className="logout-btn">
+          <LogoutOutlined />
           Sair
         </button>
       </div>
