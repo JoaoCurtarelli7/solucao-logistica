@@ -30,23 +30,47 @@ function parseDateToDate(input) {
         return maybe;
     throw new Error(`Formato de data inválido: ${str}. Use DD/MM/YYYY ou YYYY-MM-DD`);
 }
+function parseOptionalDate(input) {
+    if (input === undefined || input === null || input === "")
+        return null;
+    try {
+        return parseDateToDate(input);
+    }
+    catch {
+        return null;
+    }
+}
+/** Aceita string ISO, YYYY-MM-DD, DD/MM/YYYY, Date ou vazio (null no banco). */
+const optionalDateSchema = zod_1.z.preprocess((val) => {
+    if (val === undefined || val === null || val === "")
+        return null;
+    if (val instanceof Date)
+        return val;
+    return val;
+}, zod_1.z.union([zod_1.z.string(), zod_1.z.date()]).nullable().transform((val) => parseOptionalDate(val)));
+const truckUpdateShape = {
+    name: zod_1.z.string().min(1, "Nome é obrigatório"),
+    plate: zod_1.z.string().min(1, "Placa é obrigatória"),
+    brand: zod_1.z.string().min(1, "Marca é obrigatória"),
+    year: zod_1.z.coerce.number().min(1900, "Ano deve ser válido"),
+    docExpiry: zod_1.z.union([zod_1.z.string(), zod_1.z.date()]).transform((val) => {
+        if (val instanceof Date)
+            return val;
+        return parseDateToDate(val);
+    }),
+    insuranceExpiry: optionalDateSchema,
+    tachographCalibrationExpiry: optionalDateSchema,
+    oilChangeEngineDate: optionalDateSchema,
+    oilChangeGearboxDate: optionalDateSchema,
+    oilChangeDifferentialDate: optionalDateSchema,
+    renavam: zod_1.z.string().min(1, "Renavam é obrigatório"),
+    image: zod_1.z.union([zod_1.z.string(), zod_1.z.null()]).optional().transform((v) => (v === null || v === "" ? null : v)),
+};
 async function truckRoutes(app) {
     const paramsSchema = zod_1.z.object({
         id: zod_1.z.coerce.number(),
     });
-    const truckBodySchema = zod_1.z.object({
-        name: zod_1.z.string().min(1, "Nome é obrigatório"),
-        plate: zod_1.z.string().min(1, "Placa é obrigatória"),
-        brand: zod_1.z.string().min(1, "Marca é obrigatória"),
-        year: zod_1.z.coerce.number().min(1900, "Ano deve ser válido"),
-        docExpiry: zod_1.z.union([zod_1.z.string(), zod_1.z.date()]).transform((val) => {
-            if (val instanceof Date)
-                return val;
-            return parseDateToDate(val);
-        }),
-        renavam: zod_1.z.string().min(1, "Renavam é obrigatório"),
-        image: zod_1.z.string().optional(),
-    });
+    const truckBodySchema = zod_1.z.object(truckUpdateShape);
     const maintenanceBodySchema = zod_1.z.object({
         date: zod_1.z.string().transform((str) => new Date(str)),
         service: zod_1.z.string().min(1, "Serviço é obrigatório"),
@@ -193,7 +217,22 @@ async function truckRoutes(app) {
             if (existingTruck) {
                 return rep.code(400).send({ message: "Já existe um caminhão com esta placa" });
             }
-            const truck = await prisma_1.prisma.truck.create({ data });
+            const truck = await prisma_1.prisma.truck.create({
+                data: {
+                    name: data.name,
+                    plate: data.plate,
+                    brand: data.brand,
+                    year: data.year,
+                    docExpiry: data.docExpiry,
+                    renavam: data.renavam,
+                    image: data.image === undefined ? null : data.image,
+                    insuranceExpiry: data.insuranceExpiry,
+                    tachographCalibrationExpiry: data.tachographCalibrationExpiry,
+                    oilChangeEngineDate: data.oilChangeEngineDate,
+                    oilChangeGearboxDate: data.oilChangeGearboxDate,
+                    oilChangeDifferentialDate: data.oilChangeDifferentialDate,
+                },
+            });
             return rep.code(201).send(truck);
         }
         catch (error) {
@@ -231,7 +270,23 @@ async function truckRoutes(app) {
             if (existingTruck) {
                 return rep.code(400).send({ message: "Já existe um caminhão com esta placa" });
             }
-            const truck = await prisma_1.prisma.truck.update({ where: { id }, data });
+            const truck = await prisma_1.prisma.truck.update({
+                where: { id },
+                data: {
+                    name: data.name,
+                    plate: data.plate,
+                    brand: data.brand,
+                    year: data.year,
+                    docExpiry: data.docExpiry,
+                    renavam: data.renavam,
+                    ...(data.image !== undefined ? { image: data.image } : {}),
+                    insuranceExpiry: data.insuranceExpiry,
+                    tachographCalibrationExpiry: data.tachographCalibrationExpiry,
+                    oilChangeEngineDate: data.oilChangeEngineDate,
+                    oilChangeGearboxDate: data.oilChangeGearboxDate,
+                    oilChangeDifferentialDate: data.oilChangeDifferentialDate,
+                },
+            });
             return truck;
         }
         catch (error) {

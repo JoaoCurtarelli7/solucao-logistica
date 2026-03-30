@@ -127,10 +127,13 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   /** Indica se ainda não existe usuário (permite apenas o cadastro do primeiro admin). */
-  app.get("/auth/bootstrap-status", async (_req: FastifyRequest, rep: FastifyReply) => {
-    const count = await prisma.user.count();
-    return rep.send({ firstUserSetup: count === 0 });
-  });
+  app.get(
+    "/auth/bootstrap-status",
+    async (_req: FastifyRequest, rep: FastifyReply) => {
+      const count = await prisma.user.count();
+      return rep.send({ firstUserSetup: count === 0 });
+    },
+  );
 
   /**
    * Cadastro público desativado.
@@ -160,9 +163,13 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       await ensureDefaultRolesForBootstrap();
-      const adminRole = await prisma.role.findFirst({ where: { name: "Admin" } });
+      const adminRole = await prisma.role.findFirst({
+        where: { name: "Admin" },
+      });
       if (!adminRole) {
-        return rep.code(500).send({ message: "Perfil Admin não encontrado após bootstrap" });
+        return rep
+          .code(500)
+          .send({ message: "Perfil Admin não encontrado após bootstrap" });
       }
 
       const hashedPassword = await hashPassword(password);

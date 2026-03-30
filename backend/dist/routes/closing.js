@@ -4,12 +4,13 @@ exports.closingRoutes = closingRoutes;
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
+const permissionMiddleware_1 = require("../middlewares/permissionMiddleware");
 async function closingRoutes(app) {
     app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // Schema para validação de fechamento
     const createClosingSchema = zod_1.z.object({
         monthId: zod_1.z.number(),
-        companyId: zod_1.z.number().optional(),
+        companyId: zod_1.z.preprocess((v) => (v === "" || v === undefined || v === "null" ? undefined : Number(v)), zod_1.z.number().nullable().optional()),
         name: zod_1.z.string().min(1, "Nome do fechamento é obrigatório"),
         startDate: zod_1.z.string().nullable().optional().transform((str) => {
             if (!str)
@@ -45,7 +46,7 @@ async function closingRoutes(app) {
         status: zod_1.z.enum(["aberto", "fechado", "cancelado"]).optional(),
     });
     // Listar fechamentos
-    app.get("/closings", async (req, rep) => {
+    app.get("/closings", { preHandler: (0, permissionMiddleware_1.requirePermission)("closings.view") }, async (req, rep) => {
         try {
             const { monthId, companyId, status } = req.query;
             let whereClause = {};
@@ -76,20 +77,75 @@ async function closingRoutes(app) {
                             cnpj: true,
                         },
                     },
+                    FinancialEntry: {
+                        select: { type: true, amount: true },
+                    },
                 },
                 orderBy: {
                     createdAt: 'desc',
                 },
             });
-            // Formatar resposta para manter compatibilidade com o frontend
-            const formattedClosings = closings.map(c => ({
-                ...c,
-                monthName: c.Month?.name,
-                monthYear: c.Month?.year,
-                monthNumber: c.Month?.month,
-                companyName: c.Company?.name,
-                companyCnpj: c.Company?.cnpj,
-            }));
+            // Calcular total de salários por mês (base + créditos - débitos) para incluir nas saídas
+            const salaryByMonth = new Map();
+            const uniqueMonths = new Map();
+            for (const c of closings) {
+                const m = c.Month;
+                if (m?.year != null && m?.month != null) {
+                    uniqueMonths.set(`${m.year}-${m.month}`, { year: m.year, month: m.month });
+                }
+            }
+            for (const [, { year, month }] of uniqueMonths) {
+                const startOfMonth = new Date(year, month - 1, 1, 0, 0, 0, 0);
+                const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+                const employees = await prisma_1.prisma.employee.findMany({
+                    where: { status: "Ativo" },
+                    include: {
+                        Transaction: {
+                            where: { date: { gte: startOfMonth, lte: endOfMonth } },
+                        },
+                    },
+                });
+                let total = 0;
+                for (const emp of employees) {
+                    const credits = (emp.Transaction ?? [])
+                        .filter((t) => t.type === "Crédito" || t.type === "Credito")
+                        .reduce((s, t) => s + Number(t.amount || 0), 0);
+                    const debits = (emp.Transaction ?? [])
+                        .filter((t) => t.type === "Débito" || t.type === "Debito")
+                        .reduce((s, t) => s + Number(t.amount || 0), 0);
+                    const finalSalary = Number(emp.baseSalary || 0) + credits - debits;
+                    if (finalSalary > 0)
+                        total += finalSalary;
+                }
+                salaryByMonth.set(`${year}-${month}`, total);
+            }
+            const formattedClosings = closings.map((c) => {
+                const entries = c.FinancialEntry || [];
+                const entriesSaida = entries.filter((e) => e.category !== "Salários");
+                const totalEntries = entries.filter((e) => e.type === "entrada").reduce((s, e) => s + e.amount, 0);
+                let totalExpenses = entriesSaida.filter((e) => e.type === "saida").reduce((s, e) => s + e.amount, 0);
+                const m = c.Month;
+                if (m?.year != null && m?.month != null) {
+                    totalExpenses += salaryByMonth.get(`${m.year}-${m.month}`) ?? 0;
+                }
+                const totalTaxes = entries.filter((e) => e.type === "imposto").reduce((s, e) => s + e.amount, 0);
+                const balance = totalEntries - totalExpenses - totalTaxes;
+                const profitMargin = totalEntries > 0 ? (balance / totalEntries) * 100 : 0;
+                const { FinancialEntry, ...rest } = c;
+                return {
+                    ...rest,
+                    monthName: c.Month?.name,
+                    monthYear: c.Month?.year,
+                    monthNumber: c.Month?.month,
+                    companyName: c.Company?.name,
+                    companyCnpj: c.Company?.cnpj,
+                    totalEntries,
+                    totalExpenses,
+                    totalTaxes,
+                    balance,
+                    profitMargin,
+                };
+            });
             return rep.send(formattedClosings);
         }
         catch (error) {
@@ -100,7 +156,7 @@ async function closingRoutes(app) {
         }
     });
     // Obter fechamento específico
-    app.get("/closings/:id", async (req, rep) => {
+    app.get("/closings/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("closings.view") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             const closing = await prisma_1.prisma.closing.findUnique({
@@ -136,9 +192,11 @@ async function closingRoutes(app) {
         }
     });
     // Criar novo fechamento
-    app.post("/closings", async (req, rep) => {
+    app.post("/closings", { preHandler: (0, permissionMiddleware_1.requirePermission)("closings.create") }, async (req, rep) => {
         try {
             const data = createClosingSchema.parse(req.body);
+            // Garantir companyId null quando não informado (Todas as empresas)
+            const companyId = data.companyId === undefined ? null : data.companyId;
             // Verificar se o mês existe
             const month = await prisma_1.prisma.month.findUnique({
                 where: { id: data.monthId },
@@ -146,19 +204,26 @@ async function closingRoutes(app) {
             if (!month) {
                 return rep.code(404).send({ message: "Mês não encontrado" });
             }
-            // Verificar se a empresa existe (se fornecida)
-            if (data.companyId) {
-                const company = await prisma_1.prisma.company.findUnique({
-                    where: { id: data.companyId },
+            // Verificar se a empresa existe (se fornecida) e obter dados (inclui comissão)
+            let company = null;
+            if (companyId != null) {
+                const foundCompany = await prisma_1.prisma.company.findUnique({
+                    where: { id: companyId },
+                    select: {
+                        id: true,
+                        name: true,
+                        commission: true,
+                    },
                 });
-                if (!company) {
+                if (!foundCompany) {
                     return rep.code(404).send({ message: "Empresa não encontrada" });
                 }
+                company = foundCompany;
             }
             // Criar fechamento usando Prisma ORM em vez de SQL bruto
             const closingData = {
                 monthId: data.monthId,
-                companyId: data.companyId || null,
+                companyId,
                 name: data.name,
                 status: 'aberto',
                 startDate: data.startDate || null,
@@ -188,6 +253,10 @@ async function closingRoutes(app) {
         }
         catch (error) {
             console.error("Erro ao criar fechamento:", error);
+            if (error?.name === "ZodError" && error?.errors) {
+                const msg = error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ");
+                return rep.code(400).send({ message: msg });
+            }
             return rep.code(500).send({
                 message: "Erro interno do servidor",
                 error: error instanceof Error ? error.message : "Erro desconhecido"
@@ -195,7 +264,7 @@ async function closingRoutes(app) {
         }
     });
     // Atualizar fechamento
-    app.put("/closings/:id", async (req, rep) => {
+    app.put("/closings/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("closings.update") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             const data = updateClosingSchema.parse(req.body);
@@ -237,7 +306,7 @@ async function closingRoutes(app) {
         }
     });
     // Deletar fechamento
-    app.delete("/closings/:id", async (req, rep) => {
+    app.delete("/closings/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("closings.delete") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             // Verificar se o fechamento existe
@@ -326,7 +395,7 @@ async function closingRoutes(app) {
         }
     });
     // Reabrir fechamento
-    app.post("/closings/:id/reopen", async (req, rep) => {
+    app.post("/closings/:id/reopen", { preHandler: (0, permissionMiddleware_1.requirePermission)("closings.update") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             const closing = await prisma_1.prisma.closing.findUnique({
@@ -377,12 +446,13 @@ async function closingRoutes(app) {
         }
     });
     // Obter entradas financeiras de um fechamento
-    app.get("/closings/:id/entries", async (req, rep) => {
+    app.get("/closings/:id/entries", { preHandler: (0, permissionMiddleware_1.requirePermission)("closings.view") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             const closing = await prisma_1.prisma.closing.findUnique({
                 where: { id },
                 include: {
+                    Month: { select: { id: true, year: true, month: true } },
                     FinancialEntry: {
                         include: {
                             Company: {
@@ -400,6 +470,54 @@ async function closingRoutes(app) {
             if (!closing) {
                 return rep.code(404).send({ message: "Fechamento não encontrado" });
             }
+            // Salários: usar o mês do fechamento (Month) para pegar créditos/débitos corretos
+            const salaryEntries = [];
+            const monthData = closing.Month;
+            const targetYear = monthData?.year;
+            const targetMonth = monthData?.month;
+            if (targetYear != null && targetMonth != null) {
+                const startOfMonth = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0);
+                const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+                const employees = await prisma_1.prisma.employee.findMany({
+                    where: { status: "Ativo" },
+                    include: {
+                        Transaction: {
+                            where: {
+                                date: { gte: startOfMonth, lte: endOfMonth },
+                            },
+                        },
+                    },
+                });
+                for (const emp of employees) {
+                    const credits = (emp.Transaction ?? [])
+                        .filter((t) => (t.type === "Crédito" || t.type === "Credito"))
+                        .reduce((s, t) => s + Number(t.amount || 0), 0);
+                    const debits = (emp.Transaction ?? [])
+                        .filter((t) => (t.type === "Débito" || t.type === "Debito"))
+                        .reduce((s, t) => s + Number(t.amount || 0), 0);
+                    const finalSalary = Number(emp.baseSalary || 0) + credits - debits;
+                    if (finalSalary > 0) {
+                        salaryEntries.push({
+                            id: `salary-${emp.id}`,
+                            description: `Salário - ${emp.name} (${targetMonth.toString().padStart(2, "0")}/${targetYear})`,
+                            amount: finalSalary,
+                            category: "Salários",
+                            date: endOfMonth,
+                            type: "saida",
+                            observations: null,
+                            closingId: closing.id,
+                            companyId: null,
+                            _isComputed: true,
+                            Company: null,
+                        });
+                    }
+                }
+            }
+            const manualEntries = (closing.FinancialEntry ?? []).filter((e) => e.category !== "Salários");
+            const allEntries = [
+                ...manualEntries,
+                ...salaryEntries,
+            ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             return rep.send({
                 closing: {
                     id: closing.id,
@@ -413,7 +531,7 @@ async function closingRoutes(app) {
                     balance: closing.balance,
                     profitMargin: closing.profitMargin,
                 },
-                entries: closing.FinancialEntry,
+                entries: allEntries,
             });
         }
         catch (error) {
@@ -422,7 +540,7 @@ async function closingRoutes(app) {
         }
     });
     // Obter estatísticas do fechamento
-    app.get("/closings/:id/stats", async (req, rep) => {
+    app.get("/closings/:id/stats", { preHandler: (0, permissionMiddleware_1.requirePermission)("closings.view") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             const closing = await prisma_1.prisma.closing.findUnique({

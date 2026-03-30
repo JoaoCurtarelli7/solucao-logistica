@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -12,18 +12,18 @@ model Closing {
   monthId        Int
   companyId      Int?
   name           String
-  startDate      DateTime?        @db.Timestamptz(6)
-  endDate        DateTime?        @db.Timestamptz(6)
+  startDate      DateTime?
+  endDate        DateTime?
   status         String           @default("aberto")
   totalEntries   Float            @default(0)
   totalExpenses  Float            @default(0)
   totalTaxes     Float            @default(0)
   balance        Float            @default(0)
   profitMargin   Float            @default(0)
-  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime         @default(now()) @db.Timestamptz(6)
-  Company        Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_closing_company")
-  Month          Month            @relation(fields: [monthId], references: [id], onDelete: Cascade, map: "fk_closing_month")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now())
+  Company        Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  Month          Month            @relation(fields: [monthId], references: [id], onDelete: Cascade)
   FinancialEntry FinancialEntry[]
 
   @@index([companyId], map: "idx_closing_companyId")
@@ -31,19 +31,19 @@ model Closing {
 }
 
 model Company {
-  id               Int               @id @default(autoincrement())
-  name             String
-  type             String
-  cnpj             String            @unique
-  dateRegistration DateTime          @db.Timestamptz(6)
-  status           String
-  responsible      String
-  commission       Float
-  Closing          Closing[]
+  id                 Int                  @id @default(autoincrement())
+  name               String
+  type               String
+  cnpj               String               @unique
+  dateRegistration   DateTime
+  status             String
+  responsible        String
+  commission         Float
+  Closing            Closing[]
   LoadBillingClosing LoadBillingClosing[]
-  FinancialEntry   FinancialEntry[]
-  FinancialPeriod  FinancialPeriod[]
-  Load             Load[]
+  FinancialEntry     FinancialEntry[]
+  FinancialPeriod    FinancialPeriod[]
+  Load               Load[]
 }
 
 model Employee {
@@ -58,9 +58,9 @@ model Employee {
   phone       String?
   email       String?
   address     String?
-  hireDate    DateTime      @default(now()) @db.Timestamptz(6)
-  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime      @default(now()) @db.Timestamptz(6)
+  hireDate    DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now())
   Transaction Transaction[]
 }
 
@@ -69,15 +69,15 @@ model FinancialEntry {
   description  String
   amount       Float
   category     String
-  date         DateTime @db.Timestamptz(6)
+  date         DateTime
   type         String
   observations String?
   closingId    Int?
   companyId    Int?
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
-  Closing      Closing? @relation(fields: [closingId], references: [id], onDelete: Cascade, map: "fk_finEntry_closing")
-  Company      Company? @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_finEntry_company")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
+  Closing      Closing? @relation(fields: [closingId], references: [id], onDelete: Cascade)
+  Company      Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([closingId], map: "idx_finEntry_closingId")
   @@index([companyId], map: "idx_finEntry_companyId")
@@ -86,8 +86,8 @@ model FinancialEntry {
 model FinancialPeriod {
   id            Int      @id @default(autoincrement())
   name          String
-  startDate     DateTime @db.Timestamptz(6)
-  endDate       DateTime @db.Timestamptz(6)
+  startDate     DateTime
+  endDate       DateTime
   companyId     Int?
   status        String   @default("aberto")
   totalEntries  Float    @default(0)
@@ -95,43 +95,43 @@ model FinancialPeriod {
   totalTaxes    Float    @default(0)
   balance       Float    @default(0)
   profitMargin  Float    @default(0)
-  createdAt     DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime @default(now()) @db.Timestamptz(6)
-  Company       Company? @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_finPeriod_company")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+  Company       Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([companyId], map: "idx_finPeriod_companyId")
 }
 
 model Load {
-  id            Int      @id @default(autoincrement())
-  date          DateTime @db.Timestamptz(6)
-  loadingNumber String
-  deliveries    Int
-  cargoWeight   Float
-  totalValue    Float
-  freight4      Float
-  totalFreight  Float
+  id                  Int      @id @default(autoincrement())
+  date                DateTime
+  loadingNumber       String
+  deliveries          Int
+  cargoWeight         Float
+  totalValue          Float
+  freight4            Float
+  totalFreight        Float
   /// Custos extras cobrados junto com a comissão (descarga, pedágio, etc.)
-  additionalCosts     Float   @default(0)
+  additionalCosts     Float    @default(0)
   additionalCostsNote String?
-  observations  String?
-  companyId     Int
-  Company       Company  @relation(fields: [companyId], references: [id], map: "fk_load_company")
+  observations        String?
+  companyId           Int
+  Company             Company  @relation(fields: [companyId], references: [id])
 
   @@index([companyId], map: "idx_load_companyId")
 }
 
 model Maintenance {
   id        Int      @id @default(autoincrement())
-  date      DateTime @db.Timestamptz(6)
+  date      DateTime
   service   String
   km        Int
   value     Float
   notes     String?
   truckId   Int
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @db.Timestamptz(6)
-  Truck     Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade, map: "fk_maintenance_truck")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  Truck     Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade)
 
   @@index([truckId], map: "idx_maintenance_truckId")
 }
@@ -141,77 +141,77 @@ model MaintenanceServicePreset {
   id        Int      @id @default(autoincrement())
   name      String   @unique
   isDefault Boolean  @default(false)
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdAt DateTime @default(now())
 }
 
 model Month {
-  id        Int       @id @default(autoincrement())
-  year      Int
-  month     Int
-  name      String
-  status    String    @default("aberto")
-  createdAt DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime  @default(now()) @db.Timestamptz(6)
-  Closing   Closing[]
+  id                 Int                  @id @default(autoincrement())
+  year               Int
+  month              Int
+  name               String
+  status             String               @default("aberto")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @default(now())
+  Closing            Closing[]
   LoadBillingClosing LoadBillingClosing[]
 
   @@unique([year, month], map: "uq_month_year_month")
 }
 
 model LoadBillingClosing {
-  id               Int      @id @default(autoincrement())
-  monthId          Int
-  companyId        Int
-  name             String
-  startDate        DateTime @db.Timestamptz(6)
-  endDate          DateTime @db.Timestamptz(6)
-  status           String   @default("aberto")
-  totalLoads       Int      @default(0)
-  totalGrossValue  Float    @default(0)
-  totalFreight     Float    @default(0)
-  commissionRate   Float    @default(0)
+  id                   Int      @id @default(autoincrement())
+  monthId              Int
+  companyId            Int
+  name                 String
+  startDate            DateTime
+  endDate              DateTime
+  status               String   @default("aberto")
+  totalLoads           Int      @default(0)
+  totalGrossValue      Float    @default(0)
+  totalFreight         Float    @default(0)
+  commissionRate       Float    @default(0)
   /// Comissão calculada só sobre o valor bruto (percentual da empresa)
   totalCommission      Float    @default(0)
   /// Soma dos custos adicionais das cargas no período
   totalAdditionalCosts Float    @default(0)
-  billingTotal     Float    @default(0)
-  createdAt        DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime @default(now()) @db.Timestamptz(6)
-  Month            Month    @relation(fields: [monthId], references: [id], onDelete: Cascade, map: "fk_loadBillingClosing_month")
-  Company          Company  @relation(fields: [companyId], references: [id], onDelete: Restrict, map: "fk_loadBillingClosing_company")
+  billingTotal         Float    @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @default(now())
+  Month                Month    @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  Company              Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([monthId], map: "idx_loadBillingClosing_monthId")
   @@index([companyId], map: "idx_loadBillingClosing_companyId")
 }
 
 model Transaction {
-  id         Int      @id @default(autoincrement())
-  type       String
-  amount     Float
-  date       DateTime @default(now()) @db.Timestamptz(6)
+  id          Int      @id @default(autoincrement())
+  type        String
+  amount      Float
+  date        DateTime @default(now())
   // O que é a transação (opcional no schema para não quebrar registros antigos)
   description String?
-  employeeId Int
-  Employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade, map: "fk_transaction_employee")
+  employeeId  Int
+  Employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId], map: "idx_transaction_employeeId")
 }
 
 model Trip {
-  id                Int           @id @default(autoincrement())
-  origin            String?       // Origem da viagem (rota: origem → destino)
-  destination       String
-  driver            String
-  date              DateTime      @db.Timestamptz(6)
-  estimatedArrival  DateTime?     @db.Timestamptz(6) // Previsão de chegada
-  freightValue      Float
-  status            String        @default("em_andamento")
-  notes             String?
-  truckId           Int?
-  createdAt         DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime      @default(now()) @db.Timestamptz(6)
-  Truck             Truck?        @relation(fields: [truckId], references: [id], onDelete: Restrict, map: "fk_trip_truck")
-  TripExpense       TripExpense[]
+  id               Int           @id @default(autoincrement())
+  origin           String? // Origem da viagem (rota: origem → destino)
+  destination      String
+  driver           String
+  date             DateTime
+  estimatedArrival DateTime? // Previsão de chegada
+  freightValue     Float
+  status           String        @default("em_andamento")
+  notes            String?
+  truckId          Int?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @default(now())
+  Truck            Truck?        @relation(fields: [truckId], references: [id], onDelete: Restrict)
+  TripExpense      TripExpense[]
 
   @@index([truckId], map: "idx_trip_truckId")
 }
@@ -220,33 +220,33 @@ model TripExpense {
   id          Int      @id @default(autoincrement())
   description String
   amount      Float
-  date        DateTime @db.Timestamptz(6)
+  date        DateTime
   category    String
   notes       String?
   tripId      Int
-  createdAt   DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime @default(now()) @db.Timestamptz(6)
-  Trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade, map: "fk_tripExpense_trip")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+  Trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId], map: "idx_tripExpense_tripId")
 }
 
 model Truck {
-  id          Int           @id @default(autoincrement())
-  name        String
-  plate       String        @unique
-  brand       String
-  year        Int
-  docExpiry   DateTime      @db.Timestamptz(6)
-  insuranceExpiry DateTime? @db.Timestamptz(6)
-  tachographCalibrationExpiry DateTime? @db.Timestamptz(6)
-  oilChangeEngineDate DateTime? @db.Timestamptz(6)
-  oilChangeGearboxDate DateTime? @db.Timestamptz(6)
-  oilChangeDifferentialDate DateTime? @db.Timestamptz(6)
-  renavam     String
-  image       String?
-  Maintenance Maintenance[]
-  Trip        Trip[]
+  id                          Int           @id @default(autoincrement())
+  name                        String
+  plate                       String        @unique
+  brand                       String
+  year                        Int
+  docExpiry                   DateTime
+  insuranceExpiry             DateTime?
+  tachographCalibrationExpiry DateTime?
+  oilChangeEngineDate         DateTime?
+  oilChangeGearboxDate        DateTime?
+  oilChangeDifferentialDate   DateTime?
+  renavam                     String
+  image                       String?
+  Maintenance                 Maintenance[]
+  Trip                        Trip[]
 }
 
 model User {
@@ -259,7 +259,7 @@ model User {
   status    String     @default("active")
   roleId    Int?
   role      Role?      @relation(fields: [roleId], references: [id])
-  createdAt DateTime   @default(now()) @db.Timestamptz(6)
+  createdAt DateTime   @default(now())
   AuditLog  AuditLog[]
 }
 
@@ -269,8 +269,8 @@ model Role {
   description String?
   users       User[]
   permissions RolePermission[]
-  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime         @default(now()) @db.Timestamptz(6)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now())
 }
 
 model Permission {
@@ -278,8 +278,8 @@ model Permission {
   key         String           @unique
   description String?
   roles       RolePermission[]
-  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime         @default(now()) @db.Timestamptz(6)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now())
 }
 
 model RolePermission {
@@ -297,5 +297,5 @@ model AuditLog {
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   action    String
   details   String?
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdAt DateTime @default(now())
 }

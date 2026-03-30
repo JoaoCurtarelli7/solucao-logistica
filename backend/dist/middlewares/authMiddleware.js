@@ -76,7 +76,19 @@ async function authMiddleware(req, rep) {
             if (dbUser.status && dbUser.status !== "active") {
                 return rep.status(403).send({ message: "Usuário inativo" });
             }
-            const permissions = dbUser.role?.permissions?.map((rp) => rp.permission?.key).filter(Boolean) ?? [];
+            let permissions = dbUser.role?.permissions?.map((rp) => rp.permission?.key).filter(Boolean) ?? [];
+            // Usuário sem perfil (roleId null) = acesso total (super admin)
+            if (permissions.length === 0) {
+                try {
+                    const allPerms = await prisma_1.prisma.permission.findMany({
+                        select: { key: true },
+                    });
+                    permissions = allPerms.map((p) => p.key);
+                }
+                catch {
+                    permissions = ["users.manage"];
+                }
+            }
             req.user = {
                 id: dbUser.id,
                 status: dbUser.status ?? null,

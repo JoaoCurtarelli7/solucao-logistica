@@ -8,7 +8,7 @@ const prisma_1 = require("../lib/prisma");
 const zod_1 = require("zod");
 const auth_1 = require("../lib/auth");
 const bcrypt_1 = __importDefault(require("bcrypt"));
-// Permissões mínimas para o primeiro usuário (Admin) quando não há seed
+// Permissões completas do perfil Admin (view + create + update + delete em todos os módulos)
 const BOOTSTRAP_ADMIN_PERMISSIONS = [
     "dashboard.view",
     "users.view",
@@ -21,36 +21,72 @@ const BOOTSTRAP_ADMIN_PERMISSIONS = [
     "roles.update",
     "roles.delete",
     "permissions.view",
+    "permissions.create",
+    "permissions.update",
+    "permissions.delete",
     "companies.view",
+    "companies.create",
+    "companies.update",
+    "companies.delete",
     "employees.view",
+    "employees.create",
+    "employees.update",
+    "employees.delete",
     "trucks.view",
+    "trucks.create",
+    "trucks.update",
+    "trucks.delete",
     "trips.view",
+    "trips.create",
+    "trips.update",
+    "trips.delete",
+    "tripExpenses.view",
+    "tripExpenses.create",
+    "tripExpenses.update",
+    "tripExpenses.delete",
+    "maintenance.view",
+    "maintenance.create",
+    "maintenance.update",
+    "maintenance.delete",
     "loads.view",
+    "loads.create",
+    "loads.update",
+    "loads.delete",
     "financial.view",
+    "financial.create",
+    "financial.update",
+    "financial.delete",
     "closings.view",
+    "closings.create",
+    "closings.update",
+    "closings.delete",
     "months.view",
+    "months.create",
+    "months.update",
+    "months.delete",
     "reports.view",
     "reports.export",
 ];
 async function ensureAdminRoleExists() {
+    await prisma_1.prisma.$transaction(BOOTSTRAP_ADMIN_PERMISSIONS.map((key) => prisma_1.prisma.permission.upsert({
+        where: { key },
+        create: { key },
+        update: {},
+    })));
     let adminRole = await prisma_1.prisma.role.findFirst({ where: { name: "Admin" } });
-    if (adminRole)
-        return { id: adminRole.id };
-    await prisma_1.prisma.permission.createMany({
-        data: BOOTSTRAP_ADMIN_PERMISSIONS.map((key) => ({ key })),
-        skipDuplicates: true,
-    });
-    adminRole = await prisma_1.prisma.role.create({
-        data: { name: "Admin", description: "Acesso total ao sistema" },
-    });
+    if (!adminRole) {
+        adminRole = await prisma_1.prisma.role.create({
+            data: { name: "Admin", description: "Acesso total ao sistema" },
+        });
+    }
     const perms = await prisma_1.prisma.permission.findMany({
         where: { key: { in: BOOTSTRAP_ADMIN_PERMISSIONS } },
         select: { id: true },
     });
     if (perms.length) {
+        await prisma_1.prisma.rolePermission.deleteMany({ where: { roleId: adminRole.id } });
         await prisma_1.prisma.rolePermission.createMany({
             data: perms.map((p) => ({ roleId: adminRole.id, permissionId: p.id })),
-            skipDuplicates: true,
         });
     }
     return { id: adminRole.id };
@@ -69,16 +105,29 @@ async function ensureUserRoleExists() {
     if (perms.length) {
         await prisma_1.prisma.rolePermission.createMany({
             data: perms.map((p) => ({ roleId: userRole.id, permissionId: p.id })),
-            skipDuplicates: true,
         });
     }
     return { id: userRole.id };
+}
+/** Garante Admin completo e perfil User básico (para o admin criar demais usuários). */
+async function ensureDefaultRolesForBootstrap() {
+    await ensureAdminRoleExists();
+    await ensureUserRoleExists();
 }
 async function authRoutes(app) {
     const loginSchema = zod_1.z.object({
         email: zod_1.z.string().email(),
         password: zod_1.z.string(),
     });
+    /** Indica se ainda não existe usuário (permite apenas o cadastro do primeiro admin). */
+    app.get("/auth/bootstrap-status", async (_req, rep) => {
+        const count = await prisma_1.prisma.user.count();
+        return rep.send({ firstUserSetup: count === 0 });
+    });
+    /**
+     * Cadastro público desativado.
+     * Só permitido quando não existe nenhum usuário (bootstrap do primeiro administrador).
+     */
     app.post("/register", async (req, rep) => {
         try {
             const bodySchema = zod_1.z.object({
@@ -87,46 +136,42 @@ async function authRoutes(app) {
                 password: zod_1.z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
             });
             const { name, email, password } = bodySchema.parse(req.body);
+            const userCount = await prisma_1.prisma.user.count();
+            if (userCount > 0) {
+                return rep.code(403).send({
+                    message: "Cadastro público desativado. Peça a um administrador para criar sua conta.",
+                });
+            }
             const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
             if (existingUser) {
                 return rep.code(400).send({ message: "E-mail já está em uso" });
             }
-            const userCount = await prisma_1.prisma.user.count();
-            const isFirstUser = userCount === 0;
-            const roleToAssign = isFirstUser
-                ? await ensureAdminRoleExists()
-                : await ensureUserRoleExists();
+            await ensureDefaultRolesForBootstrap();
+            const adminRole = await prisma_1.prisma.role.findFirst({ where: { name: "Admin" } });
+            if (!adminRole) {
+                return rep.code(500).send({ message: "Perfil Admin não encontrado após bootstrap" });
+            }
             const hashedPassword = await (0, auth_1.hashPassword)(password);
             const newUser = await prisma_1.prisma.user.create({
                 data: {
                     name,
                     email,
                     password: hashedPassword,
-                    roleId: roleToAssign.id,
+                    roleId: adminRole.id,
                     status: "active",
                 },
             });
-            if (isFirstUser) {
-                console.log("✅ Primeiro usuário do sistema criado como Admin:", {
-                    id: newUser.id,
-                    email: newUser.email,
-                });
-            }
-            else {
-                console.log("✅ Usuário criado com sucesso:", {
-                    id: newUser.id,
-                    email: newUser.email,
-                });
-            }
+            console.log("✅ Primeiro usuário do sistema (Admin):", {
+                id: newUser.id,
+                email: newUser.email,
+            });
             return rep.code(201).send({
-                message: isFirstUser
-                    ? "Cadastro realizado! Você é o primeiro usuário e recebeu o perfil Admin."
-                    : "Usuário criado com sucesso!",
+                message: "Primeiro administrador criado. Você pode fazer login.",
                 user: {
                     id: newUser.id,
                     name: newUser.name,
                     email: newUser.email,
-                    role: isFirstUser ? "Admin" : "User",
+                    role: "Admin",
                 },
             });
         }
@@ -197,7 +242,9 @@ async function authRoutes(app) {
             if (!isPasswordValid) {
                 return rep.code(401).send({ message: "Email ou senha inválidos" });
             }
-            const permissions = user.role?.permissions?.map((rp) => rp.permission?.key).filter(Boolean) ?? [];
+            const permissions = user.role?.permissions
+                ?.map((rp) => rp.permission?.key)
+                .filter(Boolean) ?? [];
             const token = (0, auth_1.generateToken)({
                 userId: user.id,
                 roleId: user.role?.id ?? null,
