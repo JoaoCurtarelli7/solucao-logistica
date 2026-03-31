@@ -409,7 +409,7 @@ export default function CustomModalLoad({
 
   return (
     <Modal
-      visible={isVisible}
+      open={isVisible}
       title={isEditing ? "Editar Carga" : "Adicionar Nova Carga"}
       onOk={isEditing ? handleOk : undefined}
       onCancel={handleCancel}
