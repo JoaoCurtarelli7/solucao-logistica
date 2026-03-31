@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { PDFParse } from "pdf-parse";
+import pdfParse from "pdf-parse";
 import { z } from "zod";
 
 const suggestedSchema = z.object({
@@ -44,16 +44,10 @@ export function matchCompanyByCnpj(
 export async function extractTextFromPdfBuffer(
   buffer: Buffer,
 ): Promise<string> {
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
-  try {
-    const result = await parser.getText();
-    const text = String(result.text || "")
-      .replace(/\r\n/g, "\n")
-      .trim();
-    return text;
-  } finally {
-    await parser.destroy().catch(() => undefined);
-  }
+  const result = await pdfParse(buffer);
+  return String(result.text || "")
+    .replace(/\r\n/g, "\n")
+    .trim();
 }
 
 const SYSTEM_PROMPT = `Você é um assistente que extrai dados de documentos logísticos brasileiros (resumo de carregamento, romaneio, consulta de carregamento, notas fiscais relacionadas a transporte).

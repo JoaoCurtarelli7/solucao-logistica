@@ -228,10 +228,15 @@ export async function rbacRoutes(app: FastifyInstance) {
       const missingKeys = keys.filter((k) => !existingKeys.has(k));
 
       if (missingKeys.length) {
-        await prisma.permission.createMany({
-          data: missingKeys.map((key) => ({ key })),
-          skipDuplicates: true,
-        });
+        await prisma.$transaction(
+          missingKeys.map((key) =>
+            prisma.permission.upsert({
+              where: { key },
+              create: { key },
+              update: {},
+            }),
+          ),
+        );
       }
 
       const allPerms = await prisma.permission.findMany({
@@ -243,7 +248,6 @@ export async function rbacRoutes(app: FastifyInstance) {
       if (allPerms.length) {
         await prisma.rolePermission.createMany({
           data: allPerms.map((p) => ({ roleId, permissionId: p.id })),
-          skipDuplicates: true,
         });
       }
 

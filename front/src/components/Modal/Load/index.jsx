@@ -18,7 +18,7 @@ import {
 import { InboxOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
-import api from "../../lib/api";
+import api from "../../../lib/api";
 import { usePermission } from "@/hooks/usePermission";
 
 dayjs.extend(customParseFormat);

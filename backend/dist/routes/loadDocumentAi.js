@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.loadDocumentAiRoutes = loadDocumentAiRoutes;
+exports.loadDocumentAiRoutes = void 0;
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 const permissionMiddleware_1 = require("../middlewares/permissionMiddleware");
 const prisma_1 = require("../lib/prisma");
@@ -73,3 +73,4 @@ async function loadDocumentAiRoutes(app) {
         }
     });
 }
+exports.loadDocumentAiRoutes = loadDocumentAiRoutes;

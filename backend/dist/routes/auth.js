@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authRoutes = authRoutes;
+exports.authRoutes = void 0;
 const prisma_1 = require("../lib/prisma");
 const zod_1 = require("zod");
 const auth_1 = require("../lib/auth");
@@ -147,9 +147,13 @@ async function authRoutes(app) {
                 return rep.code(400).send({ message: "E-mail já está em uso" });
             }
             await ensureDefaultRolesForBootstrap();
-            const adminRole = await prisma_1.prisma.role.findFirst({ where: { name: "Admin" } });
+            const adminRole = await prisma_1.prisma.role.findFirst({
+                where: { name: "Admin" },
+            });
             if (!adminRole) {
-                return rep.code(500).send({ message: "Perfil Admin não encontrado após bootstrap" });
+                return rep
+                    .code(500)
+                    .send({ message: "Perfil Admin não encontrado após bootstrap" });
             }
             const hashedPassword = await (0, auth_1.hashPassword)(password);
             const newUser = await prisma_1.prisma.user.create({
@@ -284,3 +288,4 @@ async function authRoutes(app) {
         }
     });
 }
+exports.authRoutes = authRoutes;

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.rbacRoutes = rbacRoutes;
+exports.rbacRoutes = void 0;
 const prisma_1 = require("../lib/prisma");
 const zod_1 = require("zod");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
@@ -28,7 +28,10 @@ async function rbacRoutes(app) {
     });
     app.post("/permissions", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
         const schema = zod_1.z.object({
-            key: zod_1.z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao"),
+            key: zod_1.z
+                .string()
+                .min(3)
+                .regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao"),
             description: zod_1.z.string().optional(),
         });
         const data = schema.parse(req.body);
@@ -48,7 +51,11 @@ async function rbacRoutes(app) {
     app.put("/permissions/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
         const paramsSchema = zod_1.z.object({ id: zod_1.z.coerce.number() });
         const bodySchema = zod_1.z.object({
-            key: zod_1.z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao").optional(),
+            key: zod_1.z
+                .string()
+                .min(3)
+                .regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao")
+                .optional(),
             description: zod_1.z.string().nullable().optional(),
         });
         const { id } = paramsSchema.parse(req.params);
@@ -57,7 +64,9 @@ async function rbacRoutes(app) {
             where: { id },
             data: {
                 ...(body.key && { key: body.key }),
-                ...(body.description !== undefined && { description: body.description ?? null }),
+                ...(body.description !== undefined && {
+                    description: body.description ?? null,
+                }),
             },
             select: { id: true, key: true, description: true, createdAt: true },
         });
@@ -357,3 +366,4 @@ async function rbacRoutes(app) {
         return rep.send({ items, total, page, pageSize });
     });
 }
+exports.rbacRoutes = rbacRoutes;

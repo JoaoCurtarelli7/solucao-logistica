@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.maintenanceServicePresetRoutes = maintenanceServicePresetRoutes;
+exports.maintenanceServicePresetRoutes = void 0;
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
@@ -141,3 +141,4 @@ async function maintenanceServicePresetRoutes(app) {
         }
     });
 }
+exports.maintenanceServicePresetRoutes = maintenanceServicePresetRoutes;

@@ -3,12 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.matchCompanyByCnpj = matchCompanyByCnpj;
-exports.extractTextFromPdfBuffer = extractTextFromPdfBuffer;
-exports.suggestLoadWithOpenAI = suggestLoadWithOpenAI;
-exports.mergeCompanyMatch = mergeCompanyMatch;
+exports.mergeCompanyMatch = exports.suggestLoadWithOpenAI = exports.extractTextFromPdfBuffer = exports.matchCompanyByCnpj = void 0;
 const openai_1 = __importDefault(require("openai"));
-const pdf_parse_1 = require("pdf-parse");
+const pdf_parse_1 = __importDefault(require("pdf-parse"));
 const zod_1 = require("zod");
 const suggestedSchema = zod_1.z.object({
     loadingNumber: zod_1.z.string().nullable().optional(),
@@ -42,19 +39,14 @@ function matchCompanyByCnpj(emitterCnpj, companies) {
     const found = companies.find((c) => normalizeCnpj(c.cnpj) === digits);
     return found?.id ?? null;
 }
+exports.matchCompanyByCnpj = matchCompanyByCnpj;
 async function extractTextFromPdfBuffer(buffer) {
-    const parser = new pdf_parse_1.PDFParse({ data: new Uint8Array(buffer) });
-    try {
-        const result = await parser.getText();
-        const text = String(result.text || "")
-            .replace(/\r\n/g, "\n")
-            .trim();
-        return text;
-    }
-    finally {
-        await parser.destroy().catch(() => undefined);
-    }
+    const result = await (0, pdf_parse_1.default)(buffer);
+    return String(result.text || "")
+        .replace(/\r\n/g, "\n")
+        .trim();
 }
+exports.extractTextFromPdfBuffer = extractTextFromPdfBuffer;
 const SYSTEM_PROMPT = `Você é um assistente que extrai dados de documentos logísticos brasileiros (resumo de carregamento, romaneio, consulta de carregamento, notas fiscais relacionadas a transporte).
 
 Tarefa: ler o texto fornecido e devolver APENAS um objeto JSON com os campos abaixo. Use null quando não houver informação confiável.
@@ -121,6 +113,7 @@ async function suggestLoadWithOpenAI(params) {
     }
     return safe.data;
 }
+exports.suggestLoadWithOpenAI = suggestLoadWithOpenAI;
 function mergeCompanyMatch(suggestion, companies) {
     const ids = new Set(companies.map((c) => c.id));
     if (suggestion.matchedCompanyId != null &&
@@ -129,3 +122,4 @@ function mergeCompanyMatch(suggestion, companies) {
     }
     return matchCompanyByCnpj(suggestion.emitterCnpj, companies);
 }
+exports.mergeCompanyMatch = mergeCompanyMatch;

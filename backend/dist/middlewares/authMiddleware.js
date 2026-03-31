@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authMiddleware = authMiddleware;
+exports.authMiddleware = void 0;
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../lib/auth");
 async function authMiddleware(req, rep) {
@@ -113,3 +113,4 @@ async function authMiddleware(req, rep) {
         return rep.status(401).send({ message: "Erro na autenticação" });
     }
 }
+exports.authMiddleware = authMiddleware;
