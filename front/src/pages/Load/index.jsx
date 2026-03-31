@@ -9,6 +9,10 @@ import {
   DatePicker,
   Select,
   Input,
+  Typography,
+  Tag,
+  Row,
+  Col,
 } from "antd";
 import { useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
@@ -17,6 +21,11 @@ import {
   DeleteOutlined,
   PlusOutlined,
   SearchOutlined,
+  ReloadOutlined,
+  FileExcelOutlined,
+  TruckOutlined,
+  DollarOutlined,
+  NumberOutlined,
 } from "@ant-design/icons";
 import CustomModalLoad from "../../components/Modal/Load";
 import api from "../../lib/api";
@@ -24,6 +33,7 @@ import dayjs from "dayjs";
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
+const { Title, Text, Paragraph } = Typography;
 
 export default function Load() {
   const { id: companyId } = useParams();
@@ -430,26 +440,136 @@ export default function Load() {
     return filteredData.reduce((sum, item) => sum + item.valorTotal, 0);
   };
 
+  const summaryCards = [
+    {
+      key: "loads",
+      title: "Cargas listadas",
+      value: filteredData.length,
+      helper: selectedCompany ? "Empresa selecionada" : "Selecione uma empresa",
+      accent: "#1677ff",
+      icon: <TruckOutlined style={{ color: "#1677ff" }} />,
+    },
+    {
+      key: "value",
+      title: "Valor total",
+      value: `R$ ${calculateTotalValue().toFixed(2).replace(".", ",")}`,
+      helper: "Soma bruta das cargas",
+      accent: "#16a34a",
+      icon: <DollarOutlined style={{ color: "#16a34a" }} />,
+    },
+    {
+      key: "bill",
+      title: "Total a cobrar",
+      value: `R$ ${calculateTotalFreight().toFixed(2).replace(".", ",")}`,
+      helper: "Comissão + adicionais",
+      accent: "#7c3aed",
+      icon: <NumberOutlined style={{ color: "#7c3aed" }} />,
+    },
+  ];
+
+  const sectionCardStyle = {
+    borderRadius: 20,
+    border: "1px solid #e6edf7",
+    boxShadow: "0 12px 30px rgba(15, 23, 42, 0.06)",
+  };
+
   return (
-    <Card style={{ margin: "20px", padding: "20px" }} bordered>
-      <div style={{ marginBottom: 20 }}>
-        <h1>Gerenciamento de Cargas</h1>
+    <div
+      style={{
+        padding: "24px",
+        background: "linear-gradient(180deg, #f6f9fc 0%, #eef3f9 100%)",
+        minHeight: "100vh",
+      }}
+    >
+      <Card
+        style={{
+          ...sectionCardStyle,
+          marginBottom: 20,
+          background:
+            "linear-gradient(135deg, #0f3d8f 0%, #1677ff 55%, #69b1ff 100%)",
+          color: "#fff",
+          overflow: "hidden",
+        }}
+        bodyStyle={{ padding: 24 }}
+      >
+        <Row gutter={[20, 20]} align="middle" justify="space-between">
+          <Col xs={24} lg={16}>
+            <Text style={{ color: "rgba(255,255,255,0.78)", display: "block" }}>
+              Operações
+            </Text>
+            <Title level={2} style={{ color: "#fff", margin: "4px 0 8px" }}>
+              Cargas e pedidos
+            </Title>
+            <Paragraph
+              style={{ color: "rgba(255,255,255,0.88)", marginBottom: 0 }}
+            >
+              Gerencie lançamentos por empresa, acompanhe valores e mantenha a
+              operação organizada em uma visão clara.
+            </Paragraph>
+          </Col>
+          <Col xs={24} lg={8}>
+            <div
+              style={{
+                background: "rgba(255,255,255,0.14)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                borderRadius: 18,
+                padding: 18,
+              }}
+            >
+              <Space direction="vertical" size={6}>
+                <Text style={{ color: "rgba(255,255,255,0.78)" }}>
+                  Empresa atual
+                </Text>
+                <Text strong style={{ color: "#fff", fontSize: 18 }}>
+                  {companies.find((company) => company.id === selectedCompany)
+                    ?.name || "Nenhuma empresa selecionada"}
+                </Text>
+                <Tag color="processing" style={{ borderRadius: 999, width: "fit-content" }}>
+                  {filteredData.length} registros exibidos
+                </Tag>
+              </Space>
+            </div>
+          </Col>
+        </Row>
+      </Card>
 
-        {/* Debug: Mostrar empresas carregadas */}
-        <div
-          style={{
-            backgroundColor: "#f0f0f0",
-            padding: "10px",
-            marginBottom: "10px",
-            borderRadius: "5px",
-            fontSize: "12px",
-          }}
-        >
-          <strong>Debug:</strong> Empresas carregadas: {companies.length} |
-          Empresa selecionada: {selectedCompany || "Nenhuma"} | Cargas
-          carregadas: {data.length}
-        </div>
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        {summaryCards.map((item) => (
+          <Col xs={24} md={8} key={item.key}>
+            <Card style={sectionCardStyle} bodyStyle={{ padding: 20 }}>
+              <Space
+                align="start"
+                style={{ width: "100%", justifyContent: "space-between" }}
+              >
+                <div>
+                  <Text style={{ color: "#667085", fontSize: 13 }}>
+                    {item.title}
+                  </Text>
+                  <Title level={3} style={{ margin: "8px 0 4px", color: item.accent }}>
+                    {item.value}
+                  </Title>
+                  <Text style={{ color: "#98a2b3" }}>{item.helper}</Text>
+                </div>
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 14,
+                    background: `${item.accent}14`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {item.icon}
+                </div>
+              </Space>
+            </Card>
+          </Col>
+        ))}
+      </Row>
 
+      <Card style={{ ...sectionCardStyle, marginBottom: 20 }} bodyStyle={{ padding: 20 }}>
         <div
           style={{
             display: "flex",
@@ -495,6 +615,7 @@ export default function Load() {
             type="default"
             onClick={fetchLoads}
             disabled={!selectedCompany}
+            icon={<ReloadOutlined />}
           >
             Carregar Todas
           </Button>
@@ -522,53 +643,56 @@ export default function Load() {
             type="default"
             onClick={exportToExcel}
             disabled={filteredData.length === 0}
+            icon={<FileExcelOutlined />}
           >
             Exportar para Excel
           </Button>
         </div>
-      </div>
+      </Card>
 
       {selectedCompany && (
-        <Table
-          dataSource={filteredData}
-          columns={columns}
-          pagination={{
-            pageSize: 20,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} de ${total} cargas`,
-          }}
-          loading={loading}
-          scroll={{ x: 1200 }}
-          summary={() => (
-            <Table.Summary.Row>
-              <Table.Summary.Cell index={0} colSpan={4}>
-                <strong>Totais:</strong>
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={4} align="right">
-                <strong>
-                  R$ {calculateTotalValue().toFixed(2).replace(".", ",")}
-                </strong>
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={5} align="right">
-                <strong>
-                  R${" "}
-                  {filteredData
-                    .reduce((sum, item) => sum + item.frete4, 0)
-                    .toFixed(2)
-                    .replace(".", ",")}
-                </strong>
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={6} align="right">
-                <strong>
-                  R$ {calculateTotalFreight().toFixed(2).replace(".", ",")}
-                </strong>
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={7} colSpan={2} />
-            </Table.Summary.Row>
-          )}
-        />
+        <Card style={sectionCardStyle} bodyStyle={{ padding: 12 }}>
+          <Table
+            dataSource={filteredData}
+            columns={columns}
+            pagination={{
+              pageSize: 20,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total, range) =>
+                `${range[0]}-${range[1]} de ${total} cargas`,
+            }}
+            loading={loading}
+            scroll={{ x: 1200 }}
+            summary={() => (
+              <Table.Summary.Row>
+                <Table.Summary.Cell index={0} colSpan={4}>
+                  <strong>Totais:</strong>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={4} align="right">
+                  <strong>
+                    R$ {calculateTotalValue().toFixed(2).replace(".", ",")}
+                  </strong>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={5} align="right">
+                  <strong>
+                    R${" "}
+                    {filteredData
+                      .reduce((sum, item) => sum + item.frete4, 0)
+                      .toFixed(2)
+                      .replace(".", ",")}
+                  </strong>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={6} align="right">
+                  <strong>
+                    R$ {calculateTotalFreight().toFixed(2).replace(".", ",")}
+                  </strong>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={7} colSpan={2} />
+              </Table.Summary.Row>
+            )}
+          />
+        </Card>
       )}
 
       <CustomModalLoad
@@ -579,6 +703,6 @@ export default function Load() {
         companies={companies}
         selectedCompany={selectedCompany}
       />
-    </Card>
+    </div>
   );
 }

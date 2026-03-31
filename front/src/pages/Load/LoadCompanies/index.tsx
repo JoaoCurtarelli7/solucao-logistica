@@ -11,6 +11,10 @@ import {
   Input,
   Tooltip,
   Result,
+  Typography,
+  Tag,
+  Row,
+  Col,
 } from "antd";
 import * as XLSX from "xlsx";
 import {
@@ -19,6 +23,11 @@ import {
   PlusOutlined,
   SearchOutlined,
   EyeOutlined,
+  ReloadOutlined,
+  FileExcelOutlined,
+  ApartmentOutlined,
+  DollarOutlined,
+  TruckOutlined,
 } from "@ant-design/icons";
 import CustomModalLoad from "../../../components/Modal/Load";
 import api from "../../../lib/api";
@@ -28,6 +37,7 @@ import { usePermission } from "@/hooks/usePermission";
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
+const { Title, Text, Paragraph } = Typography;
 
 export default function LoadCompanies() {
   const navigate = useNavigate();
@@ -532,10 +542,148 @@ export default function LoadCompanies() {
 
   const totals = calculateTotals();
 
+  const sectionCardStyle = {
+    borderRadius: 20,
+    border: "1px solid #e6edf7",
+    boxShadow: "0 12px 30px rgba(15, 23, 42, 0.06)",
+  };
+
+  const summaryCards = [
+    {
+      key: "loads",
+      title: "Cargas listadas",
+      value: filteredData.length,
+      helper: selectedCompany ? "Filtro por empresa aplicado" : "Todas as empresas",
+      accent: "#1677ff",
+      icon: <TruckOutlined style={{ color: "#1677ff" }} />,
+    },
+    {
+      key: "value",
+      title: "Valor total",
+      value: `R$ ${totals.totalValue.toFixed(2).replace(".", ",")}`,
+      helper: "Soma bruta das cargas",
+      accent: "#16a34a",
+      icon: <DollarOutlined style={{ color: "#16a34a" }} />,
+    },
+    {
+      key: "companies",
+      title: "Empresas visíveis",
+      value: new Set(filteredData.map((item) => item.companyId)).size,
+      helper: "Empresas no resultado atual",
+      accent: "#7c3aed",
+      icon: <ApartmentOutlined style={{ color: "#7c3aed" }} />,
+    },
+  ];
+
   return (
-    <Card style={{ margin: "20px", padding: "20px" }} bordered>
-      <div style={{ marginBottom: 20 }}>
-        <h1>Visão Geral de Cargas - Todas as Empresas</h1>
+    <div
+      style={{
+        padding: "24px",
+        background: "linear-gradient(180deg, #f6f9fc 0%, #eef3f9 100%)",
+        minHeight: "100vh",
+      }}
+    >
+      <Card
+        style={{
+          ...sectionCardStyle,
+          marginBottom: 20,
+          background:
+            "linear-gradient(135deg, #0f3d8f 0%, #1677ff 55%, #69b1ff 100%)",
+          color: "#fff",
+          overflow: "hidden",
+        }}
+        bodyStyle={{ padding: 24 }}
+      >
+        <Row gutter={[20, 20]} align="middle" justify="space-between">
+          <Col xs={24} lg={16}>
+            <Text style={{ color: "rgba(255,255,255,0.78)", display: "block" }}>
+              Visão consolidada
+            </Text>
+            <Title level={2} style={{ color: "#fff", margin: "4px 0 8px" }}>
+              Cargas e pedidos
+            </Title>
+            <Paragraph
+              style={{ color: "rgba(255,255,255,0.88)", marginBottom: 0 }}
+            >
+              Acompanhe todas as empresas em uma única visão, com filtros rápidos,
+              resumo financeiro e acesso direto aos detalhes.
+            </Paragraph>
+          </Col>
+          <Col xs={24} lg={8}>
+            <div
+              style={{
+                background: "rgba(255,255,255,0.14)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                borderRadius: 18,
+                padding: 18,
+              }}
+            >
+              <Space direction="vertical" size={6}>
+                <Text style={{ color: "rgba(255,255,255,0.78)" }}>
+                  Filtro atual
+                </Text>
+                <Text strong style={{ color: "#fff", fontSize: 18 }}>
+                  {selectedCompany
+                    ? companies.find((company) => company.id === selectedCompany)
+                        ?.name || "Empresa"
+                    : "Todas as empresas"}
+                </Text>
+                <Tag
+                  color="processing"
+                  style={{ borderRadius: 999, width: "fit-content" }}
+                >
+                  {filteredData.length} registros exibidos
+                </Tag>
+              </Space>
+            </div>
+          </Col>
+        </Row>
+      </Card>
+
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        {summaryCards.map((item) => (
+          <Col xs={24} md={8} key={item.key}>
+            <Card style={sectionCardStyle} bodyStyle={{ padding: 20 }}>
+              <Space
+                align="start"
+                style={{ width: "100%", justifyContent: "space-between" }}
+              >
+                <div>
+                  <Text style={{ color: "#667085", fontSize: 13 }}>
+                    {item.title}
+                  </Text>
+                  <Title
+                    level={3}
+                    style={{ margin: "8px 0 4px", color: item.accent }}
+                  >
+                    {item.value}
+                  </Title>
+                  <Text style={{ color: "#98a2b3" }}>{item.helper}</Text>
+                </div>
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 14,
+                    background: `${item.accent}14`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {item.icon}
+                </div>
+              </Space>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Card
+        style={{ ...sectionCardStyle, marginBottom: 20 }}
+        bodyStyle={{ padding: 20 }}
+      >
+        <div style={{ marginBottom: 20 }}>
 
         <div
           style={{
@@ -592,7 +740,11 @@ export default function LoadCompanies() {
             Buscar por Período
           </Button>
 
-          <Button type="default" onClick={fetchAllLoads}>
+          <Button
+            type="default"
+            onClick={fetchAllLoads}
+            icon={<ReloadOutlined />}
+          >
             Carregar Todas
           </Button>
         </div>
@@ -616,6 +768,7 @@ export default function LoadCompanies() {
             type="default"
             onClick={exportToExcel}
             disabled={filteredData.length === 0}
+            icon={<FileExcelOutlined />}
           >
             Exportar para Excel
           </Button>
@@ -698,63 +851,66 @@ export default function LoadCompanies() {
             <div style={{ fontSize: "14px", color: "#666" }}>Peso Total</div>
           </div>
         </div>
-      </div>
+        </div>
+      </Card>
 
-      <Table
-        dataSource={filteredData}
-        columns={columns}
-        pagination={{
-          pageSize: 25,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) =>
-            `${range[0]}-${range[1]} de ${total} cargas`,
-        }}
-        loading={loading}
-        scroll={{ x: 1680 }}
-        summary={() => (
-          <Table.Summary.Row>
-            <Table.Summary.Cell index={0} colSpan={4}>
-              <strong>Totais:</strong>
-            </Table.Summary.Cell>
+      <Card style={sectionCardStyle} bodyStyle={{ padding: 12 }}>
+        <Table
+          dataSource={filteredData}
+          columns={columns}
+          pagination={{
+            pageSize: 25,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} de ${total} cargas`,
+          }}
+          loading={loading}
+          scroll={{ x: 1680 }}
+          summary={() => (
+            <Table.Summary.Row>
+              <Table.Summary.Cell index={0} colSpan={4}>
+                <strong>Totais:</strong>
+              </Table.Summary.Cell>
 
-            <Table.Summary.Cell index={4} align="right">
-              <strong>
-                {totals.totalPeso.toLocaleString("pt-BR", {
-                  minimumFractionDigits: 2,
-                })}{" "}
-                kg
-              </strong>
-            </Table.Summary.Cell>
+              <Table.Summary.Cell index={4} align="right">
+                <strong>
+                  {totals.totalPeso.toLocaleString("pt-BR", {
+                    minimumFractionDigits: 2,
+                  })}{" "}
+                  kg
+                </strong>
+              </Table.Summary.Cell>
 
-            <Table.Summary.Cell index={5} align="right">
-              <strong>
-                R$ {totals.totalValue.toFixed(2).replace(".", ",")}
-              </strong>
-            </Table.Summary.Cell>
+              <Table.Summary.Cell index={5} align="right">
+                <strong>
+                  R$ {totals.totalValue.toFixed(2).replace(".", ",")}
+                </strong>
+              </Table.Summary.Cell>
 
-            <Table.Summary.Cell index={6} align="right">
-              <strong>
-                R$ {totals.totalFreight.toFixed(2).replace(".", ",")}
-              </strong>
-            </Table.Summary.Cell>
+              <Table.Summary.Cell index={6} align="right">
+                <strong>
+                  R$ {totals.totalFreight.toFixed(2).replace(".", ",")}
+                </strong>
+              </Table.Summary.Cell>
 
-            <Table.Summary.Cell index={7} align="right">
-              <strong>
-                R$ {totals.totalAdditional.toFixed(2).replace(".", ",")}
-              </strong>
-            </Table.Summary.Cell>
+              <Table.Summary.Cell index={7} align="right">
+                <strong>
+                  R$ {totals.totalAdditional.toFixed(2).replace(".", ",")}
+                </strong>
+              </Table.Summary.Cell>
 
-            <Table.Summary.Cell index={8} align="right">
-              <strong>
-                R$ {totals.totalToBill.toFixed(2).replace(".", ",")}
-              </strong>
-            </Table.Summary.Cell>
+              <Table.Summary.Cell index={8} align="right">
+                <strong>
+                  R$ {totals.totalToBill.toFixed(2).replace(".", ",")}
+                </strong>
+              </Table.Summary.Cell>
 
-            <Table.Summary.Cell index={9} colSpan={2} />
-          </Table.Summary.Row>
-        )}
-      />
+              <Table.Summary.Cell index={9} colSpan={2} />
+            </Table.Summary.Row>
+          )}
+        />
+      </Card>
 
       <CustomModalLoad
         isVisible={isModalOpen}
@@ -764,6 +920,6 @@ export default function LoadCompanies() {
         companies={companies}
         selectedCompany={null}
       />
-    </Card>
+    </div>
   );
 }
