@@ -249,9 +249,13 @@ export default function CustomModalLoad({
       const { data } = await api.post("/loads/suggest-from-pdf", fd);
       const s = data.suggestion || {};
       applySuggestionToForm(s);
-      message.success(
-        "Sugestão aplicada nos campos encontrados. Edite o que precisar e complete o que faltar antes de salvar.",
-      );
+      if (data.warning) {
+        message.warning(data.warning);
+      } else {
+        message.success(
+          "Sugestão aplicada nos campos encontrados. Edite o que precisar e complete o que faltar antes de salvar.",
+        );
+      }
       onSuccess?.(data, raw);
     } catch (err) {
       const status = err.response?.status;

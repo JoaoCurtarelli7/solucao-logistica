@@ -9,6 +9,7 @@ import { prisma } from "../lib/prisma";
 import {
   extractTextFromPdfBuffer,
   mergeCompanyMatch,
+  suggestLoadFallback,
   suggestLoadWithOpenAI,
 } from "../services/loadDocumentExtract";
 
@@ -65,10 +66,42 @@ export async function loadDocumentAiRoutes(app: FastifyInstance) {
           orderBy: { name: "asc" },
         });
 
-        const suggestion = await suggestLoadWithOpenAI({
-          pdfText,
-          companies,
-        });
+        let suggestion;
+        let warning: string | undefined;
+        try {
+          suggestion = await suggestLoadWithOpenAI({
+            pdfText,
+            companies,
+          });
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          const code =
+            typeof e === "object" && e && "code" in e
+              ? String((e as { code?: unknown }).code)
+              : "";
+          const status =
+            typeof e === "object" && e && "status" in e
+              ? Number((e as { status?: unknown }).status)
+              : 0;
+
+          if (
+            msg.includes("OPENAI_API_KEY") ||
+            code === "insufficient_quota" ||
+            status === 429 ||
+            /quota|rate limit|429/i.test(msg)
+          ) {
+            suggestion = suggestLoadFallback({
+              pdfText,
+              companies,
+            });
+            warning =
+              code === "insufficient_quota" || /quota/i.test(msg)
+                ? "A IA está sem cota no momento. Usei uma leitura local do PDF e preenchi apenas o que consegui identificar."
+                : "A IA não respondeu no momento. Usei uma leitura local do PDF e preenchi apenas o que consegui identificar.";
+          } else {
+            throw e;
+          }
+        }
 
         const matchedCompanyId = mergeCompanyMatch(suggestion, companies);
 
@@ -78,6 +111,7 @@ export async function loadDocumentAiRoutes(app: FastifyInstance) {
             matchedCompanyId,
           },
           rawTextPreview: pdfText.slice(0, 1200),
+          warning,
         });
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);

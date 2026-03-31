@@ -45,10 +45,39 @@ async function loadDocumentAiRoutes(app) {
                 select: { id: true, name: true, cnpj: true },
                 orderBy: { name: "asc" },
             });
-            const suggestion = await (0, loadDocumentExtract_1.suggestLoadWithOpenAI)({
-                pdfText,
-                companies,
-            });
+            let suggestion;
+            let warning;
+            try {
+                suggestion = await (0, loadDocumentExtract_1.suggestLoadWithOpenAI)({
+                    pdfText,
+                    companies,
+                });
+            }
+            catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                const code = typeof e === "object" && e && "code" in e
+                    ? String(e.code)
+                    : "";
+                const status = typeof e === "object" && e && "status" in e
+                    ? Number(e.status)
+                    : 0;
+                if (msg.includes("OPENAI_API_KEY") ||
+                    code === "insufficient_quota" ||
+                    status === 429 ||
+                    /quota|rate limit|429/i.test(msg)) {
+                    suggestion = (0, loadDocumentExtract_1.suggestLoadFallback)({
+                        pdfText,
+                        companies,
+                    });
+                    warning =
+                        code === "insufficient_quota" || /quota/i.test(msg)
+                            ? "A IA está sem cota no momento. Usei uma leitura local do PDF e preenchi apenas o que consegui identificar."
+                            : "A IA não respondeu no momento. Usei uma leitura local do PDF e preenchi apenas o que consegui identificar.";
+                }
+                else {
+                    throw e;
+                }
+            }
             const matchedCompanyId = (0, loadDocumentExtract_1.mergeCompanyMatch)(suggestion, companies);
             return rep.send({
                 suggestion: {
@@ -56,6 +85,7 @@ async function loadDocumentAiRoutes(app) {
                     matchedCompanyId,
                 },
                 rawTextPreview: pdfText.slice(0, 1200),
+                warning,
             });
         }
         catch (e) {
