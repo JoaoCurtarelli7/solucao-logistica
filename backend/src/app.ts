@@ -1,10 +1,12 @@
 import fastifyCors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import fastify from "fastify";
 
 import { companyRoutes } from "./routes/company";
 import { employeeRoutes } from "./routes/employee";
 import { authRoutes } from "./routes/auth";
 import { loadRoutes } from "./routes/load";
+import { loadDocumentAiRoutes } from "./routes/loadDocumentAi";
 import { userRoutes } from "./routes/user";
 import { financialRoutes } from "./routes/financial";
 import { dashboardRoutes } from "./routes/dashboard";
@@ -58,6 +60,10 @@ app.addHook("onRequest", async (request, reply) => {
   }
 });
 
+app.register(multipart, {
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
+
 app.register(fastifyCors, {
   origin: (
     origin: string | undefined,
@@ -82,6 +88,7 @@ app.register(companyRoutes);
 app.register(employeeRoutes);
 app.register(authRoutes);
 app.register(loadRoutes);
+app.register(loadDocumentAiRoutes);
 app.register(userRoutes);
 app.register(financialRoutes);
 app.register(dashboardRoutes);

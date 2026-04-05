@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.requirePermission = requirePermission;
+exports.requirePermission = void 0;
 function requirePermission(permissionKey) {
     return async (req, rep) => {
         const permissions = req.user?.permissions ?? [];
@@ -9,3 +9,4 @@ function requirePermission(permissionKey) {
         }
     };
 }
+exports.requirePermission = requirePermission;

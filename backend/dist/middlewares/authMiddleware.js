@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authMiddleware = authMiddleware;
+exports.authMiddleware = void 0;
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../lib/auth");
 async function authMiddleware(req, rep) {
@@ -76,7 +76,19 @@ async function authMiddleware(req, rep) {
             if (dbUser.status && dbUser.status !== "active") {
                 return rep.status(403).send({ message: "Usuário inativo" });
             }
-            const permissions = dbUser.role?.permissions?.map((rp) => rp.permission?.key).filter(Boolean) ?? [];
+            let permissions = dbUser.role?.permissions?.map((rp) => rp.permission?.key).filter(Boolean) ?? [];
+            // Usuário sem perfil (roleId null) = acesso total (super admin)
+            if (permissions.length === 0) {
+                try {
+                    const allPerms = await prisma_1.prisma.permission.findMany({
+                        select: { key: true },
+                    });
+                    permissions = allPerms.map((p) => p.key);
+                }
+                catch {
+                    permissions = ["users.manage"];
+                }
+            }
             req.user = {
                 id: dbUser.id,
                 status: dbUser.status ?? null,
@@ -101,3 +113,4 @@ async function authMiddleware(req, rep) {
         return rep.status(401).send({ message: "Erro na autenticação" });
     }
 }
+exports.authMiddleware = authMiddleware;

@@ -1,19 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tripRoutes = tripRoutes;
+exports.tripRoutes = void 0;
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 async function tripRoutes(app) {
     const paramsSchema = zod_1.z.object({ id: zod_1.z.coerce.number() });
     const tripBodySchema = zod_1.z.object({
+        origin: zod_1.z.union([zod_1.z.string(), zod_1.z.null()]).optional().transform((v) => v || null),
         destination: zod_1.z.string().min(1, "Destino é obrigatório"),
         driver: zod_1.z.string().min(1, "Motorista é obrigatório"),
-        date: zod_1.z.string().transform((str) => new Date(str)),
+        date: zod_1.z.union([zod_1.z.string(), zod_1.z.date()]).transform((v) => (typeof v === 'string' ? new Date(v) : v)),
+        estimatedArrival: zod_1.z.union([zod_1.z.string(), zod_1.z.null()]).optional().transform((v) => (v && v !== '' ? new Date(v) : null)),
         freightValue: zod_1.z.coerce.number().min(0, "Valor do frete deve ser válido"),
-        truckId: zod_1.z.coerce.number().optional(),
+        truckId: zod_1.z.coerce.number().optional().nullable(),
         status: zod_1.z.enum(["em_andamento", "concluida", "cancelada"]).default("em_andamento"),
-        notes: zod_1.z.string().optional(),
+        notes: zod_1.z.union([zod_1.z.string(), zod_1.z.null()]).optional().transform((v) => v || null),
     });
     app.addHook("preHandler", authMiddleware_1.authMiddleware);
     // Listar todas as viagens
@@ -109,9 +111,11 @@ async function tripRoutes(app) {
             }
             const trip = await prisma_1.prisma.trip.create({
                 data: {
+                    origin: data.origin || null,
                     destination: data.destination,
                     driver: data.driver,
                     date: data.date,
+                    estimatedArrival: data.estimatedArrival ?? null,
                     freightValue: data.freightValue,
                     truckId: data.truckId,
                     status: data.status,
@@ -131,7 +135,11 @@ async function tripRoutes(app) {
         }
         catch (error) {
             console.error("Erro ao criar viagem:", error);
-            return rep.code(500).send({ message: "Erro ao criar viagem" });
+            const isPrismaSchemaError = error?.code === 'P2010' || error?.message?.includes('column') || error?.message?.includes('does not exist');
+            const message = isPrismaSchemaError
+                ? "Banco desatualizado. No terminal do backend execute: npx prisma migrate deploy"
+                : (error?.message || "Erro ao criar viagem");
+            return rep.code(500).send({ message });
         }
     });
     // Atualizar viagem
@@ -158,9 +166,11 @@ async function tripRoutes(app) {
             const trip = await prisma_1.prisma.trip.update({
                 where: { id },
                 data: {
+                    origin: data.origin ?? undefined,
                     destination: data.destination,
                     driver: data.driver,
                     date: data.date,
+                    estimatedArrival: data.estimatedArrival ?? undefined,
                     freightValue: data.freightValue,
                     truckId: data.truckId,
                     status: data.status,
@@ -283,3 +293,4 @@ async function tripRoutes(app) {
         }
     });
 }
+exports.tripRoutes = tripRoutes;

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.maintenanceRoutes = maintenanceRoutes;
+exports.maintenanceRoutes = void 0;
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
@@ -65,3 +65,4 @@ async function maintenanceRoutes(app) {
         }
     });
 }
+exports.maintenanceRoutes = maintenanceRoutes;

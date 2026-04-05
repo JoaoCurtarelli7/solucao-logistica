@@ -1,12 +1,8 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.rbacRoutes = rbacRoutes;
+exports.rbacRoutes = void 0;
 const prisma_1 = require("../lib/prisma");
 const zod_1 = require("zod");
-const crypto_1 = __importDefault(require("crypto"));
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 const permissionMiddleware_1 = require("../middlewares/permissionMiddleware");
 const auth_1 = require("../lib/auth");
@@ -32,7 +28,10 @@ async function rbacRoutes(app) {
     });
     app.post("/permissions", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
         const schema = zod_1.z.object({
-            key: zod_1.z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao"),
+            key: zod_1.z
+                .string()
+                .min(3)
+                .regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao"),
             description: zod_1.z.string().optional(),
         });
         const data = schema.parse(req.body);
@@ -52,7 +51,11 @@ async function rbacRoutes(app) {
     app.put("/permissions/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
         const paramsSchema = zod_1.z.object({ id: zod_1.z.coerce.number() });
         const bodySchema = zod_1.z.object({
-            key: zod_1.z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao").optional(),
+            key: zod_1.z
+                .string()
+                .min(3)
+                .regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao")
+                .optional(),
             description: zod_1.z.string().nullable().optional(),
         });
         const { id } = paramsSchema.parse(req.params);
@@ -61,7 +64,9 @@ async function rbacRoutes(app) {
             where: { id },
             data: {
                 ...(body.key && { key: body.key }),
-                ...(body.description !== undefined && { description: body.description ?? null }),
+                ...(body.description !== undefined && {
+                    description: body.description ?? null,
+                }),
             },
             select: { id: true, key: true, description: true, createdAt: true },
         });
@@ -158,10 +163,11 @@ async function rbacRoutes(app) {
         const existingKeys = new Set(existing.map((p) => p.key));
         const missingKeys = keys.filter((k) => !existingKeys.has(k));
         if (missingKeys.length) {
-            await prisma_1.prisma.permission.createMany({
-                data: missingKeys.map((key) => ({ key })),
-                skipDuplicates: true,
-            });
+            await prisma_1.prisma.$transaction(missingKeys.map((key) => prisma_1.prisma.permission.upsert({
+                where: { key },
+                create: { key },
+                update: {},
+            })));
         }
         const allPerms = await prisma_1.prisma.permission.findMany({
             where: { key: { in: keys } },
@@ -171,7 +177,6 @@ async function rbacRoutes(app) {
         if (allPerms.length) {
             await prisma_1.prisma.rolePermission.createMany({
                 data: allPerms.map((p) => ({ roleId, permissionId: p.id })),
-                skipDuplicates: true,
             });
         }
         const role = await prisma_1.prisma.role.findUnique({
@@ -233,11 +238,24 @@ async function rbacRoutes(app) {
             email: zod_1.z.string().email(),
             roleId: zod_1.z.number(),
             status: zod_1.z.enum(["active", "inactive"]).default("active"),
-            password: zod_1.z.string().min(6).optional(),
+            password: zod_1.z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
         });
         const body = schema.parse(req.body);
-        const tempPassword = body.password ?? crypto_1.default.randomBytes(9).toString("base64url"); // ~12 chars
-        const hashed = await (0, auth_1.hashPassword)(tempPassword);
+        const emailTaken = await prisma_1.prisma.user.findUnique({
+            where: { email: body.email },
+            select: { id: true },
+        });
+        if (emailTaken) {
+            return rep.code(400).send({ message: "E-mail já está em uso" });
+        }
+        const role = await prisma_1.prisma.role.findUnique({
+            where: { id: body.roleId },
+            select: { id: true },
+        });
+        if (!role) {
+            return rep.code(400).send({ message: "Perfil (role) inválido" });
+        }
+        const hashed = await (0, auth_1.hashPassword)(body.password);
         const user = await prisma_1.prisma.user.create({
             data: {
                 name: body.name,
@@ -260,9 +278,7 @@ async function rbacRoutes(app) {
             email: user.email,
             roleId: body.roleId,
         });
-        return rep
-            .code(201)
-            .send({ user, tempPassword: body.password ? undefined : tempPassword });
+        return rep.code(201).send({ user });
     });
     app.put("/admin/users/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("users.manage") }, async (req, rep) => {
         const paramsSchema = zod_1.z.object({ id: zod_1.z.coerce.number() });
@@ -350,3 +366,4 @@ async function rbacRoutes(app) {
         return rep.send({ items, total, page, pageSize });
     });
 }
+exports.rbacRoutes = rbacRoutes;

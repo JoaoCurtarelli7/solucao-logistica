@@ -15,6 +15,8 @@ declare module "fastify/types/request" {
       role?: string | null;
       permissions?: string[];
     };
+    /** @fastify/multipart */
+    file(): Promise<import("@fastify/multipart").MultipartFile | undefined>;
   }
 }
 

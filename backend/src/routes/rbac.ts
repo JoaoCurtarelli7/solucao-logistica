@@ -45,7 +45,10 @@ export async function rbacRoutes(app: FastifyInstance) {
     { preHandler: requirePermission("users.manage") },
     async (req: FastifyRequest, rep: FastifyReply) => {
       const schema = z.object({
-        key: z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao"),
+        key: z
+          .string()
+          .min(3)
+          .regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao"),
         description: z.string().optional(),
       });
       const data = schema.parse(req.body);
@@ -72,7 +75,11 @@ export async function rbacRoutes(app: FastifyInstance) {
     async (req: FastifyRequest, rep: FastifyReply) => {
       const paramsSchema = z.object({ id: z.coerce.number() });
       const bodySchema = z.object({
-        key: z.string().min(3).regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao").optional(),
+        key: z
+          .string()
+          .min(3)
+          .regex(/^[a-z]+\.[a-z]+$/, "Formato inválido. Use: modulo.acao")
+          .optional(),
         description: z.string().nullable().optional(),
       });
       const { id } = paramsSchema.parse(req.params);
@@ -82,7 +89,9 @@ export async function rbacRoutes(app: FastifyInstance) {
         where: { id },
         data: {
           ...(body.key && { key: body.key }),
-          ...(body.description !== undefined && { description: body.description ?? null }),
+          ...(body.description !== undefined && {
+            description: body.description ?? null,
+          }),
         },
         select: { id: true, key: true, description: true, createdAt: true },
       });
@@ -108,7 +117,8 @@ export async function rbacRoutes(app: FastifyInstance) {
 
       if (rolePermissions) {
         return rep.code(400).send({
-          message: "Não é possível deletar permissão que está em uso por algum perfil",
+          message:
+            "Não é possível deletar permissão que está em uso por algum perfil",
         });
       }
 
@@ -218,10 +228,15 @@ export async function rbacRoutes(app: FastifyInstance) {
       const missingKeys = keys.filter((k) => !existingKeys.has(k));
 
       if (missingKeys.length) {
-        await prisma.permission.createMany({
-          data: missingKeys.map((key) => ({ key })),
-          skipDuplicates: true,
-        });
+        await prisma.$transaction(
+          missingKeys.map((key) =>
+            prisma.permission.upsert({
+              where: { key },
+              create: { key },
+              update: {},
+            }),
+          ),
+        );
       }
 
       const allPerms = await prisma.permission.findMany({
@@ -233,7 +248,6 @@ export async function rbacRoutes(app: FastifyInstance) {
       if (allPerms.length) {
         await prisma.rolePermission.createMany({
           data: allPerms.map((p) => ({ roleId, permissionId: p.id })),
-          skipDuplicates: true,
         });
       }
 

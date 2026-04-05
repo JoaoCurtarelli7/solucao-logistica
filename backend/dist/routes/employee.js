@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.employeeRoutes = employeeRoutes;
+exports.employeeRoutes = void 0;
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
@@ -21,11 +21,16 @@ async function employeeRoutes(app) {
     const paramsSchema = zod_1.z.object({
         id: zod_1.z.coerce.number(),
     });
+    const employeeDetailsQuerySchema = zod_1.z.object({
+        month: zod_1.z.coerce.number().min(1).max(12).optional(),
+        year: zod_1.z.coerce.number().min(2000).max(3000).optional(),
+    });
     const bodySchema = zod_1.z.object({
         name: zod_1.z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
         role: zod_1.z.string().min(2, "Cargo deve ter pelo menos 2 caracteres"),
         baseSalary: zod_1.z.coerce.number().min(0, "Salário deve ser maior que zero"),
         status: zod_1.z.enum(["Ativo", "Inativo"]),
+        pixAccount: zod_1.z.string().optional().or(zod_1.z.literal("")),
         cpf: zod_1.z.string().optional(),
         phone: zod_1.z.string().optional(),
         email: zod_1.z.string().email("Email inválido").optional().or(zod_1.z.literal("")),
@@ -43,6 +48,7 @@ async function employeeRoutes(app) {
                     role: true,
                     baseSalary: true,
                     status: true,
+                    pixAccount: true,
                     cpf: true,
                     phone: true,
                     email: true,
@@ -64,6 +70,7 @@ async function employeeRoutes(app) {
     app.get("/employees/:id", async (req, rep) => {
         try {
             const { id } = paramsSchema.parse(req.params);
+            const { month, year } = employeeDetailsQuerySchema.parse(req.query);
             const employee = await prisma_1.prisma.employee.findUnique({
                 where: { id },
                 include: {
@@ -73,7 +80,59 @@ async function employeeRoutes(app) {
             if (!employee) {
                 return rep.code(404).send({ message: "Funcionário não encontrado" });
             }
-            return rep.send(employee);
+            const selectedYear = year ?? new Date().getFullYear();
+            const selectedMonth = month ?? new Date().getMonth() + 1;
+            const transactions = (employee.Transaction ?? []).filter((transaction) => {
+                const transactionDate = new Date(transaction.date);
+                return (transactionDate.getFullYear() === selectedYear &&
+                    transactionDate.getMonth() + 1 === selectedMonth);
+            });
+            const monthlyMap = new Map();
+            for (const transaction of employee.Transaction ?? []) {
+                const transactionDate = new Date(transaction.date);
+                const txYear = transactionDate.getFullYear();
+                const txMonth = transactionDate.getMonth() + 1;
+                const key = `${txYear}-${txMonth}`;
+                const current = monthlyMap.get(key) ?? {
+                    year: txYear,
+                    month: txMonth,
+                    totalCredits: 0,
+                    totalDebits: 0,
+                    transactionCount: 0,
+                };
+                if (transaction.type === "Crédito")
+                    current.totalCredits += transaction.amount;
+                if (transaction.type === "Débito")
+                    current.totalDebits += transaction.amount;
+                current.transactionCount += 1;
+                monthlyMap.set(key, current);
+            }
+            const monthlyHistory = Array.from(monthlyMap.values())
+                .map((item) => ({
+                ...item,
+                salaryTotalBalance: employee.baseSalary + item.totalCredits - item.totalDebits,
+            }))
+                .sort((a, b) => (b.year - a.year) || (b.month - a.month));
+            const totalCredits = transactions
+                .filter((transaction) => transaction.type === "Crédito")
+                .reduce((sum, transaction) => sum + transaction.amount, 0);
+            const totalDebits = transactions
+                .filter((transaction) => transaction.type === "Débito")
+                .reduce((sum, transaction) => sum + transaction.amount, 0);
+            const salaryTotalBalance = employee.baseSalary + totalCredits - totalDebits;
+            return rep.send({
+                ...employee,
+                financialSummary: {
+                    totalCredits,
+                    totalDebits,
+                    transactionCount: transactions.length,
+                    salaryTotalBalance,
+                    selectedMonth,
+                    selectedYear,
+                },
+                monthlyHistory,
+                Transaction: transactions,
+            });
         }
         catch (error) {
             console.error("Erro ao buscar funcionário:", error);
@@ -101,6 +160,7 @@ async function employeeRoutes(app) {
                     role: data.role,
                     baseSalary: data.baseSalary,
                     status: data.status,
+                    pixAccount: data.pixAccount && data.pixAccount.trim() !== "" ? data.pixAccount.trim() : null,
                     cpf: data.cpf && data.cpf.trim() !== "" ? data.cpf : null,
                     phone: data.phone && data.phone.trim() !== "" ? data.phone : null,
                     email: data.email && data.email.trim() !== "" ? data.email : null,
@@ -157,6 +217,7 @@ async function employeeRoutes(app) {
                     role: data.role,
                     baseSalary: data.baseSalary,
                     status: data.status,
+                    pixAccount: data.pixAccount && data.pixAccount.trim() !== "" ? data.pixAccount.trim() : null,
                     cpf: data.cpf && data.cpf.trim() !== "" ? data.cpf : null,
                     phone: data.phone && data.phone.trim() !== "" ? data.phone : null,
                     email: data.email && data.email.trim() !== "" ? data.email : null,
@@ -207,9 +268,10 @@ async function employeeRoutes(app) {
             const transactionSchema = zod_1.z.object({
                 type: zod_1.z.enum(["Crédito", "Débito"]),
                 amount: zod_1.z.coerce.number().min(0.01, "Valor deve ser maior que zero"),
+                description: zod_1.z.string().min(1, "Descrição da transação é obrigatória"),
                 date: zod_1.z.string().optional(), // aceita ISO; se vier vazio, usa agora
             });
-            const { type, amount, date } = transactionSchema.parse(req.body);
+            const { type, amount, description, date } = transactionSchema.parse(req.body);
             // garante que o funcionário existe (evita criar "solto")
             await prisma_1.prisma.employee.findUniqueOrThrow({ where: { id } });
             const transactionDate = date ? new Date(date) : new Date();
@@ -219,6 +281,7 @@ async function employeeRoutes(app) {
                     type,
                     amount,
                     date: transactionDate,
+                    description,
                     Employee: { connect: { id } }, // <- este é o pulo do gato
                 },
             });
@@ -240,7 +303,7 @@ async function employeeRoutes(app) {
                 where: { id },
                 include: {
                     Transaction: {
-                        select: { id: true, type: true, amount: true, date: true },
+                        select: { id: true, type: true, amount: true, date: true, description: true },
                         orderBy: { date: "desc" },
                     },
                 },
@@ -252,6 +315,77 @@ async function employeeRoutes(app) {
         }
         catch (error) {
             console.error("Erro ao buscar transações:", error);
+            return rep.code(500).send({ message: "Erro interno do servidor" });
+        }
+    });
+    // Editar transação do funcionário
+    app.put("/employees/:id/transactions/:transactionId", async (req, rep) => {
+        try {
+            const transactionParamsSchema = zod_1.z.object({
+                id: zod_1.z.coerce.number(),
+                transactionId: zod_1.z.coerce.number(),
+            });
+            const transactionBodySchema = zod_1.z.object({
+                type: zod_1.z.enum(["Crédito", "Débito"]),
+                amount: zod_1.z.coerce.number().min(0.01, "Valor deve ser maior que zero"),
+                description: zod_1.z.string().min(1, "Descrição da transação é obrigatória"),
+                date: zod_1.z.string().optional(),
+            });
+            const { id, transactionId } = transactionParamsSchema.parse(req.params);
+            const { type, amount, description, date } = transactionBodySchema.parse(req.body);
+            const existing = await prisma_1.prisma.transaction.findUnique({
+                where: { id: transactionId },
+                select: { id: true, employeeId: true },
+            });
+            if (!existing || existing.employeeId !== id) {
+                return rep.code(404).send({ message: "Transação não encontrada para este funcionário" });
+            }
+            const transactionDate = date ? new Date(date) : new Date();
+            const updated = await prisma_1.prisma.transaction.update({
+                where: { id: transactionId },
+                data: {
+                    type,
+                    amount,
+                    description,
+                    date: transactionDate,
+                },
+            });
+            return rep.send(updated);
+        }
+        catch (error) {
+            if (error instanceof zod_1.z.ZodError) {
+                return rep.code(400).send({
+                    message: "Dados inválidos",
+                    errors: error.errors.map((err) => ({
+                        field: err.path.join("."),
+                        message: err.message,
+                    })),
+                });
+            }
+            console.error("Erro ao editar transação:", error);
+            return rep.code(500).send({ message: "Erro interno do servidor" });
+        }
+    });
+    // Remover transação do funcionário
+    app.delete("/employees/:id/transactions/:transactionId", async (req, rep) => {
+        try {
+            const transactionParamsSchema = zod_1.z.object({
+                id: zod_1.z.coerce.number(),
+                transactionId: zod_1.z.coerce.number(),
+            });
+            const { id, transactionId } = transactionParamsSchema.parse(req.params);
+            const existing = await prisma_1.prisma.transaction.findUnique({
+                where: { id: transactionId },
+                select: { id: true, employeeId: true },
+            });
+            if (!existing || existing.employeeId !== id) {
+                return rep.code(404).send({ message: "Transação não encontrada para este funcionário" });
+            }
+            await prisma_1.prisma.transaction.delete({ where: { id: transactionId } });
+            return rep.code(204).send();
+        }
+        catch (error) {
+            console.error("Erro ao remover transação:", error);
             return rep.code(500).send({ message: "Erro interno do servidor" });
         }
     });
@@ -297,3 +431,4 @@ async function employeeRoutes(app) {
         }
     });
 }
+exports.employeeRoutes = employeeRoutes;

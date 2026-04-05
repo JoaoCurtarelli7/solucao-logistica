@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.monthRoutes = monthRoutes;
+exports.monthRoutes = void 0;
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
+const permissionMiddleware_1 = require("../middlewares/permissionMiddleware");
 async function monthRoutes(app) {
     app.addHook("preHandler", authMiddleware_1.authMiddleware);
     const createMonthSchema = zod_1.z.object({
@@ -14,7 +15,7 @@ async function monthRoutes(app) {
         status: zod_1.z.enum(["aberto", "fechado", "cancelado"]).optional(),
     });
     // Listar meses
-    app.get("/months", async (req, rep) => {
+    app.get("/months", { preHandler: (0, permissionMiddleware_1.requirePermission)("months.view") }, async (req, rep) => {
         try {
             const querySchema = zod_1.z.object({
                 year: zod_1.z.string().optional(),
@@ -30,6 +31,9 @@ async function monthRoutes(app) {
             }
             const months = await prisma_1.prisma.month.findMany({
                 where: whereClause,
+                include: {
+                    Closing: { select: { id: true, status: true } },
+                },
                 orderBy: [
                     { year: 'desc' },
                     { month: 'desc' },
@@ -42,7 +46,7 @@ async function monthRoutes(app) {
         }
     });
     // Obter mês por ID
-    app.get("/months/:id", async (req, rep) => {
+    app.get("/months/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("months.view") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             const month = await prisma_1.prisma.month.findUnique({
@@ -68,7 +72,7 @@ async function monthRoutes(app) {
         }
     });
     // Criar novo mês
-    app.post("/months", async (req, rep) => {
+    app.post("/months", { preHandler: (0, permissionMiddleware_1.requirePermission)("months.create") }, async (req, rep) => {
         try {
             const body = req.body;
             const { year, month: monthNumber } = createMonthSchema.parse(body);
@@ -114,7 +118,7 @@ async function monthRoutes(app) {
         }
     });
     // Atualizar mês
-    app.put("/months/:id", async (req, rep) => {
+    app.put("/months/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("months.update") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             const data = updateMonthSchema.parse(req.body);
@@ -138,7 +142,7 @@ async function monthRoutes(app) {
         }
     });
     // Deletar mês
-    app.delete("/months/:id", async (req, rep) => {
+    app.delete("/months/:id", { preHandler: (0, permissionMiddleware_1.requirePermission)("months.delete") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             const month = await prisma_1.prisma.month.findUnique({
@@ -161,7 +165,7 @@ async function monthRoutes(app) {
         }
     });
     // Estatísticas do mês
-    app.get("/months/:id/stats", async (req, rep) => {
+    app.get("/months/:id/stats", { preHandler: (0, permissionMiddleware_1.requirePermission)("months.view") }, async (req, rep) => {
         try {
             const { id } = zod_1.z.object({ id: zod_1.z.coerce.number() }).parse(req.params);
             const month = await prisma_1.prisma.month.findUnique({
@@ -207,3 +211,4 @@ async function monthRoutes(app) {
         }
     });
 }
+exports.monthRoutes = monthRoutes;

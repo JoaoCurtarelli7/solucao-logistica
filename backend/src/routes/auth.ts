@@ -69,10 +69,15 @@ const BOOTSTRAP_ADMIN_PERMISSIONS = [
 ];
 
 async function ensureAdminRoleExists(): Promise<{ id: number }> {
-  await prisma.permission.createMany({
-    data: BOOTSTRAP_ADMIN_PERMISSIONS.map((key) => ({ key })),
-    skipDuplicates: true,
-  });
+  await prisma.$transaction(
+    BOOTSTRAP_ADMIN_PERMISSIONS.map((key) =>
+      prisma.permission.upsert({
+        where: { key },
+        create: { key },
+        update: {},
+      }),
+    ),
+  );
 
   let adminRole = await prisma.role.findFirst({ where: { name: "Admin" } });
   if (!adminRole) {
@@ -89,7 +94,6 @@ async function ensureAdminRoleExists(): Promise<{ id: number }> {
     await prisma.rolePermission.deleteMany({ where: { roleId: adminRole.id } });
     await prisma.rolePermission.createMany({
       data: perms.map((p) => ({ roleId: adminRole!.id, permissionId: p.id })),
-      skipDuplicates: true,
     });
   }
   return { id: adminRole.id };
@@ -108,7 +112,6 @@ async function ensureUserRoleExists(): Promise<{ id: number }> {
   if (perms.length) {
     await prisma.rolePermission.createMany({
       data: perms.map((p) => ({ roleId: userRole!.id, permissionId: p.id })),
-      skipDuplicates: true,
     });
   }
   return { id: userRole.id };
@@ -127,10 +130,13 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   /** Indica se ainda não existe usuário (permite apenas o cadastro do primeiro admin). */
-  app.get("/auth/bootstrap-status", async (_req: FastifyRequest, rep: FastifyReply) => {
-    const count = await prisma.user.count();
-    return rep.send({ firstUserSetup: count === 0 });
-  });
+  app.get(
+    "/auth/bootstrap-status",
+    async (_req: FastifyRequest, rep: FastifyReply) => {
+      const count = await prisma.user.count();
+      return rep.send({ firstUserSetup: count === 0 });
+    },
+  );
 
   /**
    * Cadastro público desativado.
@@ -160,9 +166,13 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       await ensureDefaultRolesForBootstrap();
-      const adminRole = await prisma.role.findFirst({ where: { name: "Admin" } });
+      const adminRole = await prisma.role.findFirst({
+        where: { name: "Admin" },
+      });
       if (!adminRole) {
-        return rep.code(500).send({ message: "Perfil Admin não encontrado após bootstrap" });
+        return rep
+          .code(500)
+          .send({ message: "Perfil Admin não encontrado após bootstrap" });
       }
 
       const hashedPassword = await hashPassword(password);
