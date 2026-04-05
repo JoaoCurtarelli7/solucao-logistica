@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -22,6 +22,8 @@ model Closing {
   profitMargin   Float            @default(0)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @default(now())
+  /// IDs de funcionários cujo salário calculado foi excluído deste fechamento
+  excludedSalaryEmployeeIds Int[] @default([])
   Company        Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   Month          Month            @relation(fields: [monthId], references: [id], onDelete: Cascade)
   FinancialEntry FinancialEntry[]
