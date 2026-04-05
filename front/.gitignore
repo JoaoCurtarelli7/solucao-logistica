@@ -8,6 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+# Manter só npm (package-lock.json) — yarn.lock quebra deploy se existir junto
+yarn.lock
+
 dist
 dist-ssr
 *.local
