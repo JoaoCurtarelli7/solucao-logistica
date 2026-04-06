@@ -35,6 +35,14 @@ import dayjs from "dayjs";
 
 const { Title, Text, Paragraph } = Typography;
 
+function getRoleDisplayName(role) {
+  if (role == null || role === "") return "Usuário";
+  if (typeof role === "object" && role !== null && "name" in role) {
+    return role.name ?? "Usuário";
+  }
+  return String(role);
+}
+
 export default function UserProfile() {
   const { user, setUser, loading: userLoading, refreshUser } = useUserContext();
   const [form] = Form.useForm();
@@ -204,6 +212,8 @@ export default function UserProfile() {
     );
   }
 
+  const roleLabel = getRoleDisplayName(user.role);
+
   return (
     <div
       style={{
@@ -284,7 +294,7 @@ export default function UserProfile() {
                     Ativo
                   </Tag>
                   <Tag color="processing" style={{ borderRadius: 999 }}>
-                    {user.role || "Usuário"}
+                    {roleLabel}
                   </Tag>
                 </Space>
               </Space>
@@ -497,7 +507,7 @@ export default function UserProfile() {
                   <Col xs={24} sm={8}>
                     <Statistic
                       title="Tipo de Conta"
-                      value={user.role || "Usuário"}
+                      value={roleLabel}
                       valueStyle={{ color: "#1890ff" }}
                       prefix={<UserOutlined />}
                     />
