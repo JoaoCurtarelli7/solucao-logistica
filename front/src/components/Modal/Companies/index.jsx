@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect } from "react";
 import {
   Modal,
   Form,
@@ -8,11 +8,11 @@ import {
   message,
   DatePicker,
   Select,
-} from 'antd'
-import dayjs from 'dayjs'
-import api from '../../../lib/api'
+} from "antd";
+import dayjs from "dayjs";
+import api from "../../../lib/api";
 
-const { Option } = Select
+const { Option } = Select;
 
 export default function AddCompanyModal({
   isModalVisible,
@@ -21,79 +21,84 @@ export default function AddCompanyModal({
   editingCompany,
   setEditingCompany,
 }) {
-  const [form] = Form.useForm()
+  const [form] = Form.useForm();
 
   // debug removido
 
   useEffect(() => {
     // debug removido
-    
+
     if (editingCompany) {
       const formattedCompany = {
         ...editingCompany,
         dateRegistration: dayjs(editingCompany.dateRegistration),
-      }
-      form.setFieldsValue(formattedCompany)
+      };
+      form.setFieldsValue(formattedCompany);
     } else {
-      form.resetFields()
+      form.resetFields();
       // Definir valores padrão para nova empresa
       form.setFieldsValue({
-        status: 'Ativo',
+        status: "Ativo",
         commission: 0,
-        dateRegistration: dayjs()
-      })
+        dateRegistration: dayjs(),
+      });
     }
-  }, [editingCompany, form])
+  }, [editingCompany, form]);
 
   const handleSubmit = async (values) => {
     try {
-      
       // Validação adicional
-      if (!values.name || !values.type || !values.cnpj || !values.responsible || !values.dateRegistration) {
-        message.error('Por favor, preencha todos os campos obrigatórios!');
+      if (
+        !values.name ||
+        !values.type ||
+        !values.cnpj ||
+        !values.responsible ||
+        !values.dateRegistration
+      ) {
+        message.error("Por favor, preencha todos os campos obrigatórios!");
         return;
       }
-      
+
       const formattedValues = {
         ...values,
-        dateRegistration: values.dateRegistration.format('YYYY-MM-DD'),
-      }
-      
+        dateRegistration: values.dateRegistration.format("YYYY-MM-DD"),
+      };
+
       if (editingCompany) {
         // Atualizar empresa existente
-        await api.put(`/company/${editingCompany.id}`, formattedValues)
-        message.success('Empresa atualizada com sucesso!')
+        await api.put(`/company/${editingCompany.id}`, formattedValues);
+        message.success("Empresa atualizada com sucesso!");
       } else {
         // Criar nova empresa
-        const response = await api.post('/company', formattedValues)
-        message.success('Empresa cadastrada com sucesso!')
+        const response = await api.post("/company", formattedValues);
+        message.success("Empresa cadastrada com sucesso!");
       }
 
-      onCompanySaved()
+      onCompanySaved();
     } catch (error) {
-      console.error('❌ Erro ao salvar empresa:', error)
-      console.error('❌ Detalhes do erro:', {
+      console.error("❌ Erro ao salvar empresa:", error);
+      console.error("❌ Detalhes do erro:", {
         status: error.response?.status,
         data: error.response?.data,
-        message: error.message
+        message: error.message,
       });
       message.error(
         error.response?.data?.message ||
-          'Erro ao salvar empresa. Tente novamente.'
-      )
+          "Erro ao salvar empresa. Tente novamente.",
+      );
     }
-  }
+  };
 
   const handleCancel = () => {
-    form.resetFields()
-    setIsModalVisible(false)
-    setEditingCompany(null)
-  }
+    form.resetFields();
+    setIsModalVisible(false);
+    setEditingCompany(null);
+  };
 
   return (
     <Modal
-      title={editingCompany ? 'Editar Empresa' : 'Cadastrar Nova Empresa'}
-      visible={isModalVisible}
+      title={editingCompany ? "Editar Empresa" : "Cadastrar Nova Empresa"}
+      open={isModalVisible}
       onCancel={handleCancel}
       footer={null}
       width={600}
@@ -105,8 +110,8 @@ export default function AddCompanyModal({
           label="Nome da Empresa"
           name="name"
           rules={[
-            { required: true, message: 'Por favor, insira o nome da empresa!' },
-            { min: 2, message: 'O nome deve ter pelo menos 2 caracteres!' }
+            { required: true, message: "Por favor, insira o nome da empresa!" },
+            { min: 2, message: "O nome deve ter pelo menos 2 caracteres!" },
           ]}
         >
           <Input placeholder="Ex: Transportadora ABC Ltda" />
@@ -116,7 +121,7 @@ export default function AddCompanyModal({
           label="Tipo de Empresa"
           name="type"
           rules={[
-            { required: true, message: 'Por favor, insira o tipo da empresa!' },
+            { required: true, message: "Por favor, insira o tipo da empresa!" },
           ]}
         >
           <Select placeholder="Selecione o tipo">
@@ -132,8 +137,11 @@ export default function AddCompanyModal({
           label="CNPJ"
           name="cnpj"
           rules={[
-            { required: true, message: 'Por favor, insira o CNPJ!' },
-            { pattern: /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/, message: 'CNPJ deve estar no formato XX.XXX.XXX/XXXX-XX!' }
+            { required: true, message: "Por favor, insira o CNPJ!" },
+            {
+              pattern: /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/,
+              message: "CNPJ deve estar no formato XX.XXX.XXX/XXXX-XX!",
+            },
           ]}
         >
           <Input placeholder="XX.XXX.XXX/XXXX-XX" />
@@ -143,7 +151,7 @@ export default function AddCompanyModal({
           label="Responsável"
           name="responsible"
           rules={[
-            { required: true, message: 'Por favor, insira o responsável!' },
+            { required: true, message: "Por favor, insira o responsável!" },
           ]}
         >
           <Input placeholder="Nome do responsável pela empresa" />
@@ -155,18 +163,23 @@ export default function AddCompanyModal({
           rules={[
             {
               required: true,
-              message: 'Por favor, insira a porcentagem de comissão!',
+              message: "Por favor, insira a porcentagem de comissão!",
             },
-            { type: 'number', min: 0, max: 100, message: 'Comissão deve ser entre 0% e 100%!' }
+            {
+              type: "number",
+              min: 0,
+              max: 100,
+              message: "Comissão deve ser entre 0% e 100%!",
+            },
           ]}
         >
-          <InputNumber 
-            min={0} 
-            max={100} 
-            style={{ width: '100%' }}
+          <InputNumber
+            min={0}
+            max={100}
+            style={{ width: "100%" }}
             placeholder="0"
             formatter={(value) => `${value}%`}
-            parser={(value) => value.replace('%', '')}
+            parser={(value) => value.replace("%", "")}
           />
         </Form.Item>
 
@@ -176,13 +189,13 @@ export default function AddCompanyModal({
           rules={[
             {
               required: true,
-              message: 'Por favor, insira a data de cadastro!',
+              message: "Por favor, insira a data de cadastro!",
             },
           ]}
         >
-          <DatePicker 
-            format="DD/MM/YYYY" 
-            style={{ width: '100%' }}
+          <DatePicker
+            format="DD/MM/YYYY"
+            style={{ width: "100%" }}
             placeholder="Selecione a data"
           />
         </Form.Item>
@@ -193,7 +206,7 @@ export default function AddCompanyModal({
           rules={[
             {
               required: true,
-              message: 'Por favor, selecione o status da empresa!',
+              message: "Por favor, selecione o status da empresa!",
             },
           ]}
         >
@@ -203,15 +216,19 @@ export default function AddCompanyModal({
           </Select>
         </Form.Item>
 
-        <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-          <Button type="default" onClick={handleCancel} style={{ marginRight: 8 }}>
+        <Form.Item style={{ marginBottom: 0, textAlign: "right" }}>
+          <Button
+            type="default"
+            onClick={handleCancel}
+            style={{ marginRight: 8 }}
+          >
             Cancelar
           </Button>
           <Button type="primary" htmlType="submit">
-            {editingCompany ? 'Salvar Alterações' : 'Cadastrar Empresa'}
+            {editingCompany ? "Salvar Alterações" : "Cadastrar Empresa"}
           </Button>
         </Form.Item>
       </Form>
     </Modal>
-  )
+  );
 }

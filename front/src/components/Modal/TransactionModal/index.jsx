@@ -1,29 +1,29 @@
-import React from 'react'
-import { Modal, Form, Input, Button, Select, InputNumber } from 'antd'
+import React from "react";
+import { Modal, Form, Input, Button, Select, InputNumber } from "antd";
 
-const { Option } = Select
+const { Option } = Select;
 
 export default function AddTransactionModal({
   visible,
   onCancel,
   onAddTransaction,
 }) {
-  const [form] = Form.useForm()
+  const [form] = Form.useForm();
 
   const handleOk = async () => {
     try {
-      const values = await form.validateFields()
-      onAddTransaction(values) // Chama a função para adicionar a transação
-      form.resetFields()
+      const values = await form.validateFields();
+      onAddTransaction(values); // Chama a função para adicionar a transação
+      form.resetFields();
     } catch (error) {
-      console.error('Erro ao adicionar transação:', error)
+      console.error("Erro ao adicionar transação:", error);
     }
-  }
+  };
 
   return (
     <Modal
       title="Adicionar Transação"
-      visible={visible}
+      open={visible}
       onOk={handleOk}
       onCancel={onCancel}
       footer={[
@@ -39,7 +39,7 @@ export default function AddTransactionModal({
         <Form.Item
           label="Tipo"
           name="type"
-          rules={[{ required: true, message: 'Por favor, selecione o tipo!' }]}
+          rules={[{ required: true, message: "Por favor, selecione o tipo!" }]}
         >
           <Select placeholder="Selecione o tipo">
             <Option value="Crédito">Crédito</Option>
@@ -50,13 +50,13 @@ export default function AddTransactionModal({
         <Form.Item
           label="Valor"
           name="amount"
-          rules={[{ required: true, message: 'Por favor, insira o valor!' }]}
+          rules={[{ required: true, message: "Por favor, insira o valor!" }]}
         >
           <InputNumber
-            style={{ width: '100%' }}
+            style={{ width: "100%" }}
             min={0}
             formatter={(value) => `R$ ${value}`}
-            parser={(value) => value.replace('R$', '')}
+            parser={(value) => value.replace("R$", "")}
           />
         </Form.Item>
 
@@ -64,12 +64,12 @@ export default function AddTransactionModal({
           label="Descrição"
           name="description"
           rules={[
-            { required: true, message: 'Por favor, insira a descrição!' },
+            { required: true, message: "Por favor, insira a descrição!" },
           ]}
         >
           <Input />
         </Form.Item>
       </Form>
     </Modal>
-  )
+  );
 }
