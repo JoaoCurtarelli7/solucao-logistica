@@ -42,7 +42,14 @@ const parseCurrencyFromInput = (inputStr) => {
   return cents / 100;
 };
 
-function CurrencyInput({ value, onChange, onValueChange, placeholder, readOnly, ...rest }) {
+function CurrencyInput({
+  value,
+  onChange,
+  onValueChange,
+  placeholder,
+  readOnly,
+  ...rest
+}) {
   const display = formatCurrencyDisplay(value);
   const handleChange = (e) => {
     const num = parseCurrencyFromInput(e.target.value);
@@ -80,7 +87,10 @@ export default function CustomModalLoad({
 
   const scrollToTop = () => {
     setTimeout(() => {
-      modalTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      modalTopRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }, 100);
   };
 
@@ -128,7 +138,10 @@ export default function CustomModalLoad({
     const highlights = new Set();
     const patch = {};
 
-    if (s.matchedCompanyId != null && !Number.isNaN(Number(s.matchedCompanyId))) {
+    if (
+      s.matchedCompanyId != null &&
+      !Number.isNaN(Number(s.matchedCompanyId))
+    ) {
       patch.companyId = Number(s.matchedCompanyId);
       highlights.add("companyId");
     } else if (selectedCompany && !form.getFieldValue("companyId")) {
@@ -145,27 +158,46 @@ export default function CustomModalLoad({
       highlights.add("numeroCarregamento");
     }
 
-    if (s.deliveries != null && !Number.isNaN(Number(s.deliveries)) && Number(s.deliveries) >= 1) {
+    if (
+      s.deliveries != null &&
+      !Number.isNaN(Number(s.deliveries)) &&
+      Number(s.deliveries) >= 1
+    ) {
       patch.entregas = Math.max(1, Math.floor(Number(s.deliveries)));
       highlights.add("entregas");
     }
 
-    if (s.cargoWeight != null && !Number.isNaN(Number(s.cargoWeight)) && Number(s.cargoWeight) > 0) {
+    if (
+      s.cargoWeight != null &&
+      !Number.isNaN(Number(s.cargoWeight)) &&
+      Number(s.cargoWeight) > 0
+    ) {
       patch.pesoCarga = Number(s.cargoWeight);
       highlights.add("pesoCarga");
     }
 
-    if (s.totalValue != null && !Number.isNaN(Number(s.totalValue)) && Number(s.totalValue) > 0) {
+    if (
+      s.totalValue != null &&
+      !Number.isNaN(Number(s.totalValue)) &&
+      Number(s.totalValue) > 0
+    ) {
       patch.valorTotal = Number(s.totalValue);
       highlights.add("valorTotal");
     }
 
-    if (s.additionalCosts != null && !Number.isNaN(Number(s.additionalCosts)) && Number(s.additionalCosts) >= 0) {
+    if (
+      s.additionalCosts != null &&
+      !Number.isNaN(Number(s.additionalCosts)) &&
+      Number(s.additionalCosts) >= 0
+    ) {
       patch.custosAdicionais = Math.max(0, Number(s.additionalCosts));
       highlights.add("custosAdicionais");
     }
 
-    if (s.additionalCostsNote != null && String(s.additionalCostsNote).trim() !== "") {
+    if (
+      s.additionalCostsNote != null &&
+      String(s.additionalCostsNote).trim() !== ""
+    ) {
       patch.detalheCustosAdicionais = String(s.additionalCostsNote).trim();
       highlights.add("detalheCustosAdicionais");
     }
@@ -187,9 +219,18 @@ export default function CustomModalLoad({
       skipClearAiTagsRef.current = false;
     }, 0);
 
-    const vtForRecalc = patch.valorTotal !== undefined ? patch.valorTotal : form.getFieldValue("valorTotal");
-    const custosForRecalc = patch.custosAdicionais !== undefined ? patch.custosAdicionais : form.getFieldValue("custosAdicionais") ?? 0;
-    const cidForRecalc = patch.companyId !== undefined ? patch.companyId : form.getFieldValue("companyId") ?? selectedCompany;
+    const vtForRecalc =
+      patch.valorTotal !== undefined
+        ? patch.valorTotal
+        : form.getFieldValue("valorTotal");
+    const custosForRecalc =
+      patch.custosAdicionais !== undefined
+        ? patch.custosAdicionais
+        : form.getFieldValue("custosAdicionais") ?? 0;
+    const cidForRecalc =
+      patch.companyId !== undefined
+        ? patch.companyId
+        : form.getFieldValue("companyId") ?? selectedCompany;
     if (vtForRecalc != null && cidForRecalc) {
       recalcTotals(vtForRecalc, cidForRecalc, custosForRecalc);
     }
@@ -219,7 +260,10 @@ export default function CustomModalLoad({
       onSuccess?.(data, raw);
     } catch (err) {
       const status = err.response?.status;
-      const msg = err.response?.data?.message || err.message || "Não foi possível analisar o PDF.";
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        "Não foi possível analisar o PDF.";
       if (status === 503) {
         message.warning(msg);
       } else {
@@ -234,7 +278,9 @@ export default function CustomModalLoad({
   useEffect(() => {
     if (editingLoad && isVisible) {
       const raw = editingLoad.rawData || {};
-      const add = Number(raw.additionalCosts ?? editingLoad.additionalCosts ?? 0);
+      const add = Number(
+        raw.additionalCosts ?? editingLoad.additionalCosts ?? 0,
+      );
       form.setFieldsValue({
         data: dayjs(editingLoad.data, "DD/MM/YYYY"),
         numeroCarregamento: editingLoad.numeroCarregamento,
@@ -242,7 +288,8 @@ export default function CustomModalLoad({
         pesoCarga: editingLoad.pesoCarga,
         valorTotal: editingLoad.valorTotal,
         custosAdicionais: add,
-        detalheCustosAdicionais: raw.additionalCostsNote || editingLoad.additionalCostsNote || "",
+        detalheCustosAdicionais:
+          raw.additionalCostsNote || editingLoad.additionalCostsNote || "",
         frete4: editingLoad.frete4,
         somaTotalFrete: editingLoad.somaTotalFrete,
         observacoes: editingLoad.observacoes,
@@ -269,7 +316,10 @@ export default function CustomModalLoad({
     const companyId = values.companyId || selectedCompany;
     const rate = getCompanyCommissionRate(companyId);
     const frete4 = calcCommissionValue(valorTotal, rate);
-    const additionalCosts = Math.max(0, parseFloat(values.custosAdicionais) || 0);
+    const additionalCosts = Math.max(
+      0,
+      parseFloat(values.custosAdicionais) || 0,
+    );
     const somaTotalFrete = Math.round((frete4 + additionalCosts) * 100) / 100;
     return {
       ...values,
@@ -387,7 +437,11 @@ export default function CustomModalLoad({
         }}
       >
         {/* Ref para scroll ao topo */}
-        <div ref={modalTopRef} />
+        <div
+          ref={modalTopRef}
+          tabIndex={-1}
+          style={{ height: 0, overflow: "hidden" }}
+        />
 
         {!isEditing && canSuggestFromPdf && (
           <>
@@ -411,7 +465,9 @@ export default function CustomModalLoad({
                 <InboxOutlined />
               </p>
               <p className="ant-upload-text">
-                {aiLoading ? "Analisando documento…" : "Clique ou arraste o PDF para esta área"}
+                {aiLoading
+                  ? "Analisando documento…"
+                  : "Clique ou arraste o PDF para esta área"}
               </p>
               <p className="ant-upload-hint">Apenas PDF · máx. 15 MB</p>
             </Upload.Dragger>
@@ -438,7 +494,9 @@ export default function CustomModalLoad({
         <Form.Item
           name="companyId"
           label={labelWithAi("Empresa", "companyId")}
-          rules={[{ required: true, message: "Por favor, selecione a empresa" }]}
+          rules={[
+            { required: true, message: "Por favor, selecione a empresa" },
+          ]}
         >
           <Select
             placeholder="Selecione a empresa"
@@ -468,13 +526,22 @@ export default function CustomModalLoad({
           label={labelWithAi("Data", "data")}
           rules={[{ required: true, message: "Por favor, insira a data" }]}
         >
-          <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} placeholder="Selecione a data" />
+          <DatePicker
+            format="DD/MM/YYYY"
+            style={{ width: "100%" }}
+            placeholder="Selecione a data"
+          />
         </Form.Item>
 
         <Form.Item
           name="numeroCarregamento"
           label={labelWithAi("Número do Carregamento", "numeroCarregamento")}
-          rules={[{ required: true, message: "Por favor, insira o número do carregamento" }]}
+          rules={[
+            {
+              required: true,
+              message: "Por favor, insira o número do carregamento",
+            },
+          ]}
         >
           <Input placeholder="Ex: 578656" />
         </Form.Item>
@@ -482,7 +549,12 @@ export default function CustomModalLoad({
         <Form.Item
           name="entregas"
           label={labelWithAi("Quantidade de Entregas", "entregas")}
-          rules={[{ required: true, message: "Por favor, insira a quantidade de entregas" }]}
+          rules={[
+            {
+              required: true,
+              message: "Por favor, insira a quantidade de entregas",
+            },
+          ]}
         >
           <InputNumber min={1} style={{ width: "100%" }} placeholder="Ex: 1" />
         </Form.Item>
@@ -492,7 +564,11 @@ export default function CustomModalLoad({
           label={labelWithAi("Peso da Carga (kg)", "pesoCarga")}
           rules={[
             { required: true, message: "Por favor, insira o peso da carga" },
-            { type: "number", min: 0.01, message: "O peso deve ser maior que zero" },
+            {
+              type: "number",
+              min: 0.01,
+              message: "O peso deve ser maior que zero",
+            },
           ]}
         >
           <InputNumber
@@ -520,26 +596,42 @@ export default function CustomModalLoad({
           label={labelWithAi("Valor Total da Carga", "valorTotal")}
           rules={[
             { required: true, message: "Por favor, insira o valor total" },
-            { type: "number", min: 0.01, message: "O valor deve ser maior que zero" },
+            {
+              type: "number",
+              min: 0.01,
+              message: "O valor deve ser maior que zero",
+            },
           ]}
         >
-          <CurrencyInput style={{ width: "100%" }} onValueChange={handleValorTotalChange} />
+          <CurrencyInput
+            style={{ width: "100%" }}
+            onValueChange={handleValorTotalChange}
+          />
         </Form.Item>
 
         <Form.Item
           name="frete4"
           label={`Comissão (${currentRate.toFixed(2)}% sobre o valor total)`}
-          rules={[{ type: "number", min: 0, message: "O valor deve ser maior ou igual a zero" }]}
+          rules={[
+            {
+              type: "number",
+              min: 0,
+              message: "O valor deve ser maior ou igual a zero",
+            },
+          ]}
         >
           <CurrencyInput style={{ width: "100%" }} readOnly />
         </Form.Item>
 
         <Divider orientation="left" plain>
-          <Text type="secondary">Custos adicionais (cobrados junto com a comissão)</Text>
+          <Text type="secondary">
+            Custos adicionais (cobrados junto com a comissão)
+          </Text>
         </Divider>
         <Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
-          Inclua aqui despesas repassadas ao cliente: descarga, pedágio, estadia, taxas diversas etc.
-          Esse valor entra no total a cobrar e no fechamento de cargas.
+          Inclua aqui despesas repassadas ao cliente: descarga, pedágio,
+          estadia, taxas diversas etc. Esse valor entra no total a cobrar e no
+          fechamento de cargas.
         </Text>
 
         <Form.Item
@@ -557,7 +649,10 @@ export default function CustomModalLoad({
 
         <Form.Item
           name="detalheCustosAdicionais"
-          label={labelWithAi("Detalhar custos (opcional)", "detalheCustosAdicionais")}
+          label={labelWithAi(
+            "Detalhar custos (opcional)",
+            "detalheCustosAdicionais",
+          )}
         >
           <Input.TextArea
             rows={2}
@@ -570,7 +665,13 @@ export default function CustomModalLoad({
         <Form.Item
           name="somaTotalFrete"
           label="Total a cobrar (comissão + custos adicionais)"
-          rules={[{ type: "number", min: 0, message: "O total deve ser maior ou igual a zero" }]}
+          rules={[
+            {
+              type: "number",
+              min: 0,
+              message: "O total deve ser maior ou igual a zero",
+            },
+          ]}
         >
           <CurrencyInput style={{ width: "100%" }} readOnly />
         </Form.Item>
@@ -579,7 +680,10 @@ export default function CustomModalLoad({
           name="observacoes"
           label={labelWithAi("Observações gerais da carga", "observacoes")}
         >
-          <Input.TextArea rows={3} placeholder="Observações adicionais sobre a carga..." />
+          <Input.TextArea
+            rows={3}
+            placeholder="Observações adicionais sobre a carga..."
+          />
         </Form.Item>
       </Form>
     </Modal>
