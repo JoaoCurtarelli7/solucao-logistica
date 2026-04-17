@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react";
 import {
   Card,
   Button,
@@ -12,111 +12,108 @@ import {
   Row,
   Col,
   Statistic,
-} from 'antd'
-import TripModal from '../../../components/Modal/Trip'
+} from "antd";
+import TripModal from "../../../components/Modal/Trip";
 import {
   PlusCircleOutlined,
   CarOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-} from '@ant-design/icons'
-import { FaTrash, FaDollarSign, FaEdit } from 'react-icons/fa'
-import { useNavigate, useParams } from 'react-router-dom'
-import { api } from '../../../lib'
-import dayjs from 'dayjs'
-import { usePermission } from '../../../hooks/usePermission'
+} from "@ant-design/icons";
+import { FaTrash, FaDollarSign, FaEdit } from "react-icons/fa";
+import { useNavigate, useParams } from "react-router-dom";
+import { api } from "../../../lib";
+import dayjs from "dayjs";
+import { usePermission } from "../../../hooks/usePermission";
 
-const { Title } = Typography
+const { Title } = Typography;
 
 const STATUS_CONFIG = {
   em_andamento: {
-    label: 'Em andamento',
-    color: 'processing',
+    label: "Em andamento",
+    color: "processing",
     icon: <ClockCircleOutlined />,
   },
-  concluida: { label: 'Concluída', color: 'success', icon: <CheckCircleOutlined /> },
-  cancelada: { label: 'Cancelada', color: 'default', icon: null },
-}
+  concluida: {
+    label: "Concluída",
+    color: "success",
+    icon: <CheckCircleOutlined />,
+  },
+  cancelada: { label: "Cancelada", color: "default", icon: null },
+};
 
 export default function TripList() {
-  const navigate = useNavigate()
-  const { id: truckId } = useParams()
-  const { hasPermission } = usePermission()
+  const navigate = useNavigate();
+  const { id: truckId } = useParams();
+  const { hasPermission } = usePermission();
 
-  const [trips, setTrips] = useState([])
-  const [isModalVisible, setIsModalVisible] = useState(false)
-  const [currentTrip, setCurrentTrip] = useState(null)
+  const [trips, setTrips] = useState([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [currentTrip, setCurrentTrip] = useState(null);
 
-  const canView = hasPermission('trips.view')
-  const canCreate = hasPermission('trips.create')
-  const canUpdate = hasPermission('trips.update')
-  const canDelete = hasPermission('trips.delete')
-
-  if (!canView) {
-    return (
-      <Result
-        status="403"
-        title="Acesso negado"
-        subTitle="Você não tem permissão para visualizar viagens."
-      />
-    )
-  }
+  const canView = hasPermission("trips.view");
+  const canCreate = hasPermission("trips.create");
+  const canUpdate = hasPermission("trips.update");
+  const canDelete = hasPermission("trips.delete");
 
   const fetchTrips = async () => {
     try {
-      const url = truckId ? `/trucks/${truckId}/trips` : '/trips'
-      const response = await api.get(url)
+      const url = truckId ? `/trucks/${truckId}/trips` : "/trips";
+      const response = await api.get(url);
 
       const list = Array.isArray(response.data)
         ? response.data
-        : response.data?.trips || []
+        : response.data?.trips || [];
 
-      setTrips(list)
-      localStorage.setItem('tripsData', JSON.stringify(list))
+      setTrips(list);
+      localStorage.setItem("tripsData", JSON.stringify(list));
     } catch (error) {
-      console.error(error)
+      console.error(error);
 
-      const savedData = localStorage.getItem('tripsData')
+      const savedData = localStorage.getItem("tripsData");
       if (savedData) {
         try {
-          const parsedData = JSON.parse(savedData)
-          setTrips(parsedData)
-          message.warning('Dados carregados do cache devido a erro na conexão')
+          const parsedData = JSON.parse(savedData);
+          setTrips(parsedData);
+          message.warning("Dados carregados do cache devido a erro na conexão");
         } catch (parseError) {
-          console.error('Erro ao parsear dados salvos:', parseError)
-          message.error('Erro ao carregar viagens')
+          console.error("Erro ao parsear dados salvos:", parseError);
+          message.error("Erro ao carregar viagens");
         }
       } else {
-        message.error('Erro ao carregar viagens')
+        message.error("Erro ao carregar viagens");
       }
     }
-  }
+  };
 
   useEffect(() => {
-    fetchTrips()
-  }, [truckId])
+    if (!canView) return;
+    fetchTrips();
+  }, [truckId, canView]);
 
   useEffect(() => {
-    const handleReloadTrips = () => fetchTrips()
-    window.addEventListener('reloadTrips', handleReloadTrips)
-    return () => window.removeEventListener('reloadTrips', handleReloadTrips)
-  }, [])
+    if (!canView) return;
+    const handleReloadTrips = () => fetchTrips();
+    window.addEventListener("reloadTrips", handleReloadTrips);
+    return () => window.removeEventListener("reloadTrips", handleReloadTrips);
+  }, [canView]);
 
   useEffect(() => {
-    const handleFocus = () => fetchTrips()
+    if (!canView) return;
+    const handleFocus = () => fetchTrips();
 
     const handleVisibilityChange = () => {
-      if (!document.hidden) fetchTrips()
-    }
+      if (!document.hidden) fetchTrips();
+    };
 
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [])
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [canView]);
 
   const buildPayload = (values) => {
     return {
@@ -133,129 +130,129 @@ export default function TripList() {
           ? new Date(values.estimatedArrival).toISOString()
           : undefined,
       truckId: truckId ? Number(truckId) : values?.truckId,
-    }
-  }
+    };
+  };
 
   const handleAddTrip = async (values) => {
     try {
-      const payload = buildPayload(values)
-      const response = await api.post('/trips', payload)
-      setTrips((prev) => [...prev, response.data])
-      setIsModalVisible(false)
-      message.success('Viagem adicionada com sucesso!')
-      fetchTrips()
+      const payload = buildPayload(values);
+      const response = await api.post("/trips", payload);
+      setTrips((prev) => [...prev, response.data]);
+      setIsModalVisible(false);
+      message.success("Viagem adicionada com sucesso!");
+      fetchTrips();
     } catch (error) {
-      console.error(error)
-      const msg = error.response?.data?.message || 'Erro ao adicionar viagem'
-      message.error(msg)
+      console.error(error);
+      const msg = error.response?.data?.message || "Erro ao adicionar viagem";
+      message.error(msg);
     }
-  }
+  };
 
   const handleEditTrip = (trip) => {
-    setCurrentTrip(trip)
-    setIsModalVisible(true)
-  }
+    setCurrentTrip(trip);
+    setIsModalVisible(true);
+  };
 
   const handleEditSubmit = async (values) => {
     try {
-      const payload = buildPayload(values)
-      const response = await api.put(`/trips/${currentTrip.id}`, payload)
+      const payload = buildPayload(values);
+      const response = await api.put(`/trips/${currentTrip.id}`, payload);
       setTrips((prev) =>
         prev.map((trip) => (trip.id === currentTrip.id ? response.data : trip)),
-      )
-      setCurrentTrip(null)
-      setIsModalVisible(false)
-      message.success('Viagem atualizada com sucesso!')
-      fetchTrips()
+      );
+      setCurrentTrip(null);
+      setIsModalVisible(false);
+      message.success("Viagem atualizada com sucesso!");
+      fetchTrips();
     } catch (error) {
-      console.error(error)
-      message.error('Erro ao atualizar viagem')
+      console.error(error);
+      message.error("Erro ao atualizar viagem");
     }
-  }
+  };
 
   const handleDeleteTrip = async (id) => {
     try {
-      const trip = trips.find((t) => t.id === id)
-      const expenses = trip?.TripExpense ?? trip?.expenses ?? []
+      const trip = trips.find((t) => t.id === id);
+      const expenses = trip?.TripExpense ?? trip?.expenses ?? [];
 
       if (trip && expenses.length > 0) {
         message.error(
-          'Não é possível deletar uma viagem que possui despesas vinculadas. Remova as despesas primeiro.',
-        )
-        return
+          "Não é possível deletar uma viagem que possui despesas vinculadas. Remova as despesas primeiro.",
+        );
+        return;
       }
 
-      await api.delete(`/trips/${id}`)
-      setTrips((prev) => prev.filter((trip) => trip.id !== id))
-      message.success('Viagem removida com sucesso!')
-      fetchTrips()
+      await api.delete(`/trips/${id}`);
+      setTrips((prev) => prev.filter((trip) => trip.id !== id));
+      message.success("Viagem removida com sucesso!");
+      fetchTrips();
     } catch (error) {
-      console.error(error)
+      console.error(error);
       if (error.response?.data?.message) {
-        message.error(error.response.data.message)
+        message.error(error.response.data.message);
       } else {
-        message.error('Erro ao remover viagem')
+        message.error("Erro ao remover viagem");
       }
     }
-  }
+  };
 
   const columns = [
     {
-      title: 'Rota',
-      key: 'route',
+      title: "Rota",
+      key: "route",
       width: 220,
       render: (_, record) => {
-        const origin = record.origin?.trim()
-        const dest = record.destination?.trim() || '-'
-        const route = origin ? `${origin} → ${dest}` : dest
-        return <span title={route}>{route}</span>
+        const origin = record.origin?.trim();
+        const dest = record.destination?.trim() || "-";
+        const route = origin ? `${origin} → ${dest}` : dest;
+        return <span title={route}>{route}</span>;
       },
     },
-    { title: 'Motorista', dataIndex: 'driver', key: 'driver', width: 140 },
+    { title: "Motorista", dataIndex: "driver", key: "driver", width: 140 },
     {
-      title: 'Data saída',
-      dataIndex: 'date',
-      key: 'date',
+      title: "Data saída",
+      dataIndex: "date",
+      key: "date",
       width: 110,
-      render: (date) => (date ? dayjs(date).format('DD/MM/YYYY') : '-'),
+      render: (date) => (date ? dayjs(date).format("DD/MM/YYYY") : "-"),
     },
     {
-      title: 'Previsão chegada',
-      dataIndex: 'estimatedArrival',
-      key: 'estimatedArrival',
+      title: "Previsão chegada",
+      dataIndex: "estimatedArrival",
+      key: "estimatedArrival",
       width: 140,
-      render: (date) => (date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—'),
+      render: (date) => (date ? dayjs(date).format("DD/MM/YYYY HH:mm") : "—"),
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
       width: 130,
       render: (status) => {
-        const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.em_andamento
+        const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.em_andamento;
         return (
           <Tag color={cfg.color} icon={cfg.icon}>
             {cfg.label}
           </Tag>
-        )
+        );
       },
     },
     {
-      title: 'Frete',
-      dataIndex: 'freightValue',
-      key: 'freightValue',
+      title: "Frete",
+      dataIndex: "freightValue",
+      key: "freightValue",
       width: 100,
-      align: 'right',
+      align: "right",
       render: (value) =>
         value != null
-          ? `R$ ${Number(value).toFixed(2).replace('.', ',')}`
-          : '—',
+          ? `R$ ${Number(value).toFixed(2).replace(".", ",")}`
+          : "—",
     },
     {
-      title: 'Ações',
-      key: 'actions',
+      title: "Ações",
+      key: "actions",
       width: 140,
-      fixed: 'right',
+      fixed: "right",
       render: (_, record) => (
         <Space size="small">
           <Button
@@ -264,8 +261,10 @@ export default function TripList() {
             icon={<FaDollarSign />}
             title="Despesas"
             onClick={() => {
-              localStorage.setItem('tripsData', JSON.stringify(trips))
-              navigate(`/vehicle/trip-expenses/${record.id}`, { state: record })
+              localStorage.setItem("tripsData", JSON.stringify(trips));
+              navigate(`/vehicle/trip-expenses/${record.id}`, {
+                state: record,
+              });
             }}
           />
 
@@ -298,23 +297,33 @@ export default function TripList() {
         </Space>
       ),
     },
-  ]
+  ];
 
   const stats = {
     total: trips.length,
-    emAndamento: trips.filter((t) => t.status === 'em_andamento').length,
-    concluidas: trips.filter((t) => t.status === 'concluida').length,
+    emAndamento: trips.filter((t) => t.status === "em_andamento").length,
+    concluidas: trips.filter((t) => t.status === "concluida").length,
+  };
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar viagens."
+      />
+    );
   }
 
   return (
     <Card style={{ margin: 20, padding: 24 }} bordered>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Space direction="vertical" size="large" style={{ width: "100%" }}>
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
             gap: 16,
           }}
         >
@@ -327,8 +336,8 @@ export default function TripList() {
               type="primary"
               icon={<PlusCircleOutlined />}
               onClick={() => {
-                setCurrentTrip(null)
-                setIsModalVisible(true)
+                setCurrentTrip(null);
+                setIsModalVisible(true);
               }}
             >
               Nova viagem
@@ -390,5 +399,5 @@ export default function TripList() {
         )}
       </Space>
     </Card>
-  )
+  );
 }

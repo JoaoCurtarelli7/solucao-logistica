@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react";
 import {
   Card,
   Button,
@@ -14,7 +14,7 @@ import {
   Statistic,
   Progress,
   Result,
-} from 'antd'
+} from "antd";
 import {
   PlusOutlined,
   EditOutlined,
@@ -24,109 +24,107 @@ import {
   EyeOutlined,
   CalendarOutlined,
   DollarOutlined,
-} from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
-import dayjs from 'dayjs'
-import AddVehicleModal from '../../components/Modal/Vehicle'
-import { api } from '../../lib'
-import { usePermission } from '../../hooks/usePermission'
+} from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
+import AddVehicleModal from "../../components/Modal/Vehicle";
+import { api } from "../../lib";
+import { usePermission } from "../../hooks/usePermission";
 
-const { Title, Text } = Typography
+const { Title, Text } = Typography;
 
 export default function VehicleList() {
-  const navigate = useNavigate()
-  const { hasPermission } = usePermission()
+  const navigate = useNavigate();
+  const { hasPermission } = usePermission();
 
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [isModalVisible, setIsModalVisible] = useState(false)
-  const [currentVehicle, setCurrentVehicle] = useState(null)
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [currentVehicle, setCurrentVehicle] = useState(null);
 
-  const canView = hasPermission('trucks.view')
-  const canCreate = hasPermission('trucks.create')
-  const canUpdate = hasPermission('trucks.update')
-  const canDelete = hasPermission('trucks.delete')
-
-  if (!canView) {
-    return (
-      <Result
-        status="403"
-        title="Acesso negado"
-        subTitle="Você não tem permissão para visualizar caminhões."
-      />
-    )
-  }
+  const canView = hasPermission("trucks.view");
+  const canCreate = hasPermission("trucks.create");
+  const canUpdate = hasPermission("trucks.update");
+  const canDelete = hasPermission("trucks.delete");
 
   const loadTrucks = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await api.get('/trucks')
+      const response = await api.get("/trucks");
       const trucks = Array.isArray(response.data)
         ? response.data
-        : response.data?.trucks ?? []
-      setData(trucks)
+        : response.data?.trucks ?? [];
+      setData(trucks);
     } catch (error) {
-      console.error('Erro ao carregar os caminhões:', error)
-      const msg = error.response?.data?.message || 'Erro ao carregar os caminhões'
-      message.error(msg)
+      console.error("Erro ao carregar os caminhões:", error);
+      const msg =
+        error.response?.data?.message || "Erro ao carregar os caminhões";
+      message.error(msg);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    loadTrucks()
-  }, [])
+    if (!canView) return;
+    loadTrucks();
+  }, [canView]);
 
   const handleSaveVehicle = async (values) => {
     try {
       if (currentVehicle?.id) {
-        const response = await api.put(`/trucks/${currentVehicle.id}`, values)
+        const response = await api.put(`/trucks/${currentVehicle.id}`, values);
         setData((prev) =>
           prev.map((v) => (v.id === currentVehicle.id ? response.data : v)),
-        )
-        message.success('Caminhão atualizado com sucesso!')
+        );
+        message.success("Caminhão atualizado com sucesso!");
       } else {
-        const response = await api.post('/trucks', values)
-        setData((prev) => [...prev, response.data])
-        message.success('Caminhão adicionado com sucesso!')
+        const response = await api.post("/trucks", values);
+        setData((prev) => [...prev, response.data]);
+        message.success("Caminhão adicionado com sucesso!");
       }
 
-      setIsModalVisible(false)
-      setCurrentVehicle(null)
-      loadTrucks()
+      setIsModalVisible(false);
+      setCurrentVehicle(null);
+      loadTrucks();
     } catch (error) {
-      console.error('Erro ao salvar caminhão:', error)
-      message.error(error.response?.data?.message || 'Erro ao salvar caminhão')
+      console.error("Erro ao salvar caminhão:", error);
+      message.error(error.response?.data?.message || "Erro ao salvar caminhão");
     }
-  }
+  };
 
   const handleDeleteVehicle = async (id) => {
     try {
-      await api.delete(`/trucks/${id}`)
-      message.success('Caminhão deletado com sucesso!')
-      loadTrucks()
+      await api.delete(`/trucks/${id}`);
+      message.success("Caminhão deletado com sucesso!");
+      loadTrucks();
     } catch (error) {
-      console.error('Erro ao deletar caminhão:', error)
-      message.error(error.response?.data?.message || 'Erro ao deletar caminhão')
+      console.error("Erro ao deletar caminhão:", error);
+      message.error(
+        error.response?.data?.message || "Erro ao deletar caminhão",
+      );
     }
-  }
+  };
 
-  const totalTrucks = data.length
+  const totalTrucks = data.length;
   const getStatus = (dateValue) => {
-    if (!dateValue) return { label: 'Sem data', color: 'default', critical: false }
-    const days = dayjs(dateValue).startOf('day').diff(dayjs().startOf('day'), 'day')
-    if (days < 0) return { label: 'Vencido', color: 'red', critical: true }
-    if (days <= 30) return { label: `Vence em ${days}d`, color: 'orange', critical: true }
-    return { label: 'Em dia', color: 'green', critical: false }
-  }
+    if (!dateValue)
+      return { label: "Sem data", color: "default", critical: false };
+    const days = dayjs(dateValue)
+      .startOf("day")
+      .diff(dayjs().startOf("day"), "day");
+    if (days < 0) return { label: "Vencido", color: "red", critical: true };
+    if (days <= 30)
+      return { label: `Vence em ${days}d`, color: "orange", critical: true };
+    return { label: "Em dia", color: "green", critical: false };
+  };
 
   const activeTrucks = data.filter((truck) => {
-    const docExpiry = dayjs(truck.docExpiry)
-    const today = dayjs()
-    return docExpiry.isAfter(today)
-  }).length
-  const expiredDocs = totalTrucks - activeTrucks
+    const docExpiry = dayjs(truck.docExpiry);
+    const today = dayjs();
+    return docExpiry.isAfter(today);
+  }).length;
+  const expiredDocs = totalTrucks - activeTrucks;
   const dueAlerts = data.filter((truck) => {
     const checks = [
       getStatus(truck.docExpiry),
@@ -135,20 +133,20 @@ export default function VehicleList() {
       getStatus(truck.oilChangeEngineDate),
       getStatus(truck.oilChangeGearboxDate),
       getStatus(truck.oilChangeDifferentialDate),
-    ]
-    return checks.some((item) => item.critical)
-  }).length
+    ];
+    return checks.some((item) => item.critical);
+  }).length;
 
   const validityRate =
-    totalTrucks > 0 ? Math.round((activeTrucks / totalTrucks) * 100) : 0
+    totalTrucks > 0 ? Math.round((activeTrucks / totalTrucks) * 100) : 0;
 
   const columns = [
     {
-      title: 'Caminhão',
-      key: 'truck',
+      title: "Caminhão",
+      key: "truck",
       render: (_, record) => (
         <div>
-          <div style={{ fontWeight: 500, fontSize: '16px' }}>{record.name}</div>
+          <div style={{ fontWeight: 500, fontSize: "16px" }}>{record.name}</div>
           <Text type="secondary">
             {record.brand} - {record.year}
           </Text>
@@ -156,112 +154,110 @@ export default function VehicleList() {
       ),
     },
     {
-      title: 'Placa',
-      dataIndex: 'plate',
-      key: 'plate',
+      title: "Placa",
+      dataIndex: "plate",
+      key: "plate",
       render: (plate) => (
-        <Tag color="blue" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+        <Tag color="blue" style={{ fontSize: "14px", fontWeight: "bold" }}>
           {plate}
         </Tag>
       ),
     },
     {
-      title: 'Documentação',
-      key: 'docExpiry',
+      title: "Documentação",
+      key: "docExpiry",
       render: (_, record) => {
-        const docExpiry = record.docExpiry ? dayjs(record.docExpiry) : null
-        const today = dayjs()
-        const daysUntilExpiry = docExpiry ? docExpiry.diff(today, 'day') : null
+        const docExpiry = record.docExpiry ? dayjs(record.docExpiry) : null;
+        const today = dayjs();
+        const daysUntilExpiry = docExpiry ? docExpiry.diff(today, "day") : null;
 
-        let color = 'green'
-        let status = 'Válida'
+        let color = "green";
+        let status = "Válida";
 
         if (daysUntilExpiry === null) {
-          color = 'default'
-          status = 'N/A'
+          color = "default";
+          status = "N/A";
         } else if (daysUntilExpiry < 0) {
-          color = 'red'
-          status = 'Expirada'
+          color = "red";
+          status = "Expirada";
         } else if (daysUntilExpiry <= 30) {
-          color = 'orange'
-          status = 'Expira em breve'
+          color = "orange";
+          status = "Expira em breve";
         }
 
         return (
           <div>
             <Tag color={color}>{status}</Tag>
-            <div style={{ fontSize: '12px', marginTop: '4px' }}>
-              {record.docExpiry ? dayjs(record.docExpiry).format('DD/MM/YYYY') : 'N/A'}
+            <div style={{ fontSize: "12px", marginTop: "4px" }}>
+              {record.docExpiry
+                ? dayjs(record.docExpiry).format("DD/MM/YYYY")
+                : "N/A"}
             </div>
           </div>
-        )
+        );
       },
     },
     {
-      title: 'Alertas de Vencimento',
-      key: 'alerts',
+      title: "Alertas de Vencimento",
+      key: "alerts",
       render: (_, record) => {
         const items = [
-          { label: 'Doc', date: record.docExpiry },
-          { label: 'Seguro', date: record.insuranceExpiry },
-          { label: 'Tacógrafo', date: record.tachographCalibrationExpiry },
-          { label: 'Óleo Motor', date: record.oilChangeEngineDate },
-          { label: 'Óleo Caixa', date: record.oilChangeGearboxDate },
-          { label: 'Óleo Diferencial', date: record.oilChangeDifferentialDate },
-        ]
+          { label: "Doc", date: record.docExpiry },
+          { label: "Seguro", date: record.insuranceExpiry },
+          { label: "Tacógrafo", date: record.tachographCalibrationExpiry },
+          { label: "Óleo Motor", date: record.oilChangeEngineDate },
+          { label: "Óleo Caixa", date: record.oilChangeGearboxDate },
+          { label: "Óleo Diferencial", date: record.oilChangeDifferentialDate },
+        ];
         return (
           <Space size={[4, 4]} wrap>
             {items.map((item) => {
-              const status = getStatus(item.date)
+              const status = getStatus(item.date);
               return (
                 <Tag key={item.label} color={status.color}>
                   {item.label}: {status.label}
                 </Tag>
-              )
+              );
             })}
           </Space>
-        )
+        );
       },
     },
     {
-      title: 'Manutenções',
-      key: 'maintenances',
+      title: "Manutenções",
+      key: "maintenances",
       render: (_, record) => {
-        const list = record.Maintenance ?? record.maintenances ?? []
+        const list = record.Maintenance ?? record.maintenances ?? [];
         return (
           <div>
             <Text strong>{list.length}</Text>
-            <div style={{ fontSize: '12px' }}>
-              Última:{' '}
-              {list[0]?.date
-                ? dayjs(list[0].date).format('DD/MM/YYYY')
-                : 'N/A'}
+            <div style={{ fontSize: "12px" }}>
+              Última:{" "}
+              {list[0]?.date ? dayjs(list[0].date).format("DD/MM/YYYY") : "N/A"}
             </div>
           </div>
-        )
+        );
       },
     },
     {
-      title: 'Viagens',
-      key: 'trips',
+      title: "Viagens",
+      key: "trips",
       render: (_, record) => {
-        const list = record.Trip ?? record.trips ?? []
+        const list = record.Trip ?? record.trips ?? [];
         return (
           <div>
             <Text strong>{list.length}</Text>
-            <div style={{ fontSize: '12px' }}>
-              Última:{' '}
-              {list[0]?.date
-                ? dayjs(list[0].date).format('DD/MM/YYYY')
-                : 'N/A'}
+            <div style={{ fontSize: "12px" }}>
+              Última:{" "}
+              {list[0]?.date ? dayjs(list[0].date).format("DD/MM/YYYY") : "N/A"}
             </div>
           </div>
-        )
+        );
       },
     },
     {
-      title: 'Ações',
-      key: 'actions',
+      title: "Ações",
+      key: "actions",
       render: (_, record) => (
         <Space>
           <Tooltip title="Ver detalhes">
@@ -294,8 +290,8 @@ export default function VehicleList() {
                 type="text"
                 icon={<EditOutlined />}
                 onClick={() => {
-                  setCurrentVehicle(record)
-                  setIsModalVisible(true)
+                  setCurrentVehicle(record);
+                  setIsModalVisible(true);
                 }}
               />
             </Tooltip>
@@ -316,10 +312,20 @@ export default function VehicleList() {
         </Space>
       ),
     },
-  ]
+  ];
+
+  if (!canView) {
+    return (
+      <Result
+        status="403"
+        title="Acesso negado"
+        subTitle="Você não tem permissão para visualizar caminhões."
+      />
+    );
+  }
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: "24px" }}>
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col span={6}>
           <Card>
@@ -327,7 +333,7 @@ export default function VehicleList() {
               title="Total de Caminhões"
               value={totalTrucks}
               prefix={<CarOutlined />}
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: "#1890ff" }}
             />
           </Card>
         </Col>
@@ -338,7 +344,7 @@ export default function VehicleList() {
               title="Documentação Válida"
               value={activeTrucks}
               prefix={<CalendarOutlined />}
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: "#52c41a" }}
             />
           </Card>
         </Col>
@@ -349,7 +355,7 @@ export default function VehicleList() {
               title="Documentação Expirada"
               value={expiredDocs}
               prefix={<CalendarOutlined />}
-              valueStyle={{ color: '#ff4d4f' }}
+              valueStyle={{ color: "#ff4d4f" }}
             />
           </Card>
         </Col>
@@ -361,12 +367,12 @@ export default function VehicleList() {
               value={validityRate}
               suffix="%"
               prefix={<DollarOutlined />}
-              valueStyle={{ color: '#faad14' }}
+              valueStyle={{ color: "#faad14" }}
             />
             <Progress
               percent={validityRate}
               size="small"
-              status={expiredDocs === 0 ? 'success' : 'exception'}
+              status={expiredDocs === 0 ? "success" : "exception"}
             />
           </Card>
         </Col>
@@ -376,7 +382,7 @@ export default function VehicleList() {
               title="Veículos com Alerta"
               value={dueAlerts}
               prefix={<ToolOutlined />}
-              valueStyle={{ color: dueAlerts > 0 ? '#ff4d4f' : '#52c41a' }}
+              valueStyle={{ color: dueAlerts > 0 ? "#ff4d4f" : "#52c41a" }}
             />
           </Card>
         </Col>
@@ -385,9 +391,9 @@ export default function VehicleList() {
       <Card>
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
             marginBottom: 16,
           }}
         >
@@ -400,8 +406,8 @@ export default function VehicleList() {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => {
-                setCurrentVehicle(null)
-                setIsModalVisible(true)
+                setCurrentVehicle(null);
+                setIsModalVisible(true);
               }}
             >
               Adicionar Caminhão
@@ -428,13 +434,13 @@ export default function VehicleList() {
         <AddVehicleModal
           visible={isModalVisible}
           onCancel={() => {
-            setIsModalVisible(false)
-            setCurrentVehicle(null)
+            setIsModalVisible(false);
+            setCurrentVehicle(null);
           }}
           onSave={handleSaveVehicle}
           vehicle={currentVehicle}
         />
       )}
     </div>
-  )
+  );
 }
