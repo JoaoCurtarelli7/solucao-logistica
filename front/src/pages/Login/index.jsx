@@ -16,7 +16,7 @@ import {
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import "./styles.css";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { api } from "../../lib";
 import { useUserContext } from "../../context/userContext";
 
@@ -496,6 +496,15 @@ export default function LoginAndRegister() {
                 items={tabItems}
               />
             )}
+
+            <div style={{ textAlign: "center", marginTop: 16, paddingBottom: 8 }}>
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                Ainda não tem acesso?{" "}
+                <Link to="/solicitar-acesso" style={{ fontWeight: 500 }}>
+                  Solicitar acesso ao sistema
+                </Link>
+              </Text>
+            </div>
           </Card>
         </main>
       </div>

@@ -29,14 +29,15 @@ async function summarizeLoads(
   companyId: number,
   startDate: Date,
   endDate: Date,
+  tenantId: number,
 ) {
-  const company = await prisma.company.findUniqueOrThrow({
-    where: { id: companyId },
+  const company = await prisma.company.findFirstOrThrow({
+    where: { id: companyId, tenantId },
     select: { id: true, commission: true, name: true, cnpj: true },
   });
 
   const loads = await prisma.load.findMany({
-    where: { companyId, date: { gte: startDate, lte: endDate } },
+    where: { companyId, tenantId, date: { gte: startDate, lte: endDate } },
     orderBy: { date: "asc" },
   });
 
@@ -125,10 +126,12 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     monthId?: number;
     companyId?: number;
     status?: string;
+    tenantId: number;
   }) => {
     if (hasGeneratedModel()) {
       return (prisma as any).loadBillingClosing.findMany({
         where: {
+          tenantId: filters.tenantId,
           ...(filters.monthId ? { monthId: filters.monthId } : {}),
           ...(filters.companyId ? { companyId: filters.companyId } : {}),
           ...(filters.status ? { status: filters.status } : {}),
@@ -144,10 +147,12 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     }
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `SELECT * FROM "LoadBillingClosing"
-       WHERE ($1::int IS NULL OR "monthId" = $1)
-         AND ($2::int IS NULL OR "companyId" = $2)
-         AND ($3::text IS NULL OR "status" = $3)
+       WHERE "tenantId" = $1
+         AND ($2::int IS NULL OR "monthId" = $2)
+         AND ($3::int IS NULL OR "companyId" = $3)
+         AND ($4::text IS NULL OR "status" = $4)
        ORDER BY "createdAt" DESC`,
+      filters.tenantId,
       filters.monthId ?? null,
       filters.companyId ?? null,
       filters.status ?? null,
@@ -161,8 +166,8 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     }
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `INSERT INTO "LoadBillingClosing"
-       ("monthId","companyId","name","startDate","endDate","status","totalLoads","totalGrossValue","totalFreight","commissionRate","totalCommission","totalAdditionalCosts","billingTotal")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ("monthId","companyId","name","startDate","endDate","status","totalLoads","totalGrossValue","totalFreight","commissionRate","totalCommission","totalAdditionalCosts","billingTotal","tenantId")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
       data.monthId,
       data.companyId,
@@ -177,20 +182,23 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
       data.totalCommission ?? 0,
       data.totalAdditionalCosts ?? 0,
       data.billingTotal ?? 0,
+      data.tenantId,
     );
     return normalizeClosingRow(rows[0]);
   };
 
-  const findClosingOrThrow = async (id: number) => {
+  const findClosingOrThrow = async (id: number, tenantId: number) => {
     if (hasGeneratedModel()) {
-      const row = await (prisma as any).loadBillingClosing.findUniqueOrThrow({
-        where: { id },
+      const row = await (prisma as any).loadBillingClosing.findFirst({
+        where: { id, tenantId },
       });
+      if (!row) throw new Error("NOT_FOUND");
       return normalizeClosingRow(row);
     }
     const rows = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM "LoadBillingClosing" WHERE "id" = $1 LIMIT 1`,
+      `SELECT * FROM "LoadBillingClosing" WHERE "id" = $1 AND "tenantId" = $2 LIMIT 1`,
       id,
+      tenantId,
     );
     if (!rows[0]) throw new Error("NOT_FOUND");
     return normalizeClosingRow(rows[0]);
@@ -242,7 +250,8 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
           })
           .parse(req.query);
 
-        const rows = await listClosings({ monthId, companyId, status });
+        const tenantId = req.user!.tenantId;
+        const rows = await listClosings({ monthId, companyId, status, tenantId });
         return rep.send(rows);
       } catch (error) {
         app.log.error(error);
@@ -264,10 +273,12 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     async (req: FastifyRequest, rep: FastifyReply) => {
       try {
         const data = createSchema.parse(req.body);
-        const month = await prisma.month.findUniqueOrThrow({
-          where: { id: data.monthId },
+        const tenantId = req.user!.tenantId;
+        const month = await prisma.month.findFirst({
+          where: { id: data.monthId, tenantId },
           select: { id: true, month: true, year: true },
         });
+        if (!month) return rep.code(404).send({ message: "Mês não encontrado" });
 
         const defaultRange = dateRangeFromMonth(month);
         const startDate = data.startDate
@@ -281,6 +292,7 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
           data.companyId,
           startDate,
           endDate,
+          tenantId,
         );
 
         const createdBase = await createClosing({
@@ -289,6 +301,7 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
           name: data.name,
           startDate,
           endDate,
+          tenantId,
           ...summary,
         });
         const created = await withRelations(createdBase);
@@ -319,7 +332,8 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     async (req: FastifyRequest, rep: FastifyReply) => {
       try {
         const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
-        const closing = await findClosingOrThrow(id);
+        const tenantId = req.user!.tenantId;
+        const closing = await findClosingOrThrow(id, tenantId);
 
         if (closing.status === "fechado") {
           return rep
@@ -335,6 +349,7 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
         // Buscar fechamento de caixa (Closing) para o mesmo mês e empresa
         const closings = await prisma.closing.findMany({
           where: {
+            tenantId,
             monthId: closing.monthId,
             OR: [{ companyId: closing.companyId }, { companyId: null }],
           },
@@ -382,10 +397,11 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
             type: "entrada",
             companyId: closing.companyId,
             closingId: targetClosing.id,
+            tenantId,
           },
         });
 
-        const updated = await withRelations(await findClosingOrThrow(id));
+        const updated = await withRelations(await findClosingOrThrow(id, tenantId));
         return rep.send(updated);
       } catch (error: any) {
         app.log.error(error);
@@ -410,11 +426,13 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     async (req: FastifyRequest, rep: FastifyReply) => {
       try {
         const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
-        const closing = await findClosingOrThrow(id);
+        const tenantId = req.user!.tenantId;
+        const closing = await findClosingOrThrow(id, tenantId);
         const { summary } = await summarizeLoads(
           closing.companyId,
           closing.startDate,
           closing.endDate,
+          tenantId,
         );
         const updatedBase = await updateClosing(id, summary);
         const updated = await withRelations(updatedBase);
@@ -444,12 +462,14 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     async (req: FastifyRequest, rep: FastifyReply) => {
       try {
         const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
-        const closing = await withRelations(await findClosingOrThrow(id));
+        const tenantId = req.user!.tenantId;
+        const closing = await withRelations(await findClosingOrThrow(id, tenantId));
 
         const { loads, summary } = await summarizeLoads(
           closing.companyId,
           closing.startDate,
           closing.endDate,
+          tenantId,
         );
         return rep.send({
           closing: {

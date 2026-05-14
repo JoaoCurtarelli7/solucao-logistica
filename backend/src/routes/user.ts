@@ -31,6 +31,8 @@ export async function userRoutes(app: FastifyInstance) {
             phone: true,
             address: true,
             status: true,
+            tenantId: true,
+            isSuperAdmin: true,
             role: {
               select: {
                 id: true,
@@ -59,6 +61,8 @@ export async function userRoutes(app: FastifyInstance) {
               email: true,
               phone: true,
               address: true,
+              tenantId: true,
+              isSuperAdmin: true,
               createdAt: true,
             },
           });
@@ -105,6 +109,8 @@ export async function userRoutes(app: FastifyInstance) {
         phone: user.phone ?? null,
         address: user.address ?? null,
         status: user.status ?? null,
+        tenantId: user.tenantId ?? null,
+        isSuperAdmin: user.isSuperAdmin ?? false,
         createdAt: user.createdAt,
         role,
         permissions,

@@ -7,10 +7,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Tenant {
+  id                 Int                  @id @default(autoincrement())
+  name               String
+  cnpj               String?              @unique
+  status             String               @default("active")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @default(now())
+  User               User[]
+  Employee           Employee[]
+  Truck              Truck[]
+  Trip               Trip[]
+  Month              Month[]
+  Company            Company[]
+  FinancialEntry     FinancialEntry[]
+  FinancialPeriod    FinancialPeriod[]
+  Load               Load[]
+  Closing            Closing[]
+  LoadBillingClosing LoadBillingClosing[]
+}
+
 model Closing {
   id             Int              @id @default(autoincrement())
   monthId        Int
   companyId      Int?
+  tenantId       Int
   name           String
   startDate      DateTime?
   endDate        DateTime?
@@ -22,12 +43,13 @@ model Closing {
   profitMargin   Float            @default(0)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @default(now())
-  /// IDs de funcionários cujo salário calculado foi excluído deste fechamento
   excludedSalaryEmployeeIds Int[] @default([])
+  Tenant         Tenant           @relation(fields: [tenantId], references: [id])
   Company        Company?         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   Month          Month            @relation(fields: [monthId], references: [id], onDelete: Cascade)
   FinancialEntry FinancialEntry[]
 
+  @@index([tenantId], map: "idx_closing_tenantId")
   @@index([companyId], map: "idx_closing_companyId")
   @@index([monthId], map: "idx_closing_monthId")
 }
@@ -36,16 +58,21 @@ model Company {
   id                 Int                  @id @default(autoincrement())
   name               String
   type               String
-  cnpj               String               @unique
+  cnpj               String
   dateRegistration   DateTime
   status             String
   responsible        String
   commission         Float
+  tenantId           Int
+  Tenant             Tenant               @relation(fields: [tenantId], references: [id])
   Closing            Closing[]
   LoadBillingClosing LoadBillingClosing[]
   FinancialEntry     FinancialEntry[]
   FinancialPeriod    FinancialPeriod[]
   Load               Load[]
+
+  @@unique([cnpj, tenantId])
+  @@index([tenantId], map: "idx_company_tenantId")
 }
 
 model Employee {
@@ -54,16 +81,19 @@ model Employee {
   role        String
   baseSalary  Float
   status      String
-  // Conta Pix para depósito (opcional para manter compatibilidade com dados antigos)
   pixAccount  String?
   cpf         String?
   phone       String?
   email       String?
   address     String?
   hireDate    DateTime      @default(now())
+  tenantId    Int
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @default(now())
+  Tenant      Tenant        @relation(fields: [tenantId], references: [id])
   Transaction Transaction[]
+
+  @@index([tenantId], map: "idx_employee_tenantId")
 }
 
 model FinancialEntry {
@@ -76,11 +106,14 @@ model FinancialEntry {
   observations String?
   closingId    Int?
   companyId    Int?
+  tenantId     Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now())
+  Tenant       Tenant   @relation(fields: [tenantId], references: [id])
   Closing      Closing? @relation(fields: [closingId], references: [id], onDelete: Cascade)
   Company      Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([tenantId], map: "idx_finEntry_tenantId")
   @@index([closingId], map: "idx_finEntry_closingId")
   @@index([companyId], map: "idx_finEntry_companyId")
 }
@@ -91,6 +124,7 @@ model FinancialPeriod {
   startDate     DateTime
   endDate       DateTime
   companyId     Int?
+  tenantId      Int
   status        String   @default("aberto")
   totalEntries  Float    @default(0)
   totalExpenses Float    @default(0)
@@ -99,8 +133,10 @@ model FinancialPeriod {
   profitMargin  Float    @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now())
+  Tenant        Tenant   @relation(fields: [tenantId], references: [id])
   Company       Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([tenantId], map: "idx_finPeriod_tenantId")
   @@index([companyId], map: "idx_finPeriod_companyId")
 }
 
@@ -113,13 +149,15 @@ model Load {
   totalValue          Float
   freight4            Float
   totalFreight        Float
-  /// Custos extras cobrados junto com a comissão (descarga, pedágio, etc.)
   additionalCosts     Float    @default(0)
   additionalCostsNote String?
   observations        String?
   companyId           Int
+  tenantId            Int
+  Tenant              Tenant   @relation(fields: [tenantId], references: [id])
   Company             Company  @relation(fields: [companyId], references: [id])
 
+  @@index([tenantId], map: "idx_load_tenantId")
   @@index([companyId], map: "idx_load_companyId")
 }
 
@@ -138,7 +176,6 @@ model Maintenance {
   @@index([truckId], map: "idx_maintenance_truckId")
 }
 
-// Catálogo de serviços de manutenção (padrões + cadastrados pelo usuário)
 model MaintenanceServicePreset {
   id        Int      @id @default(autoincrement())
   name      String   @unique
@@ -151,19 +188,23 @@ model Month {
   year               Int
   month              Int
   name               String
+  tenantId           Int
   status             String               @default("aberto")
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @default(now())
+  Tenant             Tenant               @relation(fields: [tenantId], references: [id])
   Closing            Closing[]
   LoadBillingClosing LoadBillingClosing[]
 
-  @@unique([year, month], map: "uq_month_year_month")
+  @@unique([year, month, tenantId], map: "uq_month_year_month_tenant")
+  @@index([tenantId], map: "idx_month_tenantId")
 }
 
 model LoadBillingClosing {
   id                   Int      @id @default(autoincrement())
   monthId              Int
   companyId            Int
+  tenantId             Int
   name                 String
   startDate            DateTime
   endDate              DateTime
@@ -172,16 +213,16 @@ model LoadBillingClosing {
   totalGrossValue      Float    @default(0)
   totalFreight         Float    @default(0)
   commissionRate       Float    @default(0)
-  /// Comissão calculada só sobre o valor bruto (percentual da empresa)
   totalCommission      Float    @default(0)
-  /// Soma dos custos adicionais das cargas no período
   totalAdditionalCosts Float    @default(0)
   billingTotal         Float    @default(0)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @default(now())
+  Tenant               Tenant   @relation(fields: [tenantId], references: [id])
   Month                Month    @relation(fields: [monthId], references: [id], onDelete: Cascade)
   Company              Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([tenantId], map: "idx_loadBillingClosing_tenantId")
   @@index([monthId], map: "idx_loadBillingClosing_monthId")
   @@index([companyId], map: "idx_loadBillingClosing_companyId")
 }
@@ -191,7 +232,6 @@ model Transaction {
   type        String
   amount      Float
   date        DateTime @default(now())
-  // O que é a transação (opcional no schema para não quebrar registros antigos)
   description String?
   employeeId  Int
   Employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -201,20 +241,23 @@ model Transaction {
 
 model Trip {
   id               Int           @id @default(autoincrement())
-  origin           String? // Origem da viagem (rota: origem → destino)
+  origin           String?
   destination      String
   driver           String
   date             DateTime
-  estimatedArrival DateTime? // Previsão de chegada
+  estimatedArrival DateTime?
   freightValue     Float
   status           String        @default("em_andamento")
   notes            String?
   truckId          Int?
+  tenantId         Int
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @default(now())
+  Tenant           Tenant        @relation(fields: [tenantId], references: [id])
   Truck            Truck?        @relation(fields: [truckId], references: [id], onDelete: Restrict)
   TripExpense      TripExpense[]
 
+  @@index([tenantId], map: "idx_trip_tenantId")
   @@index([truckId], map: "idx_trip_truckId")
 }
 
@@ -236,7 +279,7 @@ model TripExpense {
 model Truck {
   id                          Int           @id @default(autoincrement())
   name                        String
-  plate                       String        @unique
+  plate                       String
   brand                       String
   year                        Int
   docExpiry                   DateTime
@@ -247,22 +290,32 @@ model Truck {
   oilChangeDifferentialDate   DateTime?
   renavam                     String
   image                       String?
+  tenantId                    Int
+  Tenant                      Tenant        @relation(fields: [tenantId], references: [id])
   Maintenance                 Maintenance[]
   Trip                        Trip[]
+
+  @@unique([plate, tenantId])
+  @@index([tenantId], map: "idx_truck_tenantId")
 }
 
 model User {
-  id        Int        @id @default(autoincrement())
-  name      String
-  email     String     @unique
-  password  String
-  phone     String?
-  address   String?
-  status    String     @default("active")
-  roleId    Int?
-  role      Role?      @relation(fields: [roleId], references: [id])
-  createdAt DateTime   @default(now())
-  AuditLog  AuditLog[]
+  id           Int        @id @default(autoincrement())
+  name         String
+  email        String     @unique
+  password     String
+  phone        String?
+  address      String?
+  status       String     @default("active")
+  roleId       Int?
+  tenantId     Int
+  isSuperAdmin Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  Tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  role         Role?      @relation(fields: [roleId], references: [id])
+  AuditLog     AuditLog[]
+
+  @@index([tenantId], map: "idx_user_tenantId")
 }
 
 model Role {

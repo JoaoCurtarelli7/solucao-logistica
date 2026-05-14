@@ -12,13 +12,10 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
 
     const parts = auth.split(" ");
     if (parts.length !== 2 || parts[0] !== "Bearer") {
-      return rep
-        .status(401)
-        .send({ message: "Formato de token inválido. Use: Bearer <token>" });
+      return rep.status(401).send({ message: "Formato de token inválido. Use: Bearer <token>" });
     }
 
     const token = parts[1];
-
     if (!token) {
       return rep.status(401).send({ message: "Token ausente" });
     }
@@ -27,22 +24,21 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
       const decoded: any = verifyToken(token);
 
       if (!decoded.userId) {
-        return rep
-          .status(401)
-          .send({ message: "Token inválido - userId não encontrado" });
+        return rep.status(401).send({ message: "Token inválido - userId não encontrado" });
       }
 
       const userId = Number(decoded.userId);
-      const tokenPermissions = Array.isArray(decoded.permissions)
-        ? decoded.permissions
-        : undefined;
+      const tokenTenantId = decoded.tenantId ? Number(decoded.tenantId) : undefined;
+      const tokenIsSuperAdmin = decoded.isSuperAdmin === true;
+      const tokenPermissions = Array.isArray(decoded.permissions) ? decoded.permissions : undefined;
       const tokenRoleId = decoded.roleId ?? undefined;
       const tokenRole = decoded.role ?? undefined;
 
-      // Se o token já vier com permissões, usa; senão busca no banco
-      if (tokenPermissions) {
+      if (tokenPermissions && tokenTenantId !== undefined) {
         req.user = {
           id: userId,
+          tenantId: tokenTenantId,
+          isSuperAdmin: tokenIsSuperAdmin,
           roleId: tokenRoleId ?? null,
           role: tokenRole ?? null,
           permissions: tokenPermissions,
@@ -50,33 +46,24 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
         return;
       }
 
-      let dbUser: any = null;
-      try {
-        dbUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: {
-            id: true,
-            status: true,
-            role: {
-              select: {
-                id: true,
-                name: true,
-                permissions: {
-                  select: {
-                    permission: { select: { key: true } },
-                  },
-                },
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          status: true,
+          tenantId: true,
+          isSuperAdmin: true,
+          role: {
+            select: {
+              id: true,
+              name: true,
+              permissions: {
+                select: { permission: { select: { key: true } } },
               },
             },
           },
-        });
-      } catch (dbErr: any) {
-        // Tabelas role/permissions podem não existir; busca só usuário
-        dbUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { id: true },
-        });
-      }
+        },
+      });
 
       if (!dbUser) {
         return rep.status(401).send({ message: "Usuário não encontrado" });
@@ -87,15 +74,12 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
       }
 
       let permissions: string[] =
-        dbUser.role?.permissions?.map((rp: { permission?: { key?: string } }) => rp.permission?.key).filter(Boolean) ?? [];
+        dbUser.role?.permissions?.map((rp: any) => rp.permission?.key).filter(Boolean) ?? [];
 
-      // Usuário sem perfil (roleId null) = acesso total (super admin)
       if (permissions.length === 0) {
         try {
-          const allPerms = await (prisma as any).permission.findMany({
-            select: { key: true },
-          });
-          permissions = (allPerms as { key: string }[]).map((p) => p.key);
+          const allPerms = await prisma.permission.findMany({ select: { key: true } });
+          permissions = allPerms.map((p) => p.key);
         } catch {
           permissions = ["users.manage"];
         }
@@ -103,22 +87,20 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
 
       req.user = {
         id: dbUser.id,
-        status: dbUser.status ?? null,
+        tenantId: dbUser.tenantId,
+        isSuperAdmin: dbUser.isSuperAdmin,
+        status: dbUser.status ?? undefined,
         roleId: dbUser.role?.id ?? null,
         role: dbUser.role?.name ?? null,
         permissions,
       };
     } catch (jwtError: any) {
-      console.error("Erro ao verificar token:", jwtError.message);
-
       if (jwtError.name === "TokenExpiredError") {
         return rep.status(401).send({ message: "Token expirado" });
       }
-
       if (jwtError.name === "JsonWebTokenError") {
         return rep.status(401).send({ message: "Token inválido" });
       }
-
       return rep.status(401).send({ message: "Token inválido ou expirado" });
     }
   } catch (error: any) {

@@ -84,17 +84,19 @@ export async function truckRoutes(app: FastifyInstance) {
   // Listar todos os caminhões
   app.get("/trucks", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
+      const tenantId = req.user!.tenantId;
       const trucks = await prisma.truck.findMany({
-        include: { 
+        where: { tenantId },
+        include: {
           Maintenance: {
             orderBy: { date: 'desc' }
-          }, 
+          },
           Trip: {
             orderBy: { date: 'desc' },
             include: {
               TripExpense: true
             }
-          } 
+          }
         },
         orderBy: { name: 'asc' }
       });
@@ -109,24 +111,27 @@ export async function truckRoutes(app: FastifyInstance) {
   app.get("/trucks/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
-      const truck = await prisma.truck.findUniqueOrThrow({
-        where: { id },
-        include: { 
+      const tenantId = req.user!.tenantId;
+      const truck = await prisma.truck.findFirst({
+        where: { id, tenantId },
+        include: {
           Maintenance: {
             orderBy: { date: 'desc' }
-          }, 
+          },
           Trip: {
             orderBy: { date: 'desc' },
             include: {
               TripExpense: true
             }
-          } 
+          }
         },
       });
+      if (!truck) {
+        return rep.code(404).send({ message: "Caminhão não encontrado" });
+      }
       return truck;
     } catch (error) {
       console.error("Erro ao buscar caminhão:", error);
-    
       return rep.code(500).send({ message: "Erro ao buscar caminhão" });
     }
   });
@@ -135,8 +140,9 @@ export async function truckRoutes(app: FastifyInstance) {
   app.get("/trucks/:id/maintenances", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
+      const tenantId = req.user!.tenantId;
       const maintenances = await prisma.maintenance.findMany({
-        where: { truckId: id },
+        where: { truckId: id, Truck: { tenantId } },
         orderBy: { date: 'desc' }
       });
       return { maintenances };
@@ -151,12 +157,13 @@ export async function truckRoutes(app: FastifyInstance) {
     try {
       const { id } = paramsSchema.parse(req.params);
       const maintenanceData = maintenanceBodySchema.parse(req.body);
-      
-      // Verificar se o caminhão existe
-      const truck = await prisma.truck.findUnique({
-        where: { id }
+      const tenantId = req.user!.tenantId;
+
+      // Verificar se o caminhão existe e pertence ao tenant
+      const truck = await prisma.truck.findFirst({
+        where: { id, tenantId }
       });
-      
+
       if (!truck) {
         return rep.code(404).send({ message: "Caminhão não encontrado" });
       }
@@ -184,7 +191,16 @@ export async function truckRoutes(app: FastifyInstance) {
     try {
       const { id } = paramsSchema.parse(req.params);
       const maintenanceData = maintenanceBodySchema.parse(req.body);
-      
+      const tenantId = req.user!.tenantId;
+
+      // Verify maintenance belongs to a truck in this tenant
+      const existingMaintenance = await prisma.maintenance.findFirst({
+        where: { id, Truck: { tenantId } },
+      });
+      if (!existingMaintenance) {
+        return rep.code(404).send({ message: "Manutenção não encontrada" });
+      }
+
       const maintenance = await prisma.maintenance.update({
         where: { id },
         data: {
@@ -195,7 +211,7 @@ export async function truckRoutes(app: FastifyInstance) {
           notes: maintenanceData.notes,
         }
       });
-      
+
       return maintenance;
     } catch (error) {
       console.error("Erro ao atualizar manutenção:", error);
@@ -207,6 +223,16 @@ export async function truckRoutes(app: FastifyInstance) {
   app.delete("/maintenances/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
+      const tenantId = req.user!.tenantId;
+
+      // Verify maintenance belongs to a truck in this tenant
+      const existingMaintenance = await prisma.maintenance.findFirst({
+        where: { id, Truck: { tenantId } },
+      });
+      if (!existingMaintenance) {
+        return rep.code(404).send({ message: "Manutenção não encontrada" });
+      }
+
       await prisma.maintenance.delete({ where: { id } });
       return rep.code(204).send();
     } catch (error) {
@@ -219,12 +245,13 @@ export async function truckRoutes(app: FastifyInstance) {
   app.post("/trucks", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = truckBodySchema.parse(req.body);
-      
-      // Verificar se a placa já existe
-      const existingTruck = await prisma.truck.findUnique({
-        where: { plate: data.plate }
+      const tenantId = req.user!.tenantId;
+
+      // Verificar se a placa já existe neste tenant
+      const existingTruck = await prisma.truck.findFirst({
+        where: { plate: data.plate, tenantId }
       });
-      
+
       if (existingTruck) {
         return rep.code(400).send({ message: "Já existe um caminhão com esta placa" });
       }
@@ -243,6 +270,7 @@ export async function truckRoutes(app: FastifyInstance) {
           oilChangeEngineDate: data.oilChangeEngineDate,
           oilChangeGearboxDate: data.oilChangeGearboxDate,
           oilChangeDifferentialDate: data.oilChangeDifferentialDate,
+          tenantId,
         },
       });
       return rep.code(201).send(truck);
@@ -275,15 +303,23 @@ export async function truckRoutes(app: FastifyInstance) {
     try {
       const { id } = paramsSchema.parse(req.params);
       const data = truckBodySchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
 
-      // Verificar se a placa já existe em outro caminhão
+      // Verify ownership before update
+      const ownedTruck = await prisma.truck.findFirst({ where: { id, tenantId } });
+      if (!ownedTruck) {
+        return rep.code(404).send({ message: "Caminhão não encontrado" });
+      }
+
+      // Verificar se a placa já existe em outro caminhão neste tenant
       const existingTruck = await prisma.truck.findFirst({
-        where: { 
+        where: {
           plate: data.plate,
+          tenantId,
           id: { not: id }
         }
       });
-      
+
       if (existingTruck) {
         return rep.code(400).send({ message: "Já existe um caminhão com esta placa" });
       }
@@ -337,10 +373,11 @@ export async function truckRoutes(app: FastifyInstance) {
   app.delete("/trucks/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      // Verificar se o caminhão tem viagens ou manutenções
-      const truck = await prisma.truck.findUnique({
-        where: { id },
+      // Verificar se o caminhão existe e pertence ao tenant
+      const truck = await prisma.truck.findFirst({
+        where: { id, tenantId },
         include: {
           Trip: true,
           Maintenance: true
@@ -369,8 +406,9 @@ export async function truckRoutes(app: FastifyInstance) {
   app.get("/maintenances/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
-      const maintenance = await prisma.maintenance.findUniqueOrThrow({
-        where: { id },
+      const tenantId = req.user!.tenantId;
+      const maintenance = await prisma.maintenance.findFirst({
+        where: { id, Truck: { tenantId } },
         include: {
           Truck: {
             select: {
@@ -381,10 +419,12 @@ export async function truckRoutes(app: FastifyInstance) {
           }
         }
       });
+      if (!maintenance) {
+        return rep.code(404).send({ message: "Manutenção não encontrada" });
+      }
       return maintenance;
     } catch (error) {
       console.error("Erro ao buscar manutenção:", error);
-     
       return rep.code(500).send({ message: "Erro ao buscar manutenção" });
     }
   });

@@ -1,10 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { authMiddleware } from "../middlewares/authMiddleware";
 
 export async function financialRoutes(app: FastifyInstance) {
-  // Autenticação desativada temporariamente para facilitar testes de integração do financeiro
-  // app.addHook("preHandler", authenticate);
+  app.addHook("preHandler", authMiddleware);
 
   // Schema para validação de entrada financeira
   const createEntrySchema = z.object({
@@ -79,7 +79,8 @@ export async function financialRoutes(app: FastifyInstance) {
   app.post("/financial/entries", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = createEntrySchema.parse(req.body);
-      
+      const tenantId = req.user!.tenantId;
+
       const entry = await prisma.financialEntry.create({
         data: {
           description: data.description,
@@ -90,6 +91,7 @@ export async function financialRoutes(app: FastifyInstance) {
           closingId: data.closingId,
           type: data.type,
           observations: data.observations,
+          tenantId,
         },
         include: {
           Company: {
@@ -125,27 +127,16 @@ export async function financialRoutes(app: FastifyInstance) {
   app.get("/financial/entries", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { startDate, endDate, companyId, type, category } = filterSchema.parse(req.query);
-      
-      const where: any = {};
-      
+      const tenantId = req.user!.tenantId;
+
+      const where: any = { tenantId };
+
       if (startDate && endDate) {
-        where.date = {
-          gte: startDate,
-          lte: endDate,
-        };
+        where.date = { gte: startDate, lte: endDate };
       }
-      
-      if (companyId) {
-        where.companyId = companyId;
-      }
-      
-      if (type) {
-        where.type = type;
-      }
-      
-      if (category) {
-        where.category = category;
-      }
+      if (companyId) where.companyId = companyId;
+      if (type) where.type = type;
+      if (category) where.category = category;
 
       const entries = await prisma.financialEntry.findMany({
         where,
@@ -177,9 +168,10 @@ export async function financialRoutes(app: FastifyInstance) {
   app.get("/financial/entries/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
-      
-      const entry = await prisma.financialEntry.findUnique({
-        where: { id },
+      const tenantId = req.user!.tenantId;
+
+      const entry = await prisma.financialEntry.findFirst({
+        where: { id, tenantId },
         include: {
           Company: {
             select: {
@@ -210,7 +202,11 @@ export async function financialRoutes(app: FastifyInstance) {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       const data = createEntrySchema.parse(req.body);
-      
+      const tenantId = req.user!.tenantId;
+
+      const existing = await prisma.financialEntry.findFirst({ where: { id, tenantId } });
+      if (!existing) return rep.code(404).send({ message: "Entrada financeira não encontrada" });
+
       const entry = await prisma.financialEntry.update({
         where: { id },
         data: {
@@ -248,10 +244,12 @@ export async function financialRoutes(app: FastifyInstance) {
   app.delete("/financial/entries/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
-      
-      await prisma.financialEntry.delete({
-        where: { id },
-      });
+      const tenantId = req.user!.tenantId;
+
+      const existing = await prisma.financialEntry.findFirst({ where: { id, tenantId } });
+      if (!existing) return rep.code(404).send({ message: "Entrada financeira não encontrada" });
+
+      await prisma.financialEntry.delete({ where: { id } });
 
       return { message: "Entrada financeira deletada com sucesso" };
     } catch (error) {
@@ -267,23 +265,14 @@ export async function financialRoutes(app: FastifyInstance) {
   app.get("/financial/summary", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { startDate, endDate, companyId } = filterSchema.parse(req.query);
-      
+      const tenantId = req.user!.tenantId;
+
       if (!startDate || !endDate) {
-        return rep.code(400).send({ 
-          message: "Data de início e fim são obrigatórias para o resumo" 
-        });
+        return rep.code(400).send({ message: "Data de início e fim são obrigatórias para o resumo" });
       }
 
-      const where: any = {
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
-      };
-      
-      if (companyId) {
-        where.companyId = companyId;
-      }
+      const where: any = { tenantId, date: { gte: startDate, lte: endDate } };
+      if (companyId) where.companyId = companyId;
 
       const entries = await prisma.financialEntry.findMany({ where });
       
@@ -329,13 +318,15 @@ export async function financialRoutes(app: FastifyInstance) {
   app.post("/financial/periods", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = createPeriodSchema.parse(req.body);
-      
+      const tenantId = req.user!.tenantId;
+
       const period = await prisma.financialPeriod.create({
         data: {
           name: data.name,
           startDate: data.startDate,
           endDate: data.endDate,
           companyId: data.companyId,
+          tenantId,
         },
         include: {
           Company: {
@@ -362,11 +353,10 @@ export async function financialRoutes(app: FastifyInstance) {
   app.get("/financial/periods", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { companyId } = filterSchema.parse(req.query);
-      
-      const where: any = {};
-      if (companyId) {
-        where.companyId = companyId;
-      }
+      const tenantId = req.user!.tenantId;
+
+      const where: any = { tenantId };
+      if (companyId) where.companyId = companyId;
 
       const periods = await prisma.financialPeriod.findMany({
         where,
@@ -398,12 +388,11 @@ export async function financialRoutes(app: FastifyInstance) {
   app.post("/financial/periods/:id/close", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
-      
-      const period = await prisma.financialPeriod.findUnique({
-        where: { id },
-        include: {
-          Company: true,
-        },
+      const tenantId = req.user!.tenantId;
+
+      const period = await prisma.financialPeriod.findFirst({
+        where: { id, tenantId },
+        include: { Company: true },
       });
 
       if (!period) {
@@ -413,6 +402,7 @@ export async function financialRoutes(app: FastifyInstance) {
       // Calcular totais do período
       const entries = await prisma.financialEntry.findMany({
         where: {
+          tenantId,
           companyId: period.companyId,
           date: {
             gte: period.startDate,

@@ -16,6 +16,7 @@ import {
   SettingOutlined,
   LogoutOutlined,
   TeamOutlined,
+  CrownOutlined,
 } from "@ant-design/icons";
 import { useUserContext } from "../../context/userContext";
 import { usePermission } from "../../hooks/usePermission";
@@ -150,6 +151,15 @@ export default function AppSidebar({ open = false, onClose }) {
             key: "/reports",
             icon: <PrinterOutlined />,
             label: <Link to="/reports">Relatórios</Link>,
+          },
+        ]
+      : []),
+    ...(userContext?.isSuperAdmin
+      ? [
+          {
+            key: "/admin",
+            icon: <CrownOutlined style={{ color: "#faad14" }} />,
+            label: <Link to="/admin" style={{ color: "#faad14", fontWeight: 600 }}>Painel Admin</Link>,
           },
         ]
       : []),

@@ -25,8 +25,9 @@ export async function monthRoutes(app: FastifyInstance) {
       });
 
       const { year, status } = querySchema.parse(req.query);
+      const tenantId = req.user!.tenantId;
 
-      let whereClause: any = {};
+      let whereClause: any = { tenantId };
 
       if (year) {
         whereClause.year = parseInt(year);
@@ -57,9 +58,10 @@ export async function monthRoutes(app: FastifyInstance) {
   app.get("/months/:id", { preHandler: requirePermission("months.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      const month = await prisma.month.findUnique({
-        where: { id },
+      const month = await prisma.month.findFirst({
+        where: { id, tenantId },
         include: {
           Closing: {
             include: {
@@ -95,12 +97,15 @@ export async function monthRoutes(app: FastifyInstance) {
 
       const monthName = `${monthNames[monthNumber - 1]} ${year}`;
 
+      const tenantId = req.user!.tenantId;
+
       const createdMonth = await prisma.month.create({
         data: {
           year,
           month: monthNumber,
           name: monthName,
           status: 'aberto',
+          tenantId,
         },
       });
 
@@ -137,6 +142,13 @@ export async function monthRoutes(app: FastifyInstance) {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       const data = updateMonthSchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
+
+      // Verify ownership before update
+      const existing = await prisma.month.findFirst({ where: { id, tenantId } });
+      if (!existing) {
+        return rep.code(404).send({ message: "Mês não encontrado" });
+      }
 
       const updatedMonth = await prisma.month.update({
         where: { id },
@@ -162,9 +174,10 @@ export async function monthRoutes(app: FastifyInstance) {
   app.delete("/months/:id", { preHandler: requirePermission("months.delete") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      const month = await prisma.month.findUnique({
-        where: { id },
+      const month = await prisma.month.findFirst({
+        where: { id, tenantId },
         include: { Closing: true },
       });
 
@@ -190,9 +203,10 @@ export async function monthRoutes(app: FastifyInstance) {
   app.get("/months/:id/stats", { preHandler: requirePermission("months.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      const month = await prisma.month.findUnique({
-        where: { id },
+      const month = await prisma.month.findFirst({
+        where: { id, tenantId },
         include: {
           Closing: {
             include: { FinancialEntry: true },

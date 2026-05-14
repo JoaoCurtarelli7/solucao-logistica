@@ -21,6 +21,7 @@ import { tripExpenseRoutes } from "./routes/tripExpense";
 import { maintenanceRoutes } from "./routes/maintenance";
 import { maintenanceServicePresetRoutes } from "./routes/maintenanceServicePreset";
 import { rbacRoutes } from "./routes/rbac";
+import { tenantRoutes } from "./routes/tenant";
 
 export const app = fastify({
   logger: true,
@@ -102,5 +103,6 @@ app.register(maintenanceServicePresetRoutes);
 app.register(tripRoutes);
 app.register(tripExpenseRoutes);
 app.register(rbacRoutes);
+app.register(tenantRoutes);
 
 export default app;

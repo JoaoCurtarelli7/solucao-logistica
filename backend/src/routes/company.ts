@@ -4,9 +4,7 @@ import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middlewares/authMiddleware";
 
 export async function companyRoutes(app: FastifyInstance) {
-  const paramsSchema = z.object({
-    id: z.coerce.number(),
-  });
+  const paramsSchema = z.object({ id: z.coerce.number() });
 
   const bodySchema = z.object({
     name: z.string(),
@@ -18,118 +16,80 @@ export async function companyRoutes(app: FastifyInstance) {
     commission: z.coerce.number(),
   });
 
-  // Listar todas as empresas (rota pública para permitir seleção)
+  app.addHook("preHandler", authMiddleware);
+
   app.get("/companies", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
+      const tenantId = req.user!.tenantId;
       const companies = await prisma.company.findMany({
-        select: {
-          id: true,
-          name: true,
-          type: true,
-          cnpj: true,
-          dateRegistration: true,
-          status: true,
-          responsible: true,
-          commission: true,
-        },
-        orderBy: {
-          name: 'asc',
-        },
+        where: { tenantId },
+        select: { id: true, name: true, type: true, cnpj: true, dateRegistration: true, status: true, responsible: true, commission: true },
+        orderBy: { name: "asc" },
       });
-
       return rep.send(companies);
     } catch (error: any) {
-      console.error("❌ Erro ao buscar empresas:", error);
-      console.error("Detalhes:", {
-        message: error?.message,
-        code: error?.code,
-        meta: error?.meta,
-      });
-      return rep.code(500).send({ 
-        message: "Erro ao buscar empresas",
-        error: process.env.NODE_ENV === 'development' ? error?.message : undefined
-      });
+      return rep.code(500).send({ message: "Erro ao buscar empresas" });
     }
   });
 
-  // 🔒 Protege as rotas restantes da empresa
-  app.addHook("preHandler", authMiddleware);
-
-  // Obter uma empresa pelo ID
   app.get("/company/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
-
-      const company = await prisma.company.findUniqueOrThrow({
-        where: { id },
-      });
-
+      const tenantId = req.user!.tenantId;
+      const company = await prisma.company.findFirst({ where: { id, tenantId } });
+      if (!company) return rep.code(404).send({ message: "Empresa não encontrada" });
       return rep.send(company);
     } catch (error: any) {
-      if (error.code === "P2025") {
-        return rep.code(404).send({ message: "Empresa não encontrada" });
-      }
-      console.error("❌ Erro ao buscar empresa:", error);
-      return rep.code(500).send({ 
-        message: "Erro interno do servidor",
-        error: process.env.NODE_ENV === 'development' ? error?.message : undefined
-      });
-    }
-  });
-
-  // Criar uma nova empresa
-  app.post("/company", async (req: FastifyRequest, rep: FastifyReply) => {
-    const { name, type, cnpj, dateRegistration, status, responsible, commission } =
-      bodySchema.parse(req.body);
-
-    try {
-      const company = await prisma.company.create({
-        data: { name, type, cnpj, dateRegistration, status, responsible, commission },
-      });
-
-      return rep.code(201).send(company);
-    } catch (error: any) {
-      if (error.code === "P2002" && error.meta?.target?.includes("cnpj")) {
-        return rep.code(400).send({ message: "Já existe uma empresa cadastrada com este CNPJ" });
-      }
-      console.error("Erro ao criar empresa:", error);
       return rep.code(500).send({ message: "Erro interno do servidor" });
     }
   });
 
-  // Atualizar uma empresa existente
+  app.post("/company", async (req: FastifyRequest, rep: FastifyReply) => {
+    const { name, type, cnpj, dateRegistration, status, responsible, commission } = bodySchema.parse(req.body);
+    const tenantId = req.user!.tenantId;
+    try {
+      const company = await prisma.company.create({
+        data: { name, type, cnpj, dateRegistration, status, responsible, commission, tenantId },
+      });
+      return rep.code(201).send(company);
+    } catch (error: any) {
+      if (error.code === "P2002") {
+        return rep.code(400).send({ message: "Já existe uma empresa cadastrada com este CNPJ" });
+      }
+      return rep.code(500).send({ message: "Erro interno do servidor" });
+    }
+  });
+
   app.put("/company/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
-    const { name, type, cnpj, dateRegistration, status, responsible, commission } =
-      bodySchema.parse(req.body);
-
+    const { name, type, cnpj, dateRegistration, status, responsible, commission } = bodySchema.parse(req.body);
+    const tenantId = req.user!.tenantId;
     try {
-      await prisma.company.findUniqueOrThrow({ where: { id } });
+      const existing = await prisma.company.findFirst({ where: { id, tenantId } });
+      if (!existing) return rep.code(404).send({ message: "Empresa não encontrada" });
 
       const updatedCompany = await prisma.company.update({
         where: { id },
         data: { name, type, cnpj, dateRegistration, status, responsible, commission },
       });
-
       return rep.send(updatedCompany);
     } catch (error: any) {
-      if (error.code === "P2002" && error.meta?.target?.includes("cnpj")) {
+      if (error.code === "P2002") {
         return rep.code(400).send({ message: "Já existe uma empresa cadastrada com este CNPJ" });
       }
-      console.error("Erro ao atualizar empresa:", error);
       return rep.code(500).send({ message: "Erro interno do servidor" });
     }
   });
 
-  // Deletar uma empresa
   app.delete("/company/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
-
+    const tenantId = req.user!.tenantId;
     try {
-      const company = await prisma.company.delete({ where: { id } });
-      return company;
+      const existing = await prisma.company.findFirst({ where: { id, tenantId } });
+      if (!existing) return rep.code(404).send({ message: "Empresa não encontrada" });
+      await prisma.company.delete({ where: { id } });
+      return rep.send({ message: "Empresa deletada com sucesso" });
     } catch (error) {
-      console.error("Erro ao deletar empresa:", error);
       return rep.code(500).send({ message: "Erro interno do servidor" });
     }
   });

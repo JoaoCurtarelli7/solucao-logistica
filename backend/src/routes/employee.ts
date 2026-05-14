@@ -41,9 +41,11 @@ export async function employeeRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
 
   // LISTAR
-  app.get("/employees", async (_req: FastifyRequest, rep: FastifyReply) => {
+  app.get("/employees", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
+      const tenantId = req.user!.tenantId;
       const employees = await prisma.employee.findMany({
+        where: { tenantId },
         select: {
           id: true,
           name: true,
@@ -73,9 +75,10 @@ export async function employeeRoutes(app: FastifyInstance) {
     try {
       const { id } = paramsSchema.parse(req.params);
       const { month, year } = employeeDetailsQuerySchema.parse(req.query);
+      const tenantId = req.user!.tenantId;
 
-      const employee = await prisma.employee.findUnique({
-        where: { id },
+      const employee = await prisma.employee.findFirst({
+        where: { id, tenantId },
         include: {
           Transaction: { orderBy: { date: "desc" } }, // relação conforme seu schema
         },
@@ -163,11 +166,12 @@ export async function employeeRoutes(app: FastifyInstance) {
   app.post("/employees", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = bodySchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
 
-      // CPF duplicado? (se fornecer CPF e não for vazio)
+      // CPF duplicado? (se fornecer CPF e não for vazio) - único por tenant
       if (data.cpf && data.cpf.trim() !== "") {
         const exists = await prisma.employee.findFirst({
-          where: { cpf: data.cpf },
+          where: { cpf: data.cpf, tenantId },
           select: { id: true },
         });
         if (exists) {
@@ -189,6 +193,7 @@ export async function employeeRoutes(app: FastifyInstance) {
           email: data.email && data.email.trim() !== "" ? data.email : null,
           address: data.address && data.address.trim() !== "" ? data.address : null,
           hireDate,
+          tenantId,
           // createdAt/updatedAt seguem defaults do banco/schema
         },
       });
@@ -219,16 +224,17 @@ export async function employeeRoutes(app: FastifyInstance) {
     try {
       const { id } = paramsSchema.parse(req.params);
       const data = bodySchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
 
-      const existing = await prisma.employee.findUnique({ where: { id } });
+      const existing = await prisma.employee.findFirst({ where: { id, tenantId } });
       if (!existing) {
         return rep.code(404).send({ message: "Funcionário não encontrado" });
       }
 
-      // CPF duplicado em outro registro?
+      // CPF duplicado em outro registro? (único por tenant)
       if (data.cpf && data.cpf.trim() !== "" && data.cpf !== existing.cpf) {
         const duplicate = await prisma.employee.findFirst({
-          where: { cpf: data.cpf, NOT: { id } },
+          where: { cpf: data.cpf, tenantId, NOT: { id } },
           select: { id: true },
         });
         if (duplicate) {
@@ -278,8 +284,9 @@ export async function employeeRoutes(app: FastifyInstance) {
   app.delete("/employees/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      const existing = await prisma.employee.findUnique({ where: { id } });
+      const existing = await prisma.employee.findFirst({ where: { id, tenantId } });
       if (!existing) {
         return rep.code(404).send({ message: "Funcionário não encontrado" });
       }
@@ -296,18 +303,22 @@ export async function employeeRoutes(app: FastifyInstance) {
   app.post("/employees/:id/transactions", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
-  
+      const tenantId = req.user!.tenantId;
+
       const transactionSchema = z.object({
         type: z.enum(["Crédito", "Débito"]),
         amount: z.coerce.number().min(0.01, "Valor deve ser maior que zero"),
         description: z.string().min(1, "Descrição da transação é obrigatória"),
         date: z.string().optional(), // aceita ISO; se vier vazio, usa agora
       });
-  
+
       const { type, amount, description, date } = transactionSchema.parse(req.body);
-  
-      // garante que o funcionário existe (evita criar "solto")
-      await prisma.employee.findUniqueOrThrow({ where: { id } });
+
+      // garante que o funcionário existe e pertence ao tenant
+      const employeeExists = await prisma.employee.findFirst({ where: { id, tenantId } });
+      if (!employeeExists) {
+        return rep.code(404).send({ message: "Funcionário não encontrado" });
+      }
   
       const transactionDate = date ? new Date(date) : new Date();
   
@@ -321,7 +332,7 @@ export async function employeeRoutes(app: FastifyInstance) {
           Employee: { connect: { id } }, // <- este é o pulo do gato
         },
       });
-  
+
       return rep.code(201).send(transaction);
     } catch (error) {
       if ((error as any)?.code === "P2025") {
@@ -336,9 +347,10 @@ export async function employeeRoutes(app: FastifyInstance) {
   app.get("/employees/:id/transactions", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
-  
-      const employee = await prisma.employee.findUnique({
-        where: { id },
+      const tenantId = req.user!.tenantId;
+
+      const employee = await prisma.employee.findFirst({
+        where: { id, tenantId },
         include: {
           Transaction: {
             select: { id: true, type: true, amount: true, date: true, description: true },
@@ -346,7 +358,7 @@ export async function employeeRoutes(app: FastifyInstance) {
           },
         },
       });
-  
+
       if (!employee) {
         return rep.code(404).send({ message: "Funcionário não encontrado" });
       }
@@ -376,6 +388,13 @@ export async function employeeRoutes(app: FastifyInstance) {
 
         const { id, transactionId } = transactionParamsSchema.parse(req.params);
         const { type, amount, description, date } = transactionBodySchema.parse(req.body);
+        const tenantId = req.user!.tenantId;
+
+        // Verify employee belongs to tenant first
+        const employeeExists = await prisma.employee.findFirst({ where: { id, tenantId } });
+        if (!employeeExists) {
+          return rep.code(404).send({ message: "Transação não encontrada para este funcionário" });
+        }
 
         const existing = await prisma.transaction.findUnique({
           where: { id: transactionId },
@@ -426,6 +445,13 @@ export async function employeeRoutes(app: FastifyInstance) {
         });
 
         const { id, transactionId } = transactionParamsSchema.parse(req.params);
+        const tenantId = req.user!.tenantId;
+
+        // Verify employee belongs to tenant first
+        const employeeExists = await prisma.employee.findFirst({ where: { id, tenantId } });
+        if (!employeeExists) {
+          return rep.code(404).send({ message: "Transação não encontrada para este funcionário" });
+        }
 
         const existing = await prisma.transaction.findUnique({
           where: { id: transactionId },
@@ -454,8 +480,9 @@ export async function employeeRoutes(app: FastifyInstance) {
       });
 
       const { name, role, status } = querySchema.parse(req.query);
+      const tenantId = req.user!.tenantId;
 
-      const where: any = {};
+      const where: any = { tenantId };
       if (name) where.name = { contains: name };
       if (role) where.role = { contains: role };
       if (status) where.status = status;

@@ -23,8 +23,10 @@ export async function tripRoutes(app: FastifyInstance) {
   // Listar todas as viagens
   app.get("/trips", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
+      const tenantId = req.user!.tenantId;
       const trips = await prisma.trip.findMany({
-        include: { 
+        where: { tenantId },
+        include: {
           TripExpense: {
             orderBy: { date: 'desc' }
           },
@@ -34,7 +36,7 @@ export async function tripRoutes(app: FastifyInstance) {
               name: true,
               plate: true
             }
-          } 
+          }
         },
         orderBy: { date: 'desc' }
       });
@@ -49,9 +51,10 @@ export async function tripRoutes(app: FastifyInstance) {
   app.get("/trips/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
-      const trip = await prisma.trip.findUniqueOrThrow({
-        where: { id },
-        include: { 
+      const tenantId = req.user!.tenantId;
+      const trip = await prisma.trip.findFirst({
+        where: { id, tenantId },
+        include: {
           TripExpense: {
             orderBy: { date: 'desc' }
           },
@@ -61,13 +64,15 @@ export async function tripRoutes(app: FastifyInstance) {
               name: true,
               plate: true
             }
-          } 
+          }
         }
       });
+      if (!trip) {
+        return rep.code(404).send({ message: "Viagem não encontrada" });
+      }
       return trip;
     } catch (error) {
       console.error("Erro ao buscar viagem:", error);
-     
       return rep.code(500).send({ message: "Erro ao buscar viagem" });
     }
   });
@@ -76,9 +81,10 @@ export async function tripRoutes(app: FastifyInstance) {
   app.get("/trucks/:truckId/trips", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { truckId } = z.object({ truckId: z.coerce.number() }).parse(req.params);
+      const tenantId = req.user!.tenantId;
       const trips = await prisma.trip.findMany({
-        where: { truckId },
-        include: { 
+        where: { truckId, tenantId },
+        include: {
           TripExpense: {
             orderBy: { date: 'desc' }
           },
@@ -103,13 +109,14 @@ export async function tripRoutes(app: FastifyInstance) {
   app.post("/trips", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = tripBodySchema.parse(req.body);
-      
-      // Verificar se o caminhão existe (se fornecido)
+      const tenantId = req.user!.tenantId;
+
+      // Verificar se o caminhão existe e pertence ao tenant (se fornecido)
       if (data.truckId) {
-        const truck = await prisma.truck.findUnique({
-          where: { id: data.truckId }
+        const truck = await prisma.truck.findFirst({
+          where: { id: data.truckId, tenantId }
         });
-        
+
         if (!truck) {
           return rep.code(400).send({ message: "Caminhão não encontrado" });
         }
@@ -126,6 +133,7 @@ export async function tripRoutes(app: FastifyInstance) {
           truckId: data.truckId,
           status: data.status,
           notes: data.notes,
+          tenantId,
         },
         include: {
           Truck: {
@@ -154,22 +162,23 @@ export async function tripRoutes(app: FastifyInstance) {
     try {
       const { id } = paramsSchema.parse(req.params);
       const data = tripBodySchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
 
-      // Verificar se a viagem existe
-      const existingTrip = await prisma.trip.findUnique({
-        where: { id }
+      // Verificar se a viagem existe e pertence ao tenant
+      const existingTrip = await prisma.trip.findFirst({
+        where: { id, tenantId }
       });
-      
+
       if (!existingTrip) {
         return rep.code(404).send({ message: "Viagem não encontrada" });
       }
 
-      // Verificar se o caminhão existe (se fornecido)
+      // Verificar se o caminhão existe e pertence ao tenant (se fornecido)
       if (data.truckId) {
-        const truck = await prisma.truck.findUnique({
-          where: { id: data.truckId }
+        const truck = await prisma.truck.findFirst({
+          where: { id: data.truckId, tenantId }
         });
-        
+
         if (!truck) {
           return rep.code(400).send({ message: "Caminhão não encontrado" });
         }
@@ -210,15 +219,16 @@ export async function tripRoutes(app: FastifyInstance) {
   app.delete("/trips/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = paramsSchema.parse(req.params);
-      
-      // Verificar se a viagem existe
-      const trip = await prisma.trip.findUnique({
-        where: { id },
+      const tenantId = req.user!.tenantId;
+
+      // Verificar se a viagem existe e pertence ao tenant
+      const trip = await prisma.trip.findFirst({
+        where: { id, tenantId },
         include: {
           TripExpense: true
         }
       });
-      
+
       if (!trip) {
         return rep.code(404).send({ message: "Viagem não encontrada" });
       }
@@ -245,6 +255,13 @@ export async function tripRoutes(app: FastifyInstance) {
       const { status } = z.object({
         status: z.enum(["em_andamento", "concluida", "cancelada"])
       }).parse(req.body);
+      const tenantId = req.user!.tenantId;
+
+      // Verify ownership before status update
+      const existingTrip = await prisma.trip.findFirst({ where: { id, tenantId } });
+      if (!existingTrip) {
+        return rep.code(404).send({ message: "Viagem não encontrada" });
+      }
 
       const trip = await prisma.trip.update({
         where: { id },
@@ -276,20 +293,21 @@ export async function tripRoutes(app: FastifyInstance) {
         truckId: z.coerce.number().optional(),
         status: z.enum(["em_andamento", "concluida", "cancelada"]).optional(),
       }).parse(req.query);
+      const tenantId = req.user!.tenantId;
 
-      const where: any = {};
-      
+      const where: any = { tenantId };
+
       if (startDate && endDate) {
         where.date = {
           gte: startDate,
           lte: endDate,
         };
       }
-      
+
       if (truckId) {
         where.truckId = truckId;
       }
-      
+
       if (status) {
         where.status = status;
       }

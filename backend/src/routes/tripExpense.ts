@@ -60,8 +60,9 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
           endDate: z.string().optional(),
         })
         .parse(req.query);
+      const tenantId = req.user!.tenantId;
 
-      const where: any = {};
+      const where: any = { Trip: { tenantId } };
       if (tripId) where.tripId = tripId;
       if (category) where.category = category;
 
@@ -96,8 +97,13 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   app.get("/trips/:tripId/expenses", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { tripId } = tripIdParam.parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      await prisma.trip.findUniqueOrThrow({ where: { id: tripId } });
+      // Verify trip belongs to tenant
+      const trip = await prisma.trip.findFirst({ where: { id: tripId, tenantId } });
+      if (!trip) {
+        return rep.code(404).send({ message: "Viagem não encontrada" });
+      }
 
       const expenses = await prisma.tripExpense.findMany({
         where: { tripId },
@@ -118,8 +124,9 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   app.get("/expenses/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = idParam.parse(req.params);
-      const expense = await prisma.tripExpense.findUniqueOrThrow({
-        where: { id },
+      const tenantId = req.user!.tenantId;
+      const expense = await prisma.tripExpense.findFirst({
+        where: { id, Trip: { tenantId } },
         include: {
           Trip: {
             select: {
@@ -132,6 +139,9 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
           },
         },
       });
+      if (!expense) {
+        return rep.code(404).send({ message: "Despesa não encontrada" });
+      }
       return expense;
     } catch (error: any) {
       if (error?.code === "P2025") {
@@ -146,8 +156,13 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   app.post("/expenses", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = expenseBodySchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
 
-      await prisma.trip.findUniqueOrThrow({ where: { id: data.tripId } });
+      // Verify trip belongs to tenant
+      const trip = await prisma.trip.findFirst({ where: { id: data.tripId, tenantId } });
+      if (!trip) {
+        return rep.code(400).send({ message: "Viagem não encontrada" });
+      }
 
       const expense = await prisma.tripExpense.create({
         data: {
@@ -189,12 +204,16 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
     try {
       const { id } = idParam.parse(req.params);
       const data = expenseBodySchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
 
-      const existing = await prisma.tripExpense.findUnique({ where: { id } });
+      const existing = await prisma.tripExpense.findFirst({
+        where: { id, Trip: { tenantId } },
+      });
       if (!existing) return rep.code(404).send({ message: "Despesa não encontrada" });
 
       if (data.tripId !== existing.tripId) {
-        await prisma.trip.findUniqueOrThrow({ where: { id: data.tripId } });
+        const newTrip = await prisma.trip.findFirst({ where: { id: data.tripId, tenantId } });
+        if (!newTrip) return rep.code(400).send({ message: "Viagem não encontrada" });
       }
 
       const expense = await prisma.tripExpense.update({
@@ -234,8 +253,11 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   app.delete("/expenses/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = idParam.parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      const expense = await prisma.tripExpense.findUnique({ where: { id } });
+      const expense = await prisma.tripExpense.findFirst({
+        where: { id, Trip: { tenantId } },
+      });
       if (!expense) return rep.code(404).send({ message: "Despesa não encontrada" });
 
       await prisma.tripExpense.delete({ where: { id } });
@@ -257,8 +279,9 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
           endDate: z.string().optional(),
         })
         .parse(req.query);
+      const tenantId = req.user!.tenantId;
 
-      const where: any = {};
+      const where: any = { Trip: { tenantId } };
       if (tripId) where.tripId = tripId;
       if (category) where.category = category;
 

@@ -285,8 +285,9 @@ export async function rbacRoutes(app: FastifyInstance) {
         status: z.string().optional(),
       });
       const { search, roleId, status } = querySchema.parse(req.query);
+      const tenantId = req.user!.tenantId;
 
-      const where: any = {};
+      const where: any = { tenantId };
       if (status) where.status = status;
       if (roleId) where.roleId = roleId;
       if (search) {
@@ -343,6 +344,7 @@ export async function rbacRoutes(app: FastifyInstance) {
       }
 
       const hashed = await hashPassword(body.password);
+      const tenantId = req.user!.tenantId;
 
       const user = await prisma.user.create({
         data: {
@@ -351,6 +353,7 @@ export async function rbacRoutes(app: FastifyInstance) {
           password: hashed,
           status: body.status,
           roleId: body.roleId,
+          tenantId,
         },
         select: {
           id: true,
@@ -384,6 +387,10 @@ export async function rbacRoutes(app: FastifyInstance) {
       });
       const { id } = paramsSchema.parse(req.params);
       const body = bodySchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
+
+      const existing = await prisma.user.findFirst({ where: { id, tenantId }, select: { id: true } });
+      if (!existing) return rep.code(404).send({ message: "Usuário não encontrado" });
 
       const user = await prisma.user.update({
         where: { id },
@@ -416,6 +423,10 @@ export async function rbacRoutes(app: FastifyInstance) {
       const bodySchema = z.object({ status: z.enum(["active", "inactive"]) });
       const { id } = paramsSchema.parse(req.params);
       const { status } = bodySchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
+
+      const existing = await prisma.user.findFirst({ where: { id, tenantId }, select: { id: true } });
+      if (!existing) return rep.code(404).send({ message: "Usuário não encontrado" });
 
       const user = await prisma.user.update({
         where: { id },

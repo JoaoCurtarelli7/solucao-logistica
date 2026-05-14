@@ -19,8 +19,11 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   // Listar manutenção de um caminhão
   app.get("/maintenance/:truckId", async (req: FastifyRequest, rep: FastifyReply) => {
     const { truckId } = paramsSchema.parse(req.params);
+    const tenantId = req.user!.tenantId;
     try {
-      const maintenances = await prisma.maintenance.findMany({ where: { truckId } });
+      const maintenances = await prisma.maintenance.findMany({
+        where: { truckId, Truck: { tenantId } },
+      });
       return maintenances;
     } catch (error) {
       console.error(error);
@@ -31,7 +34,13 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   // Criar manutenção
   app.post("/maintenance", async (req: FastifyRequest, rep: FastifyReply) => {
     const data = bodySchema.parse(req.body);
+    const tenantId = req.user!.tenantId;
     try {
+      // Verify truck belongs to tenant
+      const truck = await prisma.truck.findFirst({ where: { id: data.truckId, tenantId } });
+      if (!truck) {
+        return rep.code(404).send({ message: "Caminhão não encontrado" });
+      }
       const maintenance = await prisma.maintenance.create({ data });
       return rep.code(201).send(maintenance);
     } catch (error) {
@@ -44,8 +53,16 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   app.put("/maintenance/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
     const data = bodySchema.parse(req.body);
+    const tenantId = req.user!.tenantId;
 
     try {
+      // Verify maintenance's truck belongs to tenant
+      const existingMaintenance = await prisma.maintenance.findFirst({
+        where: { id, Truck: { tenantId } },
+      });
+      if (!existingMaintenance) {
+        return rep.code(404).send({ message: "Manutenção não encontrada" });
+      }
       const maintenance = await prisma.maintenance.update({ where: { id }, data });
       return rep.send(maintenance);
     } catch (error) {
@@ -57,7 +74,15 @@ export async function maintenanceRoutes(app: FastifyInstance) {
   // Deletar manutenção
   app.delete("/maintenance/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
+    const tenantId = req.user!.tenantId;
     try {
+      // Verify maintenance's truck belongs to tenant
+      const existingMaintenance = await prisma.maintenance.findFirst({
+        where: { id, Truck: { tenantId } },
+      });
+      if (!existingMaintenance) {
+        return rep.code(404).send({ message: "Manutenção não encontrada" });
+      }
       await prisma.maintenance.delete({ where: { id } });
       return rep.code(204).send();
     } catch (error) {

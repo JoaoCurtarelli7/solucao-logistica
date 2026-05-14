@@ -10,6 +10,8 @@ declare module "fastify/types/request" {
   interface FastifyRequest {
     user?: {
       id: number;
+      tenantId: number;
+      isSuperAdmin: boolean;
       status?: string;
       roleId?: number | null;
       role?: string | null;

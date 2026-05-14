@@ -71,9 +71,11 @@ export async function loadRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
 
   // LISTAR
-  app.get("/loads", async (_req: FastifyRequest, rep: FastifyReply) => {
+  app.get("/loads", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
+      const tenantId = req.user!.tenantId;
       const loads = await prisma.load.findMany({
+        where: { tenantId },
         include: {
           Company: {
             select: { id: true, name: true, cnpj: true, commission: true },
@@ -95,12 +97,14 @@ export async function loadRoutes(app: FastifyInstance) {
     "/loads/company/:companyId",
     async (req: FastifyRequest, rep: FastifyReply) => {
       const { companyId } = companyParamsSchema.parse(req.params);
+      const tenantId = req.user!.tenantId;
 
       try {
-        await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+        const company = await prisma.company.findFirst({ where: { id: companyId, tenantId } });
+        if (!company) return rep.code(404).send({ message: "Empresa não encontrada" });
 
         const loads = await prisma.load.findMany({
-          where: { companyId },
+          where: { companyId, tenantId },
           include: {
             Company: {
               select: { id: true, name: true, cnpj: true, commission: true },
@@ -127,10 +131,11 @@ export async function loadRoutes(app: FastifyInstance) {
   // POR ID
   app.get("/loads/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
+    const tenantId = req.user!.tenantId;
 
     try {
-      const load = await prisma.load.findUnique({
-        where: { id },
+      const load = await prisma.load.findFirst({
+        where: { id, tenantId },
         include: {
           Company: {
             select: { id: true, name: true, cnpj: true, commission: true },
@@ -165,37 +170,27 @@ export async function loadRoutes(app: FastifyInstance) {
       companyId,
     } = bodySchema.parse(req.body);
 
+    const tenantId = req.user!.tenantId;
     try {
-      await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+      const company = await prisma.company.findFirst({ where: { id: companyId, tenantId } });
+      if (!company) return rep.code(404).send({ message: "Empresa não encontrada" });
 
       const existing = await prisma.load.findFirst({
-        where: { loadingNumber, companyId },
+        where: { loadingNumber, companyId, tenantId },
         select: { id: true },
       });
       if (existing) {
-        return rep
-          .code(400)
-          .send({
-            message:
-              "Já existe um carregamento com este número para esta empresa",
-          });
+        return rep.code(400).send({ message: "Já existe um carregamento com este número para esta empresa" });
       }
 
       const load = await prisma.load.create({
         data: {
-          date,
-          loadingNumber,
-          deliveries,
-          cargoWeight,
-          totalValue,
-          freight4,
-          totalFreight,
+          date, loadingNumber, deliveries, cargoWeight, totalValue, freight4, totalFreight,
           additionalCosts: Math.max(0, additionalCosts ?? 0),
-          additionalCostsNote: additionalCostsNote?.trim()
-            ? additionalCostsNote.trim()
-            : null,
+          additionalCostsNote: additionalCostsNote?.trim() ? additionalCostsNote.trim() : null,
           observations: observations?.trim() ? observations : null,
-          Company: { connect: { id: companyId } },
+          tenantId,
+          companyId,
         },
         include: {
           Company: {
@@ -222,16 +217,18 @@ export async function loadRoutes(app: FastifyInstance) {
   app.put("/loads/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
     const updateData = updateBodySchema.parse(req.body);
+    const tenantId = req.user!.tenantId;
 
     try {
-      const existing = await prisma.load.findUnique({ where: { id } });
+      const existing = await prisma.load.findFirst({ where: { id, tenantId } });
       if (!existing)
         return rep.code(404).send({ message: "Carregamento não encontrado" });
 
       if (updateData.companyId) {
-        await prisma.company.findUniqueOrThrow({
-          where: { id: updateData.companyId },
+        const company = await prisma.company.findFirst({
+          where: { id: updateData.companyId, tenantId },
         });
+        if (!company) return rep.code(404).send({ message: "Empresa não encontrada" });
       }
 
       if (
@@ -325,9 +322,10 @@ export async function loadRoutes(app: FastifyInstance) {
   // DELETAR
   app.delete("/loads/:id", async (req: FastifyRequest, rep: FastifyReply) => {
     const { id } = paramsSchema.parse(req.params);
+    const tenantId = req.user!.tenantId;
 
     try {
-      const existing = await prisma.load.findUnique({ where: { id } });
+      const existing = await prisma.load.findFirst({ where: { id, tenantId } });
       if (!existing)
         return rep.code(404).send({ message: "Carregamento não encontrado" });
 

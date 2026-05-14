@@ -19,9 +19,14 @@ import UsersPermissions from "./pages/UsersPermissions";
 import LoadBillingClosing from "./pages/LoadBillingClosing";
 import MaintenanceMonths from "./pages/Maintenance/Months";
 import MaintenanceServices from "./pages/Maintenance/Services";
+import Register from "./pages/Register";
+import AdminPanel from "./pages/Admin";
 import { UserProvider } from "./context/userContext";
 
 const router = createBrowserRouter([
+  // Página pública de solicitação de acesso (sem layout)
+  { path: "/solicitar-acesso", element: <Register /> },
+
   {
     path: "/",
     element: <Layout />,
@@ -46,6 +51,7 @@ const router = createBrowserRouter([
       { path: "/load-billing-closings", element: <LoadBillingClosing /> },
       { path: "/maintenance/months", element: <MaintenanceMonths /> },
       { path: "/maintenance/services", element: <MaintenanceServices /> },
+      { path: "/admin", element: <AdminPanel /> },
     ],
   },
 ]);

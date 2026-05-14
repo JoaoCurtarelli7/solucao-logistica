@@ -55,16 +55,17 @@ export async function closingRoutes(app: FastifyInstance) {
         status?: string; 
       };
 
-      let whereClause: any = {};
-      
+      const tenantId = req.user!.tenantId;
+      let whereClause: any = { tenantId };
+
       if (monthId) {
         whereClause.monthId = parseInt(monthId);
       }
-      
+
       if (companyId) {
         whereClause.companyId = parseInt(companyId);
       }
-      
+
       if (status) {
         whereClause.status = status;
       }
@@ -109,7 +110,7 @@ export async function closingRoutes(app: FastifyInstance) {
         const startOfMonth = new Date(year, month - 1, 1, 0, 0, 0, 0);
         const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
         const employees = await prisma.employee.findMany({
-          where: { status: "Ativo" },
+          where: { status: "Ativo", tenantId },
           include: {
             Transaction: {
               where: { date: { gte: startOfMonth, lte: endOfMonth } },
@@ -171,9 +172,10 @@ export async function closingRoutes(app: FastifyInstance) {
   app.get("/closings/:id", { preHandler: requirePermission("closings.view") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      const closing = await prisma.closing.findUnique({
-        where: { id },
+      const closing = await prisma.closing.findFirst({
+        where: { id, tenantId },
         include: {
           Month: {
             select: {
@@ -210,12 +212,13 @@ export async function closingRoutes(app: FastifyInstance) {
   app.post("/closings", { preHandler: requirePermission("closings.create") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const data = createClosingSchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
       // Garantir companyId null quando não informado (Todas as empresas)
       const companyId = data.companyId === undefined ? null : data.companyId;
 
-      // Verificar se o mês existe
-      const month = await prisma.month.findUnique({
-        where: { id: data.monthId },
+      // Verificar se o mês existe e pertence ao tenant
+      const month = await prisma.month.findFirst({
+        where: { id: data.monthId, tenantId },
       });
 
       if (!month) {
@@ -225,8 +228,8 @@ export async function closingRoutes(app: FastifyInstance) {
       // Verificar se a empresa existe (se fornecida) e obter dados (inclui comissão)
       let company: { id: number; name: string; commission: number } | null = null;
       if (companyId != null) {
-        const foundCompany = await prisma.company.findUnique({
-          where: { id: companyId },
+        const foundCompany = await prisma.company.findFirst({
+          where: { id: companyId, tenantId },
           select: {
             id: true,
             name: true,
@@ -249,6 +252,7 @@ export async function closingRoutes(app: FastifyInstance) {
         status: 'aberto',
         startDate: data.startDate || null,
         endDate: data.endDate || null,
+        tenantId,
       };
       
       const newClosing = await prisma.closing.create({
@@ -293,6 +297,13 @@ export async function closingRoutes(app: FastifyInstance) {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
       const data = updateClosingSchema.parse(req.body);
+      const tenantId = req.user!.tenantId;
+
+      // Verify ownership before update
+      const existing = await prisma.closing.findFirst({ where: { id, tenantId } });
+      if (!existing) {
+        return rep.code(404).send({ message: "Fechamento não encontrado" });
+      }
 
       // Atualizar fechamento usando Prisma ORM
       const updatedClosing = await prisma.closing.update({
@@ -336,10 +347,11 @@ export async function closingRoutes(app: FastifyInstance) {
   app.delete("/closings/:id", { preHandler: requirePermission("closings.delete") }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      // Verificar se o fechamento existe
-      const closing = await prisma.closing.findUnique({
-        where: { id },
+      // Verificar se o fechamento existe e pertence ao tenant
+      const closing = await prisma.closing.findFirst({
+        where: { id, tenantId },
       });
 
       if (!closing) {
@@ -366,9 +378,10 @@ export async function closingRoutes(app: FastifyInstance) {
   app.post("/closings/:id/close", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+      const tenantId = req.user!.tenantId;
 
-      const closing = await prisma.closing.findUnique({
-        where: { id },
+      const closing = await prisma.closing.findFirst({
+        where: { id, tenantId },
         include: {
           FinancialEntry: true,
         },
