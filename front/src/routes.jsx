@@ -1,5 +1,6 @@
-import { RouterProvider, createBrowserRouter } from "react-router-dom";
+import { RouterProvider, createBrowserRouter, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
+import { useUserContext } from "./context/userContext";
 import Home from "./pages/Home";
 import Closing from "./pages/Closing";
 import Load from "./pages/Load";
@@ -22,6 +23,13 @@ import MaintenanceServices from "./pages/Maintenance/Services";
 import Register from "./pages/Register";
 import AdminPanel from "./pages/Admin";
 import { UserProvider } from "./context/userContext";
+
+function SuperAdminRoute({ children }) {
+  const { user, loading } = useUserContext();
+  if (loading) return null;
+  if (!user || !user.isSuperAdmin) return <Navigate to="/" replace />;
+  return children;
+}
 
 const router = createBrowserRouter([
   // Página pública de solicitação de acesso (sem layout)
@@ -51,7 +59,7 @@ const router = createBrowserRouter([
       { path: "/load-billing-closings", element: <LoadBillingClosing /> },
       { path: "/maintenance/months", element: <MaintenanceMonths /> },
       { path: "/maintenance/services", element: <MaintenanceServices /> },
-      { path: "/admin", element: <AdminPanel /> },
+      { path: "/admin", element: <SuperAdminRoute><AdminPanel /></SuperAdminRoute> },
     ],
   },
 ]);
