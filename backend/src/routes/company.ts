@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fas
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middlewares/authMiddleware";
+import { paginationSchema, paginationMeta } from "../lib/paginate";
 
 export async function companyRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({ id: z.coerce.number() });
@@ -18,15 +19,42 @@ export async function companyRoutes(app: FastifyInstance) {
 
   app.addHook("preHandler", authMiddleware);
 
+  // LISTAR — suporta ?page=&limit=&search=
   app.get("/companies", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const tenantId = req.user!.tenantId;
-      const companies = await prisma.company.findMany({
-        where: { tenantId },
-        select: { id: true, name: true, type: true, cnpj: true, dateRegistration: true, status: true, responsible: true, commission: true },
-        orderBy: { name: "asc" },
-      });
-      return rep.send(companies);
+      const query = paginationSchema.parse(req.query);
+      const hasPagination = !!(req.query as Record<string, unknown>).page;
+
+      const where = {
+        tenantId,
+        ...(query.search
+          ? {
+              OR: [
+                { name: { contains: query.search, mode: "insensitive" as const } },
+                { cnpj: { contains: query.search } },
+                { responsible: { contains: query.search, mode: "insensitive" as const } },
+              ],
+            }
+          : {}),
+      };
+
+      const select = { id: true, name: true, type: true, cnpj: true, dateRegistration: true, status: true, responsible: true, commission: true };
+
+      if (!hasPagination) {
+        const companies = await prisma.company.findMany({ where, select, orderBy: { name: "asc" } });
+        return rep.send(companies);
+      }
+
+      const [total, companies] = await prisma.$transaction([
+        prisma.company.count({ where }),
+        prisma.company.findMany({
+          where, select, orderBy: { name: "asc" },
+          skip: (query.page - 1) * query.limit,
+          take: query.limit,
+        }),
+      ]);
+      return rep.send({ data: companies, ...paginationMeta(total, query.page, query.limit) });
     } catch (error: any) {
       return rep.code(500).send({ message: "Erro ao buscar empresas" });
     }

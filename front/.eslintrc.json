@@ -1,10 +1,9 @@
 {
-  "extends": ["@rocketseat/eslint-config/react"],
+  "extends": ["@rocketseat/eslint-config/react", "prettier"],
   "plugins": ["react-refresh"],
   "rules": {
-    "react-refresh/only-export-components": [
-      "warn",
-      { "allowConstantExport": true }
-    ]
+    "react-refresh/only-export-components": ["warn", { "allowConstantExport": true }],
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-console": "warn"
   }
 }

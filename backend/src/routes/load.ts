@@ -6,6 +6,7 @@ import type {
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middlewares/authMiddleware";
+import { paginationSchema, paginationMeta } from "../lib/paginate";
 
 function parseMaybeBrDateToDate(d: unknown): Date {
   if (d instanceof Date) return d;
@@ -70,25 +71,47 @@ export async function loadRoutes(app: FastifyInstance) {
   // protege todas as rotas deste módulo
   app.addHook("preHandler", authMiddleware);
 
-  // LISTAR
+  // LISTAR — suporta ?page=&limit=&search=&companyId=
   app.get("/loads", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const tenantId = req.user!.tenantId;
-      const loads = await prisma.load.findMany({
-        where: { tenantId },
-        include: {
-          Company: {
-            select: { id: true, name: true, cnpj: true, commission: true },
-          },
-        },
-        orderBy: { date: "desc" },
-      });
-      return rep.send(loads);
+      const query = paginationSchema.extend({
+        companyId: z.coerce.number().optional(),
+      }).parse(req.query);
+      const hasPagination = !!(req.query as Record<string, unknown>).page;
+
+      const where = {
+        tenantId,
+        ...(query.companyId ? { companyId: query.companyId } : {}),
+        ...(query.search
+          ? {
+              OR: [
+                { loadingNumber: { contains: query.search, mode: "insensitive" as const } },
+                { Company: { name: { contains: query.search, mode: "insensitive" as const } } },
+              ],
+            }
+          : {}),
+      };
+
+      const include = { Company: { select: { id: true, name: true, cnpj: true, commission: true } } };
+
+      if (!hasPagination) {
+        const loads = await prisma.load.findMany({ where, include, orderBy: { date: "desc" } });
+        return rep.send(loads);
+      }
+
+      const [total, loads] = await prisma.$transaction([
+        prisma.load.count({ where }),
+        prisma.load.findMany({
+          where, include, orderBy: { date: "desc" },
+          skip: (query.page - 1) * query.limit,
+          take: query.limit,
+        }),
+      ]);
+      return rep.send({ data: loads, ...paginationMeta(total, query.page, query.limit) });
     } catch (error) {
       app.log.error(error);
-      return rep
-        .code(500)
-        .send({ message: "Erro interno ao buscar os carregamentos" });
+      return rep.code(500).send({ message: "Erro interno ao buscar os carregamentos" });
     }
   });
 

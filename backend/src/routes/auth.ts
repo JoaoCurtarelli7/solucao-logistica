@@ -153,7 +153,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/login", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.post("/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const { email, password } = loginSchema.parse(req.body);
 

@@ -21,18 +21,39 @@ api.interceptors.request.use(
   },
 )
 
-// Intercepta as respostas para lidar com erros de token expirado
+// Intercepta as respostas para lidar com erros globais
 api.interceptors.response.use(
-  (response) => {
-    return response // Retorna a resposta se não houver erro
-  },
+  (response) => response,
   (error) => {
     const isLoginRequest = error.config?.url?.includes('/login')
-    if (error.response && error.response.status === 401 && !isLoginRequest) {
-      // 401 em outras rotas = token expirado ou inválido (não tratar 401 do próprio login)
+    const status = error.response?.status
+    const code = error.response?.data?.code
+
+    if (status === 401 && !isLoginRequest) {
       localStorage.removeItem('token')
       message.error('Sua sessão expirou. Faça login novamente.')
       window.location.href = '/login'
+      return Promise.reject(error)
+    }
+
+    if (status === 402 || code === 'PLAN_EXPIRED') {
+      message.error({
+        content: 'Seu plano expirou. Entre em contato com o administrador para renovar o acesso.',
+        duration: 8,
+      })
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      return Promise.reject(error)
+    }
+
+    if (status === 403 && code === 'ACCOUNT_SUSPENDED') {
+      message.error({
+        content: 'Conta suspensa. Entre em contato com o suporte.',
+        duration: 8,
+      })
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      return Promise.reject(error)
     }
 
     return Promise.reject(error)

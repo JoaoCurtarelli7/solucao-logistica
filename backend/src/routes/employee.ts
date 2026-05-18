@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fas
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middlewares/authMiddleware";
+import { paginationSchema, paginationMeta } from "../lib/paginate";
 
 function parseMaybeBrDate(str?: string | null) {
   if (!str) return null;
@@ -40,30 +41,47 @@ export async function employeeRoutes(app: FastifyInstance) {
 
   app.addHook("preHandler", authMiddleware);
 
-  // LISTAR
+  // LISTAR — suporta ?page=&limit=&search=
   app.get("/employees", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const tenantId = req.user!.tenantId;
-      const employees = await prisma.employee.findMany({
-        where: { tenantId },
-        select: {
-          id: true,
-          name: true,
-          role: true,
-          baseSalary: true,
-          status: true,
-          pixAccount: true,
-          cpf: true,
-          phone: true,
-          email: true,
-          address: true,
-          hireDate: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-      return rep.send(employees);
+      const query = paginationSchema.parse(req.query);
+      const hasPagination = !!(req.query as Record<string, unknown>).page;
+
+      const where = {
+        tenantId,
+        ...(query.search
+          ? {
+              OR: [
+                { name: { contains: query.search, mode: "insensitive" as const } },
+                { role: { contains: query.search, mode: "insensitive" as const } },
+                { cpf:  { contains: query.search } },
+                { email: { contains: query.search, mode: "insensitive" as const } },
+              ],
+            }
+          : {}),
+      };
+
+      const select = {
+        id: true, name: true, role: true, baseSalary: true, status: true,
+        pixAccount: true, cpf: true, phone: true, email: true,
+        address: true, hireDate: true, createdAt: true, updatedAt: true,
+      };
+
+      if (!hasPagination) {
+        const employees = await prisma.employee.findMany({ where, select, orderBy: { createdAt: "desc" } });
+        return rep.send(employees);
+      }
+
+      const [total, employees] = await prisma.$transaction([
+        prisma.employee.count({ where }),
+        prisma.employee.findMany({
+          where, select, orderBy: { createdAt: "desc" },
+          skip: (query.page - 1) * query.limit,
+          take: query.limit,
+        }),
+      ]);
+      return rep.send({ data: employees, ...paginationMeta(total, query.page, query.limit) });
     } catch (error) {
       console.error("Erro ao buscar funcionários:", error);
       return rep.code(500).send({ message: "Erro interno do servidor" });

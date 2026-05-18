@@ -1,6 +1,10 @@
 import fastifyCors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import fastify from "fastify";
+import type { FastifyRequest } from "fastify/types/request";
 
 import { companyRoutes } from "./routes/company";
 import { employeeRoutes } from "./routes/employee";
@@ -23,8 +27,45 @@ import { maintenanceServicePresetRoutes } from "./routes/maintenanceServicePrese
 import { rbacRoutes } from "./routes/rbac";
 import { tenantRoutes } from "./routes/tenant";
 
-export const app = fastify({
-  logger: true,
+export const app = fastify({ logger: true });
+
+app.register(swagger, {
+  openapi: {
+    info: {
+      title: "Derlei Sistema API",
+      description: "API do sistema de gestão de frotas e logística",
+      version: "1.0.0",
+    },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },
+    security: [{ bearerAuth: [] }],
+  },
+});
+
+app.register(swaggerUi, {
+  routePrefix: "/docs",
+  uiConfig: { docExpansion: "list", deepLinking: false },
+  staticCSP: true,
+});
+
+app.register(rateLimit, {
+  global: true,
+  max: 200,
+  timeWindow: "1 minute",
+  keyGenerator: (req: FastifyRequest) =>
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip,
+  errorResponseBuilder: (_req: FastifyRequest, context: { ttl: number }) => ({
+    statusCode: 429,
+    error: "Too Many Requests",
+    message: `Muitas requisições. Tente novamente em ${Math.ceil(context.ttl / 1000)} segundos.`,
+  }),
 });
 
 // CORS: lista de origens permitidas (variável CORS_ORIGIN no DigitalOcean)
@@ -84,6 +125,12 @@ app.register(fastifyCors, {
   maxAge: 86400,
   preflight: true,
 });
+
+app.get("/health", async () => ({
+  status: "ok",
+  timestamp: new Date().toISOString(),
+  uptime: process.uptime(),
+}));
 
 app.register(companyRoutes);
 app.register(employeeRoutes);

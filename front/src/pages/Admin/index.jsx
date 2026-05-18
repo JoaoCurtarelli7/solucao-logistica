@@ -7,6 +7,7 @@ import {
   CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
   StopOutlined, TeamOutlined, SearchOutlined, ReloadOutlined,
   UserOutlined, EyeOutlined, PauseCircleOutlined, PlayCircleOutlined,
+  CrownOutlined, ExperimentOutlined, CalendarOutlined,
 } from "@ant-design/icons";
 import api from "../../lib/api";
 import { useUserContext } from "../../context/userContext";
@@ -21,6 +22,32 @@ const STATUS_LABELS = {
   inactive: { text: "Inativo",    color: "default", icon: <StopOutlined /> },
   rejected: { text: "Rejeitado",  color: "error",   icon: <CloseCircleOutlined /> },
 };
+
+const PLAN_LABELS = {
+  trial: { text: "Trial",  color: "processing", icon: <ExperimentOutlined /> },
+  basic: { text: "Basic",  color: "blue",       icon: <CrownOutlined /> },
+  pro:   { text: "Pro",    color: "gold",       icon: <CrownOutlined /> },
+};
+
+function PlanTag({ plan, planExpiresAt }) {
+  const label = PLAN_LABELS[plan] || { text: plan || "—", color: "default", icon: null };
+  const expired = planExpiresAt && new Date(planExpiresAt) < new Date();
+  const expiresText = planExpiresAt
+    ? `${expired ? "Expirou" : "Expira"} em ${new Date(planExpiresAt).toLocaleDateString("pt-BR")}`
+    : null;
+  return (
+    <Space direction="vertical" size={2}>
+      <Tag color={expired ? "error" : label.color} icon={label.icon}>
+        {expired ? "Expirado" : label.text}
+      </Tag>
+      {expiresText && (
+        <Text type={expired ? "danger" : "secondary"} style={{ fontSize: 11 }}>
+          <CalendarOutlined style={{ marginRight: 4 }} />{expiresText}
+        </Text>
+      )}
+    </Space>
+  );
+}
 
 export default function AdminPanel() {
   const { user } = useUserContext();
@@ -56,8 +83,16 @@ export default function AdminPanel() {
   const handleApprove = async (tenant) => {
     setActionLoading((p) => ({ ...p, [tenant.id]: true }));
     try {
-      await api.patch(`/tenants/${tenant.id}/approve`);
-      message.success(`${tenant.name} aprovado com sucesso!`);
+      const res = await api.patch(`/tenants/${tenant.id}/approve`);
+      const trialEnd = res.data?.trialEndsAt
+        ? new Date(res.data.trialEndsAt).toLocaleDateString("pt-BR")
+        : null;
+      message.success(
+        trialEnd
+          ? `${tenant.name} aprovado! Trial ativo até ${trialEnd}.`
+          : `${tenant.name} aprovado com sucesso!`,
+        5,
+      );
       fetchTenants();
     } catch {
       message.error("Erro ao aprovar");
@@ -109,6 +144,8 @@ export default function AdminPanel() {
     active:   tenants.filter((t) => t.status === "active").length,
     pending:  tenants.filter((t) => t.status === "pending").length,
     inactive: tenants.filter((t) => t.status === "inactive").length,
+    trial:    tenants.filter((t) => t.plan === "trial" && t.status === "active").length,
+    expired:  tenants.filter((t) => t.planExpiresAt && new Date(t.planExpiresAt) < new Date()).length,
   };
 
   const filtered = tenants.filter((t) => {
@@ -153,6 +190,14 @@ export default function AdminPanel() {
       width: 90,
       render: (_, record) => (
         <Text>{record._count?.Company ?? 0}</Text>
+      ),
+    },
+    {
+      title: "Plano",
+      key: "plan",
+      width: 140,
+      render: (_, record) => (
+        <PlanTag plan={record.plan} planExpiresAt={record.planExpiresAt} />
       ),
     },
     {
@@ -246,27 +291,37 @@ export default function AdminPanel() {
       </div>
 
       {/* Stats */}
-      <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={6}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={12} sm={8} lg={4}>
           <Card bordered={false} style={{ background: "#f0f5ff" }}>
-            <Statistic title="Total de Clientes" value={stats.total} prefix={<TeamOutlined />} />
+            <Statistic title="Total" value={stats.total} prefix={<TeamOutlined />} />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
+        <Col xs={12} sm={8} lg={4}>
           <Card bordered={false} style={{ background: "#f6ffed" }}>
             <Statistic title="Ativos" value={stats.active} valueStyle={{ color: "#52c41a" }} prefix={<CheckCircleOutlined />} />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
+        <Col xs={12} sm={8} lg={4}>
           <Card bordered={false} style={{ background: "#fffbe6" }}>
             <Badge count={stats.pending} offset={[8, -4]}>
-              <Statistic title="Aguardando Aprovação" value={stats.pending} valueStyle={{ color: "#faad14" }} prefix={<ClockCircleOutlined />} />
+              <Statistic title="Aguardando" value={stats.pending} valueStyle={{ color: "#faad14" }} prefix={<ClockCircleOutlined />} />
             </Badge>
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
+        <Col xs={12} sm={8} lg={4}>
           <Card bordered={false} style={{ background: "#f5f5f5" }}>
             <Statistic title="Inativos" value={stats.inactive} valueStyle={{ color: "#999" }} prefix={<StopOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} lg={4}>
+          <Card bordered={false} style={{ background: "#f9f0ff" }}>
+            <Statistic title="Em Trial" value={stats.trial} valueStyle={{ color: "#722ed1" }} prefix={<ExperimentOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} lg={4}>
+          <Card bordered={false} style={{ background: "#fff1f0" }}>
+            <Statistic title="Plano Expirado" value={stats.expired} valueStyle={{ color: "#f5222d" }} prefix={<ClockCircleOutlined />} />
           </Card>
         </Col>
       </Row>

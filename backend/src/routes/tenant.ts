@@ -3,6 +3,9 @@ import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { hashPassword } from "../lib/auth";
+import { sendWelcomeEmail } from "../services/emailService";
+
+const TRIAL_DAYS = 14;
 
 function requireSuperAdmin(req: FastifyRequest, rep: FastifyReply, done: () => void) {
   if (!req.user?.isSuperAdmin) {
@@ -14,7 +17,7 @@ function requireSuperAdmin(req: FastifyRequest, rep: FastifyReply, done: () => v
 export async function tenantRoutes(app: FastifyInstance) {
 
   // ---- Rota pública: solicitar acesso (sem autenticação) ----
-  app.post("/public/register", async (req: FastifyRequest, rep: FastifyReply) => {
+  app.post("/public/register", { config: { rateLimit: { max: 5, timeWindow: "5 minutes" } } }, async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const schema = z.object({
         name: z.string().min(2, "Nome é obrigatório"),
@@ -203,11 +206,46 @@ export async function tenantRoutes(app: FastifyInstance) {
       const tenant = await prisma.tenant.findUnique({ where: { id } });
       if (!tenant) return rep.code(404).send({ message: "Tenant não encontrado" });
 
-      await prisma.tenant.update({ where: { id }, data: { status: "active", updatedAt: new Date() } });
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
+
+      await prisma.tenant.update({
+        where: { id },
+        data: {
+          status: "active",
+          plan: "trial",
+          planExpiresAt: trialEndsAt,
+          updatedAt: new Date(),
+        },
+      });
       await prisma.user.updateMany({ where: { tenantId: id, status: "inactive" }, data: { status: "active" } });
 
-      return rep.send({ message: "Tenant aprovado com sucesso" });
+      // Criar subscription de trial
+      await prisma.subscription.upsert({
+        where: { tenantId: id },
+        create: { tenantId: id, plan: "trial", status: "active", startedAt: new Date(), expiresAt: trialEndsAt },
+        update: { plan: "trial", status: "active", startedAt: new Date(), expiresAt: trialEndsAt, updatedAt: new Date() },
+      });
+
+      // Enviar email de boas-vindas para o admin do tenant
+      const adminUser = await prisma.user.findFirst({
+        where: { tenantId: id },
+        select: { name: true, email: true },
+        orderBy: { createdAt: "asc" },
+      });
+      if (adminUser) {
+        sendWelcomeEmail(adminUser.email, adminUser.name, tenant.name, trialEndsAt).catch((err) =>
+          console.error("[email] Erro ao enviar boas-vindas:", err.message),
+        );
+      }
+
+      return rep.send({
+        message: "Tenant aprovado com sucesso",
+        trialEndsAt,
+        plan: "trial",
+      });
     } catch (error) {
+      console.error("[approve] Erro:", error);
       return rep.code(500).send({ message: "Erro interno do servidor" });
     }
   });

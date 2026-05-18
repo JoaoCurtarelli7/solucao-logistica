@@ -2,6 +2,31 @@ import type { FastifyReply, FastifyRequest } from "../types/fastify";
 import { prisma } from "../lib/prisma";
 import { verifyToken } from "../lib/auth";
 
+async function checkPlan(tenantId: number, rep: FastifyReply): Promise<boolean> {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { planExpiresAt: true, status: true },
+  });
+
+  if (!tenant) return true;
+
+  if (tenant.status === "suspended") {
+    rep.code(403).send({ message: "Conta suspensa. Entre em contato com o suporte.", code: "ACCOUNT_SUSPENDED" });
+    return false;
+  }
+
+  if (tenant.planExpiresAt && tenant.planExpiresAt < new Date()) {
+    rep.code(402).send({
+      message: "Seu plano expirou. Entre em contato para renovar o acesso.",
+      code: "PLAN_EXPIRED",
+      expiredAt: tenant.planExpiresAt,
+    });
+    return false;
+  }
+
+  return true;
+}
+
 export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
   try {
     const auth = req.headers?.authorization;
@@ -43,6 +68,10 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
           role: tokenRole ?? null,
           permissions: tokenPermissions,
         };
+        if (!tokenIsSuperAdmin && tokenTenantId) {
+          const allowed = await checkPlan(tokenTenantId, rep);
+          if (!allowed) return;
+        }
         return;
       }
 
@@ -94,6 +123,10 @@ export async function authMiddleware(req: FastifyRequest, rep: FastifyReply) {
         role: dbUser.role?.name ?? null,
         permissions,
       };
+      if (!dbUser.isSuperAdmin && dbUser.tenantId) {
+        const allowed = await checkPlan(dbUser.tenantId, rep);
+        if (!allowed) return;
+      }
     } catch (jwtError: any) {
       if (jwtError.name === "TokenExpiredError") {
         return rep.status(401).send({ message: "Token expirado" });

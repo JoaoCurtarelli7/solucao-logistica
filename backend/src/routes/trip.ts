@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fas
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware } from "../middlewares/authMiddleware";
+import { paginationSchema, paginationMeta } from "../lib/paginate";
 
 export async function tripRoutes(app: FastifyInstance) {
   const paramsSchema = z.object({ id: z.coerce.number() });
@@ -20,27 +21,50 @@ export async function tripRoutes(app: FastifyInstance) {
 
   app.addHook("preHandler", authMiddleware);
 
-  // Listar todas as viagens
+  // Listar viagens — suporta ?page=&limit=&search=&status=&truckId=
   app.get("/trips", async (req: FastifyRequest, rep: FastifyReply) => {
     try {
       const tenantId = req.user!.tenantId;
-      const trips = await prisma.trip.findMany({
-        where: { tenantId },
-        include: {
-          TripExpense: {
-            orderBy: { date: 'desc' }
-          },
-          Truck: {
-            select: {
-              id: true,
-              name: true,
-              plate: true
+      const query = paginationSchema.extend({
+        status: z.enum(["em_andamento", "concluida", "cancelada"]).optional(),
+        truckId: z.coerce.number().optional(),
+      }).parse(req.query);
+      const hasPagination = !!(req.query as Record<string, unknown>).page;
+
+      const where = {
+        tenantId,
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.truckId ? { truckId: query.truckId } : {}),
+        ...(query.search
+          ? {
+              OR: [
+                { driver: { contains: query.search, mode: "insensitive" as const } },
+                { destination: { contains: query.search, mode: "insensitive" as const } },
+                { origin: { contains: query.search, mode: "insensitive" as const } },
+              ],
             }
-          }
-        },
-        orderBy: { date: 'desc' }
-      });
-      return { trips };
+          : {}),
+      };
+
+      const include = {
+        TripExpense: { orderBy: { date: "desc" as const } },
+        Truck: { select: { id: true, name: true, plate: true } },
+      };
+
+      if (!hasPagination) {
+        const trips = await prisma.trip.findMany({ where, include, orderBy: { date: "desc" } });
+        return { trips };
+      }
+
+      const [total, trips] = await prisma.$transaction([
+        prisma.trip.count({ where }),
+        prisma.trip.findMany({
+          where, include, orderBy: { date: "desc" },
+          skip: (query.page - 1) * query.limit,
+          take: query.limit,
+        }),
+      ]);
+      return rep.send({ data: trips, ...paginationMeta(total, query.page, query.limit) });
     } catch (error) {
       console.error("Erro ao listar viagens:", error);
       return rep.code(500).send({ message: "Erro ao listar viagens" });
