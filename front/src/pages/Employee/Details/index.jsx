@@ -193,16 +193,19 @@ export default function EmployeeDetails() {
     employee?.financialSummary?.salaryTotalBalance ??
     (employee?.baseSalary || 0) + stats.totalCredits - stats.totalDebits;
 
-  const credits = transactions.filter((t) => t.type === "Crédito");
-  const debits = transactions.filter((t) => t.type === "Débito");
+  const sortByDate = (arr) =>
+    [...arr].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  const movementColumns = [
+  const credits = sortByDate(transactions.filter((t) => t.type === "Crédito"));
+  const debits = sortByDate(transactions.filter((t) => t.type === "Débito"));
+
+  const makeColumns = (type) => [
     {
       title: "Data",
       dataIndex: "date",
       key: "date",
+      width: 100,
       render: (date) => dayjs(date).format("DD/MM/YYYY"),
-      sorter: (a, b) => new Date(a.date) - new Date(b.date),
     },
     {
       title: "Descrição",
@@ -215,41 +218,38 @@ export default function EmployeeDetails() {
       dataIndex: "amount",
       key: "amount",
       align: "right",
-      render: (amount, record) => (
+      width: 120,
+      render: (amount) => (
         <span
           style={{
-            color: record.type === "Crédito" ? "#52c41a" : "#ff4d4f",
+            color: type === "Crédito" ? "#52c41a" : "#ff4d4f",
             fontWeight: "bold",
           }}
         >
-          R$ {amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          {Number(amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
         </span>
       ),
-      sorter: (a, b) => a.amount - b.amount,
     },
     {
-      title: "Ações",
+      title: "",
       key: "actions",
+      width: 80,
       render: (_, record) => (
-        <Space>
+        <Space size={4}>
           <Button
-            type="link"
+            type="text"
+            size="small"
             icon={<EditOutlined />}
             onClick={() => handleEditTransaction(record)}
-          >
-            Editar
-          </Button>
+          />
           <Popconfirm
             title="Remover transação?"
-            description="Esta ação não pode ser desfeita."
             onConfirm={() => handleDeleteTransaction(record.id)}
             okText="Remover"
             cancelText="Cancelar"
             okType="danger"
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              Remover
-            </Button>
+            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
       ),
@@ -264,14 +264,8 @@ export default function EmployeeDetails() {
         subtitle: `Funcionário: ${employee.name || "-"} | Competência: ${selectedMonth.format("MM/YYYY")}`,
       });
 
-      const tableRows = transactions.map((transaction) => [
-        transaction.date ? dayjs(transaction.date).format("DD/MM/YYYY") : "-",
-        transaction.type || "-",
-        transaction.description || "-",
-        `R$ ${Number(transaction.amount || 0).toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-        })}`,
-      ]);
+      const fmtBRL = (v) =>
+        Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
 
       const y1 = addCompactTable(doc, {
         startY: 45,
@@ -280,17 +274,40 @@ export default function EmployeeDetails() {
           ["Cargo", employee.role || "-"],
           ["CPF", employee.cpf || "-"],
           ["Conta Pix", employee.pixAccount || "-"],
-          ["Salário Base", `R$ ${(employee.baseSalary || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
-          ["Total Créditos", `R$ ${stats.totalCredits.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
-          ["Total Débitos", `R$ ${stats.totalDebits.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
-          ["Totalizador do Salário", `R$ ${saldoTotalSalario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`],
+          ["Salário Base", fmtBRL(employee.baseSalary)],
+          ["Total Créditos", fmtBRL(stats.totalCredits)],
+          ["Total Débitos", fmtBRL(stats.totalDebits)],
+          ["Totalizador do Salário", fmtBRL(saldoTotalSalario)],
         ],
       });
 
+      doc.setFontSize(10);
+      doc.setFont(undefined, "bold");
+      doc.text("Créditos", 14, y1 + 10);
+      doc.setFont(undefined, "normal");
+
+      const y2 = addCompactTable(doc, {
+        startY: y1 + 14,
+        head: ["Data", "Descrição", "Valor"],
+        body: credits.map((t) => [
+          t.date ? dayjs(t.date).format("DD/MM/YYYY") : "-",
+          t.description || "-",
+          fmtBRL(t.amount),
+        ]),
+      });
+
+      doc.setFont(undefined, "bold");
+      doc.text("Débitos", 14, y2 + 10);
+      doc.setFont(undefined, "normal");
+
       addCompactTable(doc, {
-        startY: y1 + 6,
-        head: ["Data", "Tipo", "Descrição", "Valor"],
-        body: tableRows,
+        startY: y2 + 14,
+        head: ["Data", "Descrição", "Valor"],
+        body: debits.map((t) => [
+          t.date ? dayjs(t.date).format("DD/MM/YYYY") : "-",
+          t.description || "-",
+          fmtBRL(t.amount),
+        ]),
       });
 
       const finalY = (doc.lastAutoTable?.finalY || 120) + 24;
@@ -564,98 +581,51 @@ export default function EmployeeDetails() {
       </Card>
 
       <Row gutter={[20, 20]} style={{ marginTop: "20px" }}>
-        <Col span={24}>
-          <Card title="Todas as Transações">
-            <Space direction="vertical" style={{ width: "100%" }} size="middle">
-              <Row gutter={16}>
-                <Col xs={24} md={8}>
-                  <Statistic
-                    title="Total Geral de Transações"
-                    value={stats.transactionCount}
-                    suffix="transações"
-                  />
-                </Col>
-                <Col xs={24} md={8}>
-                  <Statistic
-                    title="Total de Créditos"
-                    value={stats.totalCredits}
-                    precision={2}
-                    prefix="R$"
-                    valueStyle={{ color: "#3f8600" }}
-                  />
-                </Col>
-                <Col xs={24} md={8}>
-                  <Statistic
-                    title="Total de Débitos"
-                    value={stats.totalDebits}
-                    precision={2}
-                    prefix="R$"
-                    valueStyle={{ color: "#cf1322" }}
-                  />
-                </Col>
-              </Row>
-              <Table
-                dataSource={transactions}
-                columns={movementColumns}
-                rowKey="id"
-                pagination={{
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                }}
-                locale={{ emptyText: "Nenhuma transação encontrada" }}
-              />
-            </Space>
+        <Col xs={24} md={12}>
+          <Card
+            title={
+              <span style={{ color: "#3f8600" }}>
+                Créditos — {credits.length} lançamento{credits.length !== 1 ? "s" : ""}
+              </span>
+            }
+            extra={
+              <Text strong style={{ color: "#3f8600" }}>
+                {stats.totalCredits.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
+              </Text>
+            }
+          >
+            <Table
+              dataSource={credits}
+              columns={makeColumns("Crédito")}
+              rowKey="id"
+              size="small"
+              pagination={{ pageSize: 10, showSizeChanger: false }}
+              locale={{ emptyText: "Nenhum crédito encontrado" }}
+            />
           </Card>
         </Col>
 
         <Col xs={24} md={12}>
-          <Card title="Créditos">
-            <Space direction="vertical" style={{ width: "100%" }} size="middle">
-              <Statistic
-                title="Total de Créditos"
-                value={stats.totalCredits}
-                precision={2}
-                prefix="R$"
-                valueStyle={{ color: "#3f8600" }}
-              />
-              <Table
-                dataSource={credits}
-                columns={movementColumns}
-                rowKey="id"
-                pagination={{
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                }}
-                locale={{ emptyText: "Nenhum crédito encontrado" }}
-              />
-            </Space>
-          </Card>
-        </Col>
-
-        <Col xs={24} md={12}>
-          <Card title="Débitos">
-            <Space direction="vertical" style={{ width: "100%" }} size="middle">
-              <Statistic
-                title="Total de Débitos"
-                value={stats.totalDebits}
-                precision={2}
-                prefix="R$"
-                valueStyle={{ color: "#cf1322" }}
-              />
-              <Table
-                dataSource={debits}
-                columns={movementColumns}
-                rowKey="id"
-                pagination={{
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                }}
-                locale={{ emptyText: "Nenhum débito encontrado" }}
-              />
-            </Space>
+          <Card
+            title={
+              <span style={{ color: "#cf1322" }}>
+                Débitos — {debits.length} lançamento{debits.length !== 1 ? "s" : ""}
+              </span>
+            }
+            extra={
+              <Text strong style={{ color: "#cf1322" }}>
+                {stats.totalDebits.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 })}
+              </Text>
+            }
+          >
+            <Table
+              dataSource={debits}
+              columns={makeColumns("Débito")}
+              rowKey="id"
+              size="small"
+              pagination={{ pageSize: 10, showSizeChanger: false }}
+              locale={{ emptyText: "Nenhum débito encontrado" }}
+            />
           </Card>
         </Col>
       </Row>

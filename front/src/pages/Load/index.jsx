@@ -47,6 +47,7 @@ export default function Load() {
   );
   const [dateRange, setDateRange] = useState(null);
   const [searchText, setSearchText] = useState("");
+  const [sortOrder, setSortOrder] = useState("date_desc");
 
   useEffect(() => {
     fetchCompanies();
@@ -269,13 +270,24 @@ export default function Load() {
       });
   };
 
-  const filteredData = data.filter(
-    (item) =>
-      item.numeroCarregamento
-        .toLowerCase()
-        .includes(searchText.toLowerCase()) ||
-      item.observacoes.toLowerCase().includes(searchText.toLowerCase()),
-  );
+  const filteredData = (() => {
+    let result = data.filter(
+      (item) =>
+        item.numeroCarregamento
+          .toLowerCase()
+          .includes(searchText.toLowerCase()) ||
+        item.observacoes.toLowerCase().includes(searchText.toLowerCase()),
+    );
+    if (sortOrder === "date_asc")
+      result = [...result].sort((a, b) => dayjs(a.data, "DD/MM/YYYY").valueOf() - dayjs(b.data, "DD/MM/YYYY").valueOf());
+    else if (sortOrder === "date_desc")
+      result = [...result].sort((a, b) => dayjs(b.data, "DD/MM/YYYY").valueOf() - dayjs(a.data, "DD/MM/YYYY").valueOf());
+    else if (sortOrder === "number")
+      result = [...result].sort((a, b) => a.numeroCarregamento.localeCompare(b.numeroCarregamento));
+    else if (sortOrder === "company")
+      result = [...result].sort((a, b) => (a.companyName || "").localeCompare(b.companyName || ""));
+    return result;
+  })();
 
   const columns = [
     {
@@ -610,6 +622,17 @@ export default function Load() {
           >
             Buscar por Período
           </Button>
+
+          <Select
+            value={sortOrder}
+            onChange={setSortOrder}
+            style={{ width: 190 }}
+          >
+            <Option value="date_desc">Data (mais recente)</Option>
+            <Option value="date_asc">Data (mais antiga)</Option>
+            <Option value="number">Nº carregamento</Option>
+            <Option value="company">Empresa</Option>
+          </Select>
 
           <Button
             type="default"

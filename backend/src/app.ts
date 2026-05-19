@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import fastifyCors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
@@ -27,7 +28,7 @@ import { maintenanceServicePresetRoutes } from "./routes/maintenanceServicePrese
 import { rbacRoutes } from "./routes/rbac";
 import { tenantRoutes } from "./routes/tenant";
 
-export const app = fastify({ logger: true });
+export const app = fastify({ logger: process.env.NODE_ENV !== "test" });
 
 app.register(swagger, {
   openapi: {
@@ -151,5 +152,7 @@ app.register(tripRoutes);
 app.register(tripExpenseRoutes);
 app.register(rbacRoutes);
 app.register(tenantRoutes);
+
+Sentry.setupFastifyErrorHandler(app);
 
 export default app;

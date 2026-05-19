@@ -233,6 +233,10 @@ model LoadBillingClosing {
   totalCommission      Float    @default(0)
   totalAdditionalCosts Float    @default(0)
   billingTotal         Float    @default(0)
+  totalDeliveries      Int      @default(0)
+  totalWeight          Float    @default(0)
+  documentType         String?
+  documentNumber       String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @default(now())
   Tenant               Tenant   @relation(fields: [tenantId], references: [id])

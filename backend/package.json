@@ -34,12 +34,14 @@
     "@types/pdf-parse": "^1.1.5",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
+    "@vitest/coverage-v8": "^4.1.6",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.3",
     "prisma": "^5.22.0",
     "tsx": "^3.14.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "vitest": "^4.1.6"
   },
   "dependencies": {
     "@fastify/cors": "^8.5.0",
@@ -48,6 +50,7 @@
     "@fastify/swagger": "^8.15.0",
     "@fastify/swagger-ui": "^1.10.2",
     "@prisma/client": "^5.22.0",
+    "@sentry/node": "^10.53.1",
     "@types/jsonwebtoken": "^9.0.8",
     "bcrypt": "^5.1.1",
     "fastify": "^4.26.0",

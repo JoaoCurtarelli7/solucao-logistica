@@ -51,15 +51,21 @@ async function summarizeLoads(
     0,
   );
   const commissionRate = company.commission || 0;
-  // Comissão percentual sobre o valor bruto das cargas.
   const totalCommission = (totalGrossValue * commissionRate) / 100;
   const totalAdditionalCosts = loads.reduce(
     (sum, l) =>
       sum + ((l as { additionalCosts?: number }).additionalCosts || 0),
     0,
   );
-  // Valor total a cobrar: comissão + custos adicionais repassados (descarga, etc.).
   const billingTotal = totalCommission + totalAdditionalCosts;
+  const totalDeliveries = loads.reduce(
+    (sum, l) => sum + (l.deliveries || 0),
+    0,
+  );
+  const totalWeight = loads.reduce(
+    (sum, l) => sum + (l.cargoWeight || 0),
+    0,
+  );
 
   return {
     company,
@@ -72,6 +78,8 @@ async function summarizeLoads(
       totalCommission,
       totalAdditionalCosts,
       billingTotal,
+      totalDeliveries,
+      totalWeight,
     },
   };
 }
@@ -127,7 +135,12 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     companyId?: number;
     status?: string;
     tenantId: number;
+    orderBy?: string;
   }) => {
+    const sortField = filters.orderBy === "name" ? "name"
+      : filters.orderBy === "company" ? "companyId"
+      : "createdAt";
+
     if (hasGeneratedModel()) {
       return (prisma as any).loadBillingClosing.findMany({
         where: {
@@ -142,7 +155,7 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
             select: { id: true, name: true, cnpj: true, commission: true },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { [sortField]: "asc" },
       });
     }
     const rows = await prisma.$queryRawUnsafe<any[]>(
@@ -166,8 +179,8 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     }
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `INSERT INTO "LoadBillingClosing"
-       ("monthId","companyId","name","startDate","endDate","status","totalLoads","totalGrossValue","totalFreight","commissionRate","totalCommission","totalAdditionalCosts","billingTotal","tenantId")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       ("monthId","companyId","name","startDate","endDate","status","totalLoads","totalGrossValue","totalFreight","commissionRate","totalCommission","totalAdditionalCosts","billingTotal","totalDeliveries","totalWeight","documentType","documentNumber","tenantId")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING *`,
       data.monthId,
       data.companyId,
@@ -182,6 +195,10 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
       data.totalCommission ?? 0,
       data.totalAdditionalCosts ?? 0,
       data.billingTotal ?? 0,
+      data.totalDeliveries ?? 0,
+      data.totalWeight ?? 0,
+      data.documentType ?? null,
+      data.documentNumber ?? null,
       data.tenantId,
     );
     return normalizeClosingRow(rows[0]);
@@ -210,7 +227,7 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     const statusVal = data.status ?? null;
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `UPDATE "LoadBillingClosing"
-       SET "totalLoads"=$2,"totalGrossValue"=$3,"totalFreight"=$4,"commissionRate"=$5,"totalCommission"=$6,"totalAdditionalCosts"=$7,"billingTotal"=$8,"status"=COALESCE($9::text,"status"),"updatedAt"=CURRENT_TIMESTAMP
+       SET "totalLoads"=$2,"totalGrossValue"=$3,"totalFreight"=$4,"commissionRate"=$5,"totalCommission"=$6,"totalAdditionalCosts"=$7,"billingTotal"=$8,"status"=COALESCE($9::text,"status"),"totalDeliveries"=$10,"totalWeight"=$11,"updatedAt"=CURRENT_TIMESTAMP
        WHERE "id"=$1
        RETURNING *`,
       id,
@@ -222,6 +239,28 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
       data.totalAdditionalCosts ?? 0,
       data.billingTotal ?? 0,
       statusVal,
+      data.totalDeliveries ?? 0,
+      data.totalWeight ?? 0,
+    );
+    if (!rows[0]) throw new Error("NOT_FOUND");
+    return normalizeClosingRow(rows[0]);
+  };
+
+  const updateDocumentFields = async (id: number, tenantId: number, data: { documentType?: string; documentNumber?: string }) => {
+    if (hasGeneratedModel())
+      return (prisma as any).loadBillingClosing.update({
+        where: { id },
+        data: { documentType: data.documentType ?? null, documentNumber: data.documentNumber ?? null, updatedAt: new Date() },
+      });
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `UPDATE "LoadBillingClosing"
+       SET "documentType"=$3,"documentNumber"=$4,"updatedAt"=CURRENT_TIMESTAMP
+       WHERE "id"=$1 AND "tenantId"=$2
+       RETURNING *`,
+      id,
+      tenantId,
+      data.documentType ?? null,
+      data.documentNumber ?? null,
     );
     if (!rows[0]) throw new Error("NOT_FOUND");
     return normalizeClosingRow(rows[0]);
@@ -235,6 +274,8 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     name: z.string().min(2),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
+    documentType: z.string().optional(),
+    documentNumber: z.string().optional(),
   });
 
   app.get(
@@ -242,16 +283,17 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     { preHandler: requirePermission("closings.view") },
     async (req: FastifyRequest, rep: FastifyReply) => {
       try {
-        const { monthId, companyId, status } = z
+        const { monthId, companyId, status, orderBy } = z
           .object({
             monthId: z.coerce.number().optional(),
             companyId: z.coerce.number().optional(),
             status: z.string().optional(),
+            orderBy: z.string().optional(),
           })
           .parse(req.query);
 
         const tenantId = req.user!.tenantId;
-        const rows = await listClosings({ monthId, companyId, status, tenantId });
+        const rows = await listClosings({ monthId, companyId, status, tenantId, orderBy });
         return rep.send(rows);
       } catch (error) {
         app.log.error(error);
@@ -281,12 +323,23 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
         if (!month) return rep.code(404).send({ message: "Mês não encontrado" });
 
         const defaultRange = dateRangeFromMonth(month);
-        const startDate = data.startDate
-          ? parseBrOrIsoDate(data.startDate)
-          : defaultRange.start;
-        const endDate = data.endDate
-          ? parseBrOrIsoDate(data.endDate)
-          : defaultRange.end;
+
+        let startDate: Date;
+        let endDate: Date;
+
+        if (data.startDate) {
+          startDate = parseBrOrIsoDate(data.startDate);
+          startDate.setHours(0, 0, 0, 0);
+        } else {
+          startDate = defaultRange.start;
+        }
+
+        if (data.endDate) {
+          endDate = parseBrOrIsoDate(data.endDate);
+          endDate.setHours(23, 59, 59, 999);
+        } else {
+          endDate = defaultRange.end;
+        }
 
         const { summary } = await summarizeLoads(
           data.companyId,
@@ -301,6 +354,8 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
           name: data.name,
           startDate,
           endDate,
+          documentType: data.documentType ?? null,
+          documentNumber: data.documentNumber ?? null,
           tenantId,
           ...summary,
         });
@@ -326,6 +381,65 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
     },
   );
 
+  app.patch(
+    "/load-billing-closings/:id/document",
+    { preHandler: requirePermission("closings.update") },
+    async (req: FastifyRequest, rep: FastifyReply) => {
+      try {
+        const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+        const { documentType, documentNumber } = z.object({
+          documentType: z.string().optional().nullable(),
+          documentNumber: z.string().optional().nullable(),
+        }).parse(req.body);
+        const tenantId = req.user!.tenantId;
+        const updated = await updateDocumentFields(id, tenantId, {
+          documentType: documentType ?? undefined,
+          documentNumber: documentNumber ?? undefined,
+        });
+        return rep.send(updated);
+      } catch (error) {
+        app.log.error(error);
+        if (error instanceof Error && error.message === "NOT_FOUND")
+          return rep.code(404).send({ message: "Fechamento não encontrado" });
+        return rep.code(500).send({ message: "Erro ao atualizar documento" });
+      }
+    },
+  );
+
+  app.delete(
+    "/load-billing-closings/:id",
+    { preHandler: requirePermission("closings.delete") },
+    async (req: FastifyRequest, rep: FastifyReply) => {
+      try {
+        const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
+        const tenantId = req.user!.tenantId;
+        const closing = await findClosingOrThrow(id, tenantId);
+
+        if (closing.status === "fechado") {
+          return rep.code(400).send({ message: "Não é possível excluir um fechamento já finalizado" });
+        }
+
+        if (hasGeneratedModel()) {
+          await (prisma as any).loadBillingClosing.delete({ where: { id } });
+        } else {
+          await prisma.$queryRawUnsafe(
+            `DELETE FROM "LoadBillingClosing" WHERE "id" = $1 AND "tenantId" = $2`,
+            id,
+            tenantId,
+          );
+        }
+        return rep.code(204).send();
+      } catch (error) {
+        app.log.error(error);
+        if (error instanceof Error && error.message === "NOT_FOUND")
+          return rep.code(404).send({ message: "Fechamento não encontrado" });
+        return rep.code(500).send({
+          message: resolveDbErrorMessage(error, "Erro ao excluir fechamento de carga"),
+        });
+      }
+    },
+  );
+
   app.post(
     "/load-billing-closings/:id/finalize",
     { preHandler: requirePermission("closings.update") },
@@ -346,7 +460,6 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
             ? closing.endDate
             : new Date(closing.endDate);
 
-        // Buscar fechamento de caixa (Closing) para o mesmo mês e empresa
         const closings = await prisma.closing.findMany({
           where: {
             tenantId,
@@ -375,7 +488,6 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
             });
         }
 
-        // Atualizar status para fechado
         await updateClosing(id, {
           status: "fechado",
           totalLoads: closing.totalLoads,
@@ -385,9 +497,10 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
           totalCommission: closing.totalCommission,
           totalAdditionalCosts: closing.totalAdditionalCosts ?? 0,
           billingTotal: closing.billingTotal,
+          totalDeliveries: closing.totalDeliveries ?? 0,
+          totalWeight: closing.totalWeight ?? 0,
         });
 
-        // Criar entrada no fechamento de caixa
         await prisma.financialEntry.create({
           data: {
             description: `Fechamento de cargas: ${closing.name}`,

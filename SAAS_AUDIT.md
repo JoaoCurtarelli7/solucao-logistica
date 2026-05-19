@@ -310,7 +310,7 @@ Cada item tem:
 3. [x] Health check endpoint (`GET /health`)
 4. [x] Graceful shutdown (SIGTERM/SIGINT)
 5. [x] `.env.example` nos dois projetos
-6. [ ] Sentry (backend + frontend) — requer DSN do projeto
+6. [x] Sentry (backend + frontend) — requer DSN do projeto (SENTRY_DSN / VITE_SENTRY_DSN)
 
 ### Fase 2 — Billing Mínimo ✅ PARCIALMENTE CONCLUÍDA
 1. [x] Modelo de planos no schema (`Tenant.plan`, `Tenant.planExpiresAt`, tabela `Subscription`)
@@ -345,7 +345,7 @@ Cada item tem:
 | 4 | Integração de pagamento | 🔴 | G | [ ] |
 | 5 | Testes automatizados | 🔴 | G | [ ] |
 | 6 | Docker + CI/CD | 🔴 | M | [ ] |
-| 7 | Sentry (error tracking) | 🔴 | P | [ ] |
+| 7 | Sentry (error tracking) | 🔴 | P | [x] |
 | 8 | RLS no PostgreSQL | 🔴 | G | [ ] |
 | 9 | Trial automático (14 dias) | 🟡 | P | [x] |
 | 10 | Email boas-vindas | 🟡 | P | [x] |

@@ -22,6 +22,8 @@ import {
 import {
   CalculatorOutlined,
   CheckOutlined,
+  DeleteOutlined,
+  EditOutlined,
   EyeOutlined,
   FilePdfOutlined,
 } from "@ant-design/icons";
@@ -39,11 +41,19 @@ const formatCurrency = (value) =>
   });
 const toMoney = (value) => Number(value || 0).toFixed(2);
 
+const DOCUMENT_TYPES = [
+  { value: "CTE", label: "CT-e" },
+  { value: "NF", label: "Nota Fiscal" },
+  { value: "FATURA", label: "Fatura" },
+  { value: "OUTRO", label: "Outro" },
+];
+
 export default function LoadBillingClosing() {
   const { hasPermission } = usePermission();
   const canView = hasPermission("closings.view");
   const canCreate = hasPermission("closings.create");
   const canUpdate = hasPermission("closings.update");
+  const canDelete = hasPermission("closings.delete");
 
   const [months, setMonths] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -57,6 +67,16 @@ export default function LoadBillingClosing() {
   const [detail, setDetail] = useState(null);
   const [loads, setLoads] = useState([]);
   const [creating, setCreating] = useState(false);
+
+  // Filtros
+  const [filterDateRange, setFilterDateRange] = useState(null);
+  const [filterLoadNumber, setFilterLoadNumber] = useState("");
+  const [sortOrder, setSortOrder] = useState("createdAt");
+
+  // Modal doc
+  const [docModalOpen, setDocModalOpen] = useState(false);
+  const [docForm] = Form.useForm();
+  const [editingDocRow, setEditingDocRow] = useState(null);
 
   useEffect(() => {
     loadBaseData();
@@ -90,7 +110,7 @@ export default function LoadBillingClosing() {
     try {
       setLoading(true);
       const { data } = await api.get(
-        `/load-billing-closings?monthId=${monthId}`,
+        `/load-billing-closings?monthId=${monthId}&orderBy=${sortOrder}`,
       );
       setRows(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -130,7 +150,10 @@ export default function LoadBillingClosing() {
       }
     }
     if (type === "custom" && values?.range?.[0] && values?.range?.[1]) {
-      return [values.range[0], values.range[1]];
+      return [
+        dayjs(values.range[0]).startOf("day"),
+        dayjs(values.range[1]).endOf("day"),
+      ];
     }
     return [null, null];
   };
@@ -149,6 +172,8 @@ export default function LoadBillingClosing() {
         name: values.name,
         startDate: start.format("DD/MM/YYYY"),
         endDate: end.format("DD/MM/YYYY"),
+        documentType: values.documentType || null,
+        documentNumber: values.documentNumber || null,
       };
       await api.post("/load-billing-closings", payload);
       message.success("Fechamento de carga criado com sucesso");
@@ -161,6 +186,41 @@ export default function LoadBillingClosing() {
       );
     } finally {
       setCreating(false);
+    }
+  };
+
+  const onDelete = async (id) => {
+    try {
+      await api.delete(`/load-billing-closings/${id}`);
+      message.success("Fechamento excluído com sucesso");
+      loadClosings(selectedMonth);
+    } catch (error) {
+      message.error(
+        error.response?.data?.message || "Erro ao excluir fechamento",
+      );
+    }
+  };
+
+  const openDocModal = (row) => {
+    setEditingDocRow(row);
+    docForm.setFieldsValue({
+      documentType: row.documentType || null,
+      documentNumber: row.documentNumber || "",
+    });
+    setDocModalOpen(true);
+  };
+
+  const onSaveDoc = async (values) => {
+    try {
+      await api.patch(`/load-billing-closings/${editingDocRow.id}/document`, {
+        documentType: values.documentType || null,
+        documentNumber: values.documentNumber || null,
+      });
+      message.success("Documento vinculado com sucesso");
+      setDocModalOpen(false);
+      loadClosings(selectedMonth);
+    } catch {
+      message.error("Erro ao salvar documento");
     }
   };
 
@@ -219,6 +279,8 @@ export default function LoadBillingClosing() {
       startY: 45,
       head: [
         "Total Cargas",
+        "Entregas",
+        "Peso Total (kg)",
         "Valor Bruto",
         "Comissão s/ bruto",
         "Custos adicionais",
@@ -228,6 +290,8 @@ export default function LoadBillingClosing() {
       body: [
         [
           String(detail.totalLoads || 0),
+          String(detail.totalDeliveries || 0),
+          Number(detail.totalWeight || 0).toLocaleString("pt-BR"),
           formatCurrency(detail.totalGrossValue),
           formatCurrency(detail.totalCommission),
           formatCurrency(detail.totalAdditionalCosts),
@@ -236,8 +300,18 @@ export default function LoadBillingClosing() {
         ],
       ],
     });
+
+    if (detail.documentType || detail.documentNumber) {
+      doc.setFontSize(9);
+      doc.text(
+        `Documento: ${detail.documentType || ""} nº ${detail.documentNumber || ""}`,
+        14,
+        y1 + 4,
+      );
+    }
+
     addCompactTable(doc, {
-      startY: y1 + 6,
+      startY: y1 + (detail.documentType || detail.documentNumber ? 10 : 6),
       head: [
         "Data",
         "Carga",
@@ -273,19 +347,64 @@ export default function LoadBillingClosing() {
     doc.save(`fechamento_cargas_${safeName}.pdf`);
   };
 
+  // Filtragem local dos rows
+  const filteredRows = useMemo(() => {
+    let result = [...rows];
+
+    if (filterDateRange?.[0] && filterDateRange?.[1]) {
+      const from = filterDateRange[0].startOf("day");
+      const to = filterDateRange[1].endOf("day");
+      result = result.filter((r) => {
+        const start = dayjs(r.startDate);
+        const end = dayjs(r.endDate);
+        return (
+          (start.isAfter(from) || start.isSame(from)) &&
+          (end.isBefore(to) || end.isSame(to))
+        );
+      });
+    }
+
+    if (filterLoadNumber.trim()) {
+      const q = filterLoadNumber.toLowerCase();
+      result = result.filter(
+        (r) =>
+          r.name?.toLowerCase().includes(q) ||
+          r.documentNumber?.toLowerCase().includes(q),
+      );
+    }
+
+    if (sortOrder === "name") result.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortOrder === "company")
+      result.sort((a, b) =>
+        (a.Company?.name || "").localeCompare(b.Company?.name || ""),
+      );
+    else if (sortOrder === "startDate")
+      result.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    else result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return result;
+  }, [rows, filterDateRange, filterLoadNumber, sortOrder]);
+
   const columns = useMemo(
     () => [
       {
         title: "Nome",
         dataIndex: "name",
         key: "name",
-        width: 220,
+        width: 200,
         ellipsis: true,
         render: (_, record) => (
           <div>
             <Text strong>{record.name}</Text>
             <br />
             <Text type="secondary">{record.Company?.name}</Text>
+            {(record.documentType || record.documentNumber) && (
+              <div>
+                <Tag color="blue" style={{ fontSize: 11, marginTop: 2 }}>
+                  {record.documentType} {record.documentNumber}
+                </Tag>
+              </div>
+            )}
           </div>
         ),
       },
@@ -305,6 +424,13 @@ export default function LoadBillingClosing() {
         dataIndex: "totalLoads",
         key: "totalLoads",
         align: "right",
+        width: 70,
+      },
+      {
+        title: "Entregas",
+        dataIndex: "totalDeliveries",
+        key: "totalDeliveries",
+        align: "right",
         width: 80,
       },
       {
@@ -313,14 +439,6 @@ export default function LoadBillingClosing() {
         key: "totalGrossValue",
         align: "right",
         width: 130,
-        render: (v) => <Text>{formatCurrency(v)}</Text>,
-      },
-      {
-        title: "Custos adicionais",
-        dataIndex: "totalAdditionalCosts",
-        key: "totalAdditionalCosts",
-        align: "right",
-        width: 120,
         render: (v) => <Text>{formatCurrency(v)}</Text>,
       },
       {
@@ -355,14 +473,23 @@ export default function LoadBillingClosing() {
       {
         title: "Ações",
         key: "actions",
-        width: 120,
+        width: 150,
         render: (_, record) => (
           <Space>
             <Button
               icon={<EyeOutlined />}
               size="small"
+              title="Visualizar"
               onClick={() => openDetail(record)}
             />
+            {canUpdate && (
+              <Button
+                icon={<EditOutlined />}
+                size="small"
+                title="Vincular documento"
+                onClick={() => openDocModal(record)}
+              />
+            )}
             {canUpdate && record.status === "aberto" && (
               <Popconfirm
                 title="Finalizar este fechamento?"
@@ -371,16 +498,25 @@ export default function LoadBillingClosing() {
                 okText="Sim, finalizar"
                 cancelText="Cancelar"
               >
-                <Button type="primary" size="small" icon={<CheckOutlined />}>
-                  Finalizar
-                </Button>
+                <Button type="primary" size="small" icon={<CheckOutlined />} title="Finalizar" />
+              </Popconfirm>
+            )}
+            {canDelete && record.status !== "fechado" && (
+              <Popconfirm
+                title="Excluir este fechamento?"
+                description="Esta ação não pode ser desfeita."
+                onConfirm={() => onDelete(record.id)}
+                okText="Sim, excluir"
+                cancelText="Cancelar"
+              >
+                <Button danger icon={<DeleteOutlined />} size="small" title="Excluir" />
               </Popconfirm>
             )}
           </Space>
         ),
       },
     ],
-    [canUpdate],
+    [canUpdate, canDelete],
   );
 
   const loadColumns = [
@@ -466,16 +602,17 @@ export default function LoadBillingClosing() {
     );
   }
 
-  const totals = rows.reduce(
+  const totals = filteredRows.reduce(
     (acc, r) => {
       acc.loads += Number(r.totalLoads || 0);
+      acc.deliveries += Number(r.totalDeliveries || 0);
       acc.gross += Number(r.totalGrossValue || 0);
       acc.commission += Number(r.totalCommission || 0);
       acc.additional += Number(r.totalAdditionalCosts || 0);
       acc.billing += Number(r.billingTotal || 0);
       return acc;
     },
-    { loads: 0, gross: 0, commission: 0, additional: 0, billing: 0 },
+    { loads: 0, deliveries: 0, gross: 0, commission: 0, additional: 0, billing: 0 },
   );
 
   return (
@@ -487,8 +624,7 @@ export default function LoadBillingClosing() {
               <CalculatorOutlined /> Fechamento de Cargas (Faturamento)
             </Title>
             <Text type="secondary">
-              Módulo separado para cobrança de cliente baseado em cargas e
-              comissão.
+              Módulo separado para cobrança de cliente baseado em cargas e comissão.
             </Text>
           </Col>
           <Col>
@@ -529,46 +665,79 @@ export default function LoadBillingClosing() {
         )}
         {selectedMonth && (
           <>
+            {/* Filtros */}
             <Row gutter={12} style={{ marginBottom: 12 }}>
-              <Col span={4}>
+              <Col>
+                <DatePicker.RangePicker
+                  format="DD/MM/YYYY"
+                  placeholder={["Data início", "Data fim"]}
+                  value={filterDateRange}
+                  onChange={setFilterDateRange}
+                  allowClear
+                />
+              </Col>
+              <Col>
+                <Input.Search
+                  placeholder="Buscar por nome ou nº documento"
+                  value={filterLoadNumber}
+                  onChange={(e) => setFilterLoadNumber(e.target.value)}
+                  allowClear
+                  style={{ width: 260 }}
+                />
+              </Col>
+              <Col>
+                <Select
+                  value={sortOrder}
+                  onChange={setSortOrder}
+                  style={{ width: 180 }}
+                >
+                  <Select.Option value="createdAt">Ordem de lançamento</Select.Option>
+                  <Select.Option value="startDate">Por data</Select.Option>
+                  <Select.Option value="name">Alfabético</Select.Option>
+                  <Select.Option value="company">Por empresa</Select.Option>
+                </Select>
+              </Col>
+            </Row>
+
+            <Row gutter={12} style={{ marginBottom: 12 }}>
+              <Col span={3}>
                 <Statistic title="Total de Cargas" value={totals.loads} />
+              </Col>
+              <Col span={3}>
+                <Statistic title="Entregas" value={totals.deliveries} />
               </Col>
               <Col span={5}>
                 <Statistic
                   title="Valor Bruto"
                   value={totals.gross}
-                  precision={2}
-                  suffix="R$"
+                  formatter={(v) => formatCurrency(v)}
                 />
               </Col>
               <Col span={5}>
                 <Statistic
                   title="Comissão (s/ bruto)"
                   value={totals.commission}
-                  precision={2}
-                  suffix="R$"
+                  formatter={(v) => formatCurrency(v)}
                 />
               </Col>
-              <Col span={5}>
+              <Col span={4}>
                 <Statistic
                   title="Custos adicionais"
                   value={totals.additional}
-                  precision={2}
-                  suffix="R$"
+                  formatter={(v) => formatCurrency(v)}
                 />
               </Col>
-              <Col span={5}>
+              <Col span={4}>
                 <Statistic
                   title="Valor a Cobrar"
                   value={totals.billing}
-                  precision={2}
-                  suffix="R$"
+                  formatter={(v) => formatCurrency(v)}
                 />
               </Col>
             </Row>
             <Table
               rowKey="id"
-              dataSource={rows}
+              dataSource={filteredRows}
               columns={columns}
               loading={loading}
               locale={{
@@ -576,13 +745,14 @@ export default function LoadBillingClosing() {
               }}
               size="small"
               tableLayout="fixed"
-              scroll={{ x: 900 }}
+              scroll={{ x: 1100 }}
               pagination={{ pageSize: 8, showSizeChanger: false }}
             />
           </>
         )}
       </Card>
 
+      {/* Modal criar */}
       <Modal
         title="Novo Fechamento de Carga"
         open={isModalOpen}
@@ -618,17 +788,13 @@ export default function LoadBillingClosing() {
             name="closingType"
             label="Tipo de Fechamento"
             initialValue="month"
-            rules={[
-              { required: true, message: "Selecione o tipo de fechamento" },
-            ]}
+            rules={[{ required: true, message: "Selecione o tipo de fechamento" }]}
           >
             <Select>
               <Select.Option value="month">Mês Completo</Select.Option>
               <Select.Option value="first_half">1ª Quinzena</Select.Option>
               <Select.Option value="second_half">2ª Quinzena</Select.Option>
-              <Select.Option value="custom">
-                Período Personalizado
-              </Select.Option>
+              <Select.Option value="custom">Período Personalizado</Select.Option>
             </Select>
           </Form.Item>
 
@@ -640,12 +806,7 @@ export default function LoadBillingClosing() {
                   <Form.Item
                     name="range"
                     label="Período Personalizado"
-                    rules={[
-                      {
-                        required: true,
-                        message: "Selecione data inicial e final",
-                      },
-                    ]}
+                    rules={[{ required: true, message: "Selecione data inicial e final" }]}
                   >
                     <DatePicker.RangePicker
                       style={{ width: "100%" }}
@@ -680,12 +841,59 @@ export default function LoadBillingClosing() {
             }}
           </Form.Item>
 
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="documentType" label="Tipo de Documento">
+                <Select placeholder="Selecione (opcional)" allowClear>
+                  {DOCUMENT_TYPES.map((d) => (
+                    <Select.Option key={d.value} value={d.value}>
+                      {d.label}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="documentNumber" label="Número do Documento">
+                <Input placeholder="Ex: 001234" />
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Button htmlType="submit" type="primary" block loading={creating}>
             Criar
           </Button>
         </Form>
       </Modal>
 
+      {/* Modal vincular documento */}
+      <Modal
+        title="Vincular Documento ao Fechamento"
+        open={docModalOpen}
+        onCancel={() => setDocModalOpen(false)}
+        footer={null}
+        width={420}
+      >
+        <Form form={docForm} layout="vertical" onFinish={onSaveDoc}>
+          <Form.Item name="documentType" label="Tipo de Documento">
+            <Select placeholder="Selecione" allowClear>
+              {DOCUMENT_TYPES.map((d) => (
+                <Select.Option key={d.value} value={d.value}>
+                  {d.label}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="documentNumber" label="Número do Documento">
+            <Input placeholder="Ex: 001234" />
+          </Form.Item>
+          <Button htmlType="submit" type="primary" block>
+            Salvar
+          </Button>
+        </Form>
+      </Modal>
+
+      {/* Modal visualizar detalhe */}
       <Modal
         title={detail?.name || "Visualizar fechamento"}
         open={detailOpen}
@@ -719,11 +927,7 @@ export default function LoadBillingClosing() {
         </Row>
         <Card
           size="small"
-          style={{
-            marginBottom: 12,
-            background: "#fafcff",
-            borderColor: "#e6f0ff",
-          }}
+          style={{ marginBottom: 12, background: "#fafcff", borderColor: "#e6f0ff" }}
         >
           <Row gutter={12} align="middle">
             <Col span={24}>
@@ -739,45 +943,59 @@ export default function LoadBillingClosing() {
                     ? dayjs(detail.endDate).format("DD/MM/YYYY")
                     : "-"}
                 </Text>
+                {(detail?.documentType || detail?.documentNumber) && (
+                  <>
+                    {" | "}
+                    Documento:{" "}
+                    <Text strong>
+                      {detail?.documentType} nº {detail?.documentNumber}
+                    </Text>
+                  </>
+                )}
               </Text>
             </Col>
           </Row>
           <Row gutter={12} style={{ marginTop: 12 }}>
-            <Col span={6}>
+            <Col span={4}>
               <Statistic title="Total Cargas" value={detail?.totalLoads || 0} />
+            </Col>
+            <Col span={4}>
+              <Statistic title="Entregas" value={detail?.totalDeliveries || 0} />
+            </Col>
+            <Col span={4}>
+              <Statistic
+                title="Peso Total (kg)"
+                value={Number(detail?.totalWeight || 0).toLocaleString("pt-BR")}
+              />
             </Col>
             <Col span={6}>
               <Statistic
                 title="Valor Bruto"
                 value={detail?.totalGrossValue || 0}
-                precision={2}
-                suffix="R$"
+                formatter={(v) => formatCurrency(v)}
               />
             </Col>
             <Col span={6}>
               <Statistic
                 title="Comissão (s/ bruto)"
                 value={detail?.totalCommission || 0}
-                precision={2}
-                suffix="R$"
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Custos adicionais"
-                value={detail?.totalAdditionalCosts || 0}
-                precision={2}
-                suffix="R$"
+                formatter={(v) => formatCurrency(v)}
               />
             </Col>
           </Row>
           <Row gutter={12} style={{ marginTop: 8 }}>
-            <Col span={24}>
+            <Col span={6}>
               <Statistic
-                title="Valor a cobrar (comissão + adicionais)"
+                title="Custos adicionais"
+                value={detail?.totalAdditionalCosts || 0}
+                formatter={(v) => formatCurrency(v)}
+              />
+            </Col>
+            <Col span={6}>
+              <Statistic
+                title="Valor a cobrar"
                 value={detail?.billingTotal || 0}
-                precision={2}
-                suffix="R$"
+                formatter={(v) => formatCurrency(v)}
               />
             </Col>
           </Row>
@@ -805,9 +1023,7 @@ export default function LoadBillingClosing() {
           tableLayout="fixed"
           scroll={{ x: 980, y: 420 }}
           pagination={{ pageSize: 12, showSizeChanger: false }}
-          locale={{
-            emptyText: "Nenhuma carga encontrada para este fechamento.",
-          }}
+          locale={{ emptyText: "Nenhuma carga encontrada para este fechamento." }}
         />
       </Modal>
     </div>

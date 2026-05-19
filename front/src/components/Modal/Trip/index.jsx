@@ -113,10 +113,18 @@ export default function TripModal({
             placeholder="Valor (R$)"
             min={0}
             style={{ width: "100%" }}
-            formatter={(value) =>
-              `R$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
-            }
-            parser={(value) => value.replace(/[R$\s.]/g, "")}
+            formatter={(value) => {
+              const val = Number.parseFloat(value)
+              return isNaN(val)
+                ? 'R$ 0,00'
+                : val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })
+            }}
+            parser={(value) => {
+              if (value == null || value === '') return 0
+              const cleaned = String(value).replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.')
+              const num = parseFloat(cleaned)
+              return isNaN(num) ? 0 : num
+            }}
           />
         </Form.Item>
 

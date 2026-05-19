@@ -4,13 +4,10 @@ import {
   Row,
   Col,
   Typography,
-  Statistic,
   Spin,
   Alert,
   Button,
   Space,
-  Tag,
-  Progress,
 } from "antd";
 import {
   TeamOutlined,
@@ -20,14 +17,12 @@ import {
   FileTextOutlined,
   PlusOutlined,
   ReloadOutlined,
-  ArrowUpOutlined,
-  CalendarOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import api from "../../lib/api";
 import dayjs from "dayjs";
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 export default function Home() {
   const navigate = useNavigate();
@@ -205,84 +200,34 @@ export default function Home() {
   return (
     <div
       style={{
-        padding: "24px",
-        background: "linear-gradient(180deg, #f6f9fc 0%, #eef3f9 100%)",
+        padding: "20px 24px",
+        background: "#f5f7fa",
         minHeight: "100vh",
       }}
     >
-      <Card
-        style={{
-          ...sectionCardStyle,
-          marginBottom: 24,
-          background:
-            "linear-gradient(135deg, #0f3d8f 0%, #1677ff 55%, #69b1ff 100%)",
-          color: "#fff",
-          overflow: "hidden",
-        }}
-        bodyStyle={{ padding: 24 }}
-      >
-        <Row gutter={[20, 20]} align="middle" justify="space-between">
-          <Col xs={24} lg={16}>
-            <Text
-              style={{
-                color: "rgba(255,255,255,0.78)",
-                display: "block",
-                marginBottom: 8,
-              }}
-            >
-              Painel executivo
-            </Text>
-            <Title level={2} style={{ color: "#fff", margin: 0 }}>
-              Dashboard do Sistema
-            </Title>
-            <Paragraph
-              style={{
-                color: "rgba(255,255,255,0.88)",
-                margin: "10px 0 0",
-                maxWidth: 560,
-              }}
-            >
-              Visão clara da operação com os principais indicadores e atalhos
-              para as áreas mais usadas.
-            </Paragraph>
-          </Col>
-          <Col xs={24} lg={8}>
-            <div
-              style={{
-                background: "rgba(255,255,255,0.14)",
-                border: "1px solid rgba(255,255,255,0.18)",
-                borderRadius: 18,
-                padding: 18,
-              }}
-            >
-              <Space direction="vertical" size={6} style={{ width: "100%" }}>
-                <Text style={{ color: "rgba(255,255,255,0.78)" }}>
-                  Atualização
-                </Text>
-                <Text strong style={{ color: "#fff", fontSize: 18 }}>
-                  {dayjs().format("DD/MM/YYYY HH:mm")}
-                </Text>
-                <Tag
-                  color="processing"
-                  style={{
-                    width: "fit-content",
-                    borderRadius: 999,
-                    paddingInline: 10,
-                    fontWeight: 600,
-                  }}
-                >
-                  Sistema operacional
-                </Tag>
-              </Space>
-            </div>
-          </Col>
-        </Row>
-      </Card>
+      <Row align="middle" justify="space-between" style={{ marginBottom: 20 }}>
+        <Col>
+          <Title level={4} style={{ margin: 0, color: "#101828" }}>
+            Dashboard
+          </Title>
+          <Text style={{ color: "#667085" }}>
+            {dayjs().format("DD/MM/YYYY HH:mm")}
+          </Text>
+        </Col>
+        <Col>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={loadDashboardData}
+          >
+            Atualizar
+          </Button>
+        </Col>
+      </Row>
 
-      <Row gutter={[18, 18]} style={{ marginBottom: 24 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         {totalOverview.map((item) => (
           <Col xs={24} sm={12} xl={6} key={item.key}>
-            <Card style={statCardStyle} bodyStyle={{ padding: 20 }}>
+            <Card style={statCardStyle} bodyStyle={{ padding: 16 }}>
               <Space
                 align="start"
                 style={{ width: "100%", justifyContent: "space-between" }}
@@ -293,17 +238,17 @@ export default function Home() {
                   </Text>
                   <Title
                     level={3}
-                    style={{ margin: "8px 0 4px", color: "#101828" }}
+                    style={{ margin: "6px 0 4px", color: "#101828" }}
                   >
                     {item.value}
                   </Title>
-                  <Text style={{ color: "#667085" }}>{item.detail}</Text>
+                  <Text style={{ color: "#98a2b3", fontSize: 12 }}>{item.detail}</Text>
                 </div>
                 <div
                   style={{
-                    width: 46,
-                    height: 46,
-                    borderRadius: 14,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
                     background: `${item.accent}14`,
                     display: "flex",
                     alignItems: "center",
@@ -314,40 +259,17 @@ export default function Home() {
                   {item.icon}
                 </div>
               </Space>
-
-              {typeof item.progress === "number" && (
-                <div style={{ marginTop: 16 }}>
-                  <Progress
-                    percent={item.progress}
-                    size="small"
-                    strokeColor={item.accent}
-                    showInfo={false}
-                  />
-                  <Text style={{ color: "#98a2b3", fontSize: 12 }}>
-                    {item.progress}% da base ativa
-                  </Text>
-                </div>
-              )}
             </Card>
           </Col>
         ))}
       </Row>
 
-      <Row gutter={[18, 18]} style={{ marginBottom: 24 }}>
+      <Row gutter={[16, 16]}>
         <Col xs={24} xl={14}>
           <Card
             title="Ações rápidas"
-            extra={
-              <Button
-                type="text"
-                icon={<ReloadOutlined />}
-                onClick={loadDashboardData}
-              >
-                Atualizar
-              </Button>
-            }
             style={sectionCardStyle}
-            bodyStyle={{ padding: 20 }}
+            bodyStyle={{ padding: 16 }}
           >
             <Row gutter={[12, 12]}>
               {quickActions.map((action) => (
@@ -376,7 +298,7 @@ export default function Home() {
           <Card
             title="Resumo da operação"
             style={sectionCardStyle}
-            bodyStyle={{ padding: 20 }}
+            bodyStyle={{ padding: 16 }}
           >
             <Space direction="vertical" size={18} style={{ width: "100%" }}>
               {financialCards.map((item) => (
@@ -417,70 +339,6 @@ export default function Home() {
         </Col>
       </Row>
 
-      <Row gutter={[18, 18]}>
-        <Col xs={24} lg={14}>
-          <Card style={sectionCardStyle} bodyStyle={{ padding: 22 }}>
-            <Space align="start" size={14}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 14,
-                  background: "#e8f1ff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <ArrowUpOutlined style={{ color: "#1677ff" }} />
-              </div>
-              <div>
-                <Title level={4} style={{ margin: 0, color: "#101828" }}>
-                  Operação estável
-                </Title>
-                <Paragraph style={{ color: "#667085", margin: "8px 0 0" }}>
-                  O sistema está pronto para uso diário, com acesso rápido aos
-                  principais cadastros e visão resumida da operação.
-                </Paragraph>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-
-        <Col xs={24} lg={10}>
-          <Card style={sectionCardStyle} bodyStyle={{ padding: 22 }}>
-            <Space align="start" size={14}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 14,
-                  background: "#ecfdf3",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <CalendarOutlined style={{ color: "#16a34a" }} />
-              </div>
-              <div>
-                <Text
-                  style={{
-                    color: "#667085",
-                    display: "block",
-                    marginBottom: 6,
-                  }}
-                >
-                  Última atualização
-                </Text>
-                <Text strong style={{ color: "#101828", fontSize: 18 }}>
-                  {dayjs().format("DD/MM/YYYY HH:mm")}
-                </Text>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
     </div>
   );
 }

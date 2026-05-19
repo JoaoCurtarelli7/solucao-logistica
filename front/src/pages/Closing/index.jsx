@@ -62,6 +62,9 @@ export default function Closing() {
     return d.isValid() ? d.format('DD/MM/YYYY') : '-'
   }
 
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
+
   const canView = hasPermission('financial.view')
   const canCreate = hasPermission('financial.create')
   const canUpdate = hasPermission('financial.update')
@@ -306,39 +309,39 @@ export default function Closing() {
       [`Empresa: ${companyName}`],
       [''],
       ['RESUMO EXECUTIVO'],
-      ['Total Entradas', `R$ ${totalEntradas.toFixed(2).replace('.', ',')}`],
-      ['Total Saídas', `R$ ${totalSaidas.toFixed(2).replace('.', ',')}`],
-      ['Total Impostos', `R$ ${totalImpostos.toFixed(2).replace('.', ',')}`],
-      ['Saldo', `R$ ${saldo.toFixed(2).replace('.', ',')}`],
+      ['Total Entradas', formatCurrency(totalEntradas)],
+      ['Total Saídas', formatCurrency(totalSaidas)],
+      ['Total Impostos', formatCurrency(totalImpostos)],
+      ['Saldo', formatCurrency(saldo)],
       ['Margem de Lucro', `${margemLucro.toFixed(2)}%`],
       [''],
       ['ENTRADAS'],
       ['Descrição', 'Categoria', 'Data', 'Valor', 'Empresa'],
       ...entradas.map(({ description, category, date, amount, company }) => [
-        description, 
-        category, 
-        formatDateSafe(date), 
-        `R$ ${amount.toFixed(2).replace('.', ',')}`,
+        description,
+        category,
+        formatDateSafe(date),
+        formatCurrency(amount),
         company?.name || 'N/A'
       ]),
       [''],
       ['SAÍDAS'],
       ['Descrição', 'Categoria', 'Data', 'Valor', 'Empresa'],
       ...saidas.map(({ description, category, date, amount, company }) => [
-        description, 
-        category, 
-        formatDateSafe(date), 
-        `R$ ${amount.toFixed(2).replace('.', ',')}`,
+        description,
+        category,
+        formatDateSafe(date),
+        formatCurrency(amount),
         company?.name || 'N/A'
       ]),
       [''],
       ['IMPOSTOS'],
       ['Nome', 'Categoria', 'Data', 'Valor', 'Empresa'],
       ...impostos.map(({ description, category, date, amount, company }) => [
-        description, 
-        category, 
-        formatDateSafe(date), 
-        `R$ ${amount.toFixed(2).replace('.', ',')}`,
+        description,
+        category,
+        formatDateSafe(date),
+        formatCurrency(amount),
         company?.name || 'N/A'
       ]),
     ]
@@ -377,11 +380,11 @@ export default function Closing() {
       width: '25%',
       align: 'right',
       render: (valor) => (
-        <Text strong style={{ 
+        <Text strong style={{
           color: type === 'entrada' ? '#52c41a' : '#ff4d4f',
           fontSize: '16px'
         }}>
-          R$ {valor.toFixed(2).replace('.', ',')}
+          {formatCurrency(valor)}
         </Text>
       )
     },
@@ -551,10 +554,9 @@ export default function Closing() {
             <Statistic
               title="Total Entradas"
               value={totalEntradas}
-              precision={2}
+              formatter={(v) => formatCurrency(v)}
               valueStyle={{ color: '#52c41a' }}
               prefix={<RiseOutlined />}
-              suffix="R$"
             />
           </Card>
         </Col>
@@ -563,10 +565,9 @@ export default function Closing() {
             <Statistic
               title="Total Saídas"
               value={totalSaidas}
-              precision={2}
+              formatter={(v) => formatCurrency(v)}
               valueStyle={{ color: '#ff4d4f' }}
               prefix={<ArrowDownOutlined />}
-              suffix="R$"
             />
           </Card>
         </Col>
@@ -575,10 +576,9 @@ export default function Closing() {
             <Statistic
               title="Total Impostos"
               value={totalImpostos}
-              precision={2}
+              formatter={(v) => formatCurrency(v)}
               valueStyle={{ color: '#faad14' }}
               prefix={<DollarOutlined />}
-              suffix="R$"
             />
           </Card>
         </Col>
@@ -587,10 +587,9 @@ export default function Closing() {
             <Statistic
               title="Saldo"
               value={saldo}
-              precision={2}
+              formatter={(v) => formatCurrency(v)}
               valueStyle={{ color: saldo >= 0 ? '#52c41a' : '#ff4d4f' }}
               prefix={<DollarOutlined />}
-              suffix="R$"
             />
             <Progress 
               percent={Math.min(Math.abs(margemLucro), 100)} 
