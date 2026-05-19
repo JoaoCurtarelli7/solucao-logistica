@@ -2,6 +2,7 @@ import "./instrument";
 import console from "console";
 import app from "./app";
 import { prisma } from "./lib/prisma";
+import { hashPassword } from "./lib/auth";
 
 function validateEnvironment() {
   const jwtSecret = process.env.JWT_SECRET;
@@ -24,24 +25,41 @@ function validateEnvironment() {
 
 async function ensureOwner() {
   const email = process.env.OWNER_EMAIL;
-  if (!email) return;
+  const password = process.env.OWNER_PASSWORD;
+  const name = process.env.OWNER_NAME || "Super Admin";
+  if (!email || !password) return;
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    console.warn(`[owner] OWNER_EMAIL=${email} não encontrado no banco. Crie o usuário primeiro.`);
+  const existing = await prisma.user.findUnique({ where: { email } });
+
+  if (!existing) {
+    // Produção: cria super admin do zero
+    let adminRole = await prisma.role.findFirst({ where: { name: "Admin" } });
+    if (!adminRole) {
+      adminRole = await prisma.role.create({ data: { name: "Admin", description: "Acesso total ao sistema" } });
+    }
+
+    const tenant = await prisma.tenant.create({
+      data: { name: "Super Admin", status: "active" },
+    });
+
+    const hashed = await hashPassword(password);
+    await prisma.user.create({
+      data: { name, email, password: hashed, status: "active", isSuperAdmin: true, tenantId: tenant.id, roleId: adminRole.id },
+    });
+
+    console.log(`[owner] Super admin criado: ${email}`);
     return;
   }
 
+  // Garante flags corretas + atualiza senha se OWNER_PASSWORD definido
+  const hashed = await hashPassword(password);
   await prisma.user.update({
-    where: { id: user.id },
-    data: { isSuperAdmin: true, status: "active" },
+    where: { id: existing.id },
+    data: { isSuperAdmin: true, status: "active", password: hashed },
   });
 
-  if (user.tenantId) {
-    await prisma.tenant.update({
-      where: { id: user.tenantId },
-      data: { status: "active" },
-    });
+  if (existing.tenantId) {
+    await prisma.tenant.update({ where: { id: existing.tenantId }, data: { status: "active" } });
   }
 
   console.log(`[owner] ${email} garantido como superAdmin ativo.`);

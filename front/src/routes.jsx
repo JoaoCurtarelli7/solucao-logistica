@@ -1,6 +1,5 @@
-import { RouterProvider, createBrowserRouter, Navigate } from "react-router-dom";
+import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import Layout from "./components/Layout";
-import { useUserContext } from "./context/userContext";
 import Home from "./pages/Home";
 import Closing from "./pages/Closing";
 import Load from "./pages/Load";
@@ -22,18 +21,23 @@ import MaintenanceMonths from "./pages/Maintenance/Months";
 import MaintenanceServices from "./pages/Maintenance/Services";
 import Register from "./pages/Register";
 import AdminPanel from "./pages/Admin";
+import SuperAdminLogin from "./pages/SuperAdminLogin";
+import SuperAdminLayout from "./components/SuperAdminLayout";
 import { UserProvider } from "./context/userContext";
-
-function SuperAdminRoute({ children }) {
-  const { user, loading } = useUserContext();
-  if (loading) return null;
-  if (!user || !user.isSuperAdmin) return <Navigate to="/" replace />;
-  return children;
-}
 
 const router = createBrowserRouter([
   // Página pública de solicitação de acesso (sem layout)
   { path: "/solicitar-acesso", element: <Register /> },
+
+  // Super Admin — layout e login totalmente separados, sem vínculo com tenant
+  { path: "/super-admin/login", element: <SuperAdminLogin /> },
+  {
+    path: "/super-admin",
+    element: <SuperAdminLayout />,
+    children: [
+      { index: true, element: <AdminPanel /> },
+    ],
+  },
 
   {
     path: "/",
@@ -59,7 +63,6 @@ const router = createBrowserRouter([
       { path: "/load-billing-closings", element: <LoadBillingClosing /> },
       { path: "/maintenance/months", element: <MaintenanceMonths /> },
       { path: "/maintenance/services", element: <MaintenanceServices /> },
-      { path: "/admin", element: <SuperAdminRoute><AdminPanel /></SuperAdminRoute> },
     ],
   },
 ]);

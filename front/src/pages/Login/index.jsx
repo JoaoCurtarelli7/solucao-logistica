@@ -210,6 +210,7 @@ export default function LoginAndRegister() {
               placeholder="E-mail"
               size="large"
               className="custom-input"
+              autoComplete="email"
             />
           </Form.Item>
 
@@ -228,6 +229,7 @@ export default function LoginAndRegister() {
               placeholder="Senha"
               size="large"
               className="custom-input"
+              autoComplete="current-password"
               iconRender={(visible) =>
                 visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />
               }

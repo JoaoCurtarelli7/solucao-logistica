@@ -9,9 +9,7 @@ import {
   UserOutlined, EyeOutlined, PauseCircleOutlined, PlayCircleOutlined,
   CrownOutlined, ExperimentOutlined, CalendarOutlined,
 } from "@ant-design/icons";
-import api from "../../lib/api";
-import { useUserContext } from "../../context/userContext";
-import { useNavigate } from "react-router-dom";
+import api from "../../lib/superAdminApi";
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -50,21 +48,12 @@ function PlanTag({ plan, planExpiresAt }) {
 }
 
 export default function AdminPanel() {
-  const { user } = useUserContext();
-  const navigate = useNavigate();
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [usersModal, setUsersModal] = useState({ open: false, tenant: null, users: [], loading: false });
   const [actionLoading, setActionLoading] = useState({});
-
-  // Redirecionar se não for super admin
-  useEffect(() => {
-    if (user && !user.isSuperAdmin) {
-      navigate("/");
-    }
-  }, [user, navigate]);
 
   const fetchTenants = useCallback(async () => {
     setLoading(true);

@@ -154,15 +154,6 @@ export default function AppSidebar({ open = false, onClose }) {
           },
         ]
       : []),
-    ...(userContext?.isSuperAdmin
-      ? [
-          {
-            key: "/admin",
-            icon: <CrownOutlined style={{ color: "#faad14" }} />,
-            label: <Link to="/admin" style={{ color: "#faad14", fontWeight: 600 }}>Painel Admin</Link>,
-          },
-        ]
-      : []),
   ].filter((item) => {
     if (item.children && Array.isArray(item.children)) {
       return item.children.length > 0;
