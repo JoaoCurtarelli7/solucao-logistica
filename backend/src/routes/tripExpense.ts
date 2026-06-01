@@ -31,6 +31,15 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
   const idParam = z.object({ id: z.coerce.number() });
   const tripIdParam = z.object({ tripId: z.coerce.number() });
 
+  const EXPENSE_CATEGORIES = [
+    "Combustível",
+    "Pedágio",
+    "Alimentação",
+    "Hospedagem",
+    "Manutenção",
+    "Outros",
+  ] as const;
+
   // schema do corpo para criar/atualizar despesa
   const expenseBodySchema = z.object({
     description: z.string().min(1, "Descrição é obrigatória"),
@@ -42,7 +51,9 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
       }
       return parsed;
     }),
-    category: z.string().min(1, "Categoria é obrigatória"),
+    category: z.enum(EXPENSE_CATEGORIES, {
+      errorMap: () => ({ message: "Categoria inválida" }),
+    }),
     notes: z.string().optional(),
     tripId: z.coerce.number(),
   });
@@ -189,6 +200,9 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
       return rep.code(201).send(expense);
     } catch (error: any) {
       req.log.error(error);
+      if (error instanceof z.ZodError) {
+        return rep.code(400).send({ message: "Dados inválidos", errors: error.errors });
+      }
       if (error instanceof Error && /Data inválida/i.test(error.message)) {
         return rep.code(400).send({ message: error.message });
       }

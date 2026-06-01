@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  Alert,
   Card,
   Button,
   Row,
@@ -387,6 +388,40 @@ export default function VehicleList() {
           </Card>
         </Col>
       </Row>
+
+      {(() => {
+        const now = dayjs();
+        const stale = data.filter((truck) => {
+          const list = truck.Maintenance ?? truck.maintenances ?? [];
+          if (list.length === 0) return true;
+          const last = dayjs(list[0].date);
+          return now.diff(last, "day") > 30;
+        });
+        if (stale.length === 0) return null;
+        return (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={`${stale.length} caminhão${stale.length > 1 ? "s" : ""} sem manutenção há mais de 30 dias`}
+            description={
+              <Space wrap>
+                {stale.map((t) => {
+                  const list = t.Maintenance ?? t.maintenances ?? [];
+                  const days = list[0]
+                    ? now.diff(dayjs(list[0].date), "day")
+                    : null;
+                  return (
+                    <Tag key={t.id} color="orange">
+                      {t.name} ({t.plate}){days !== null ? ` — ${days} dias` : " — sem registro"}
+                    </Tag>
+                  );
+                })}
+              </Space>
+            }
+          />
+        );
+      })()}
 
       <Card>
         <div

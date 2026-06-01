@@ -358,18 +358,47 @@ export const exportFinancialReport = (data, format) => {
   }
 }
 
+const STATUS_LABELS_TRIPS = {
+  concluida: 'Concluída',
+  em_andamento: 'Em andamento',
+  cancelada: 'Cancelada',
+}
+
 // Função para exportar relatório de viagens
 export const exportTripsReport = (data, format) => {
   const columns = [
     { title: 'Destino', dataIndex: 'destination' },
     { title: 'Motorista', dataIndex: 'driver' },
-    { 
-      title: 'Caminhão', 
+    {
+      title: 'Caminhão',
       dataIndex: ['Truck', 'plate'],
       render: (plate, record) => record.Truck?.plate || 'N/A'
     },
-    { title: 'Status', dataIndex: 'status' },
-    { title: 'Data', dataIndex: 'date' }
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      render: (status) => STATUS_LABELS_TRIPS[status] || status
+    },
+    {
+      title: 'Frete',
+      dataIndex: 'freightValue',
+      render: (v) => formatCurrency(v)
+    },
+    {
+      title: 'Despesas',
+      dataIndex: '_totalExpenses',
+      render: (v) => formatCurrency(v || 0)
+    },
+    {
+      title: 'Lucro',
+      dataIndex: '_profit',
+      render: (v) => formatCurrency(v || 0)
+    },
+    {
+      title: 'Data',
+      dataIndex: 'date',
+      render: (date) => formatDate(date)
+    }
   ]
 
   if (format === 'pdf') {

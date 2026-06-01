@@ -249,6 +249,25 @@ export default function TripList() {
           : "—",
     },
     {
+      title: "Lucro",
+      key: "profit",
+      width: 110,
+      align: "right",
+      render: (_, record) => {
+        const freight = Number(record.freightValue || 0);
+        const expenses = (record.TripExpense || []).reduce(
+          (s, e) => s + Number(e.amount || 0),
+          0,
+        );
+        const profit = freight - expenses;
+        return (
+          <span style={{ color: profit >= 0 ? "#52c41a" : "#ff4d4f", fontWeight: 600 }}>
+            R$ {profit.toFixed(2).replace(".", ",")}
+          </span>
+        );
+      },
+    },
+    {
       title: "Ações",
       key: "actions",
       width: 140,

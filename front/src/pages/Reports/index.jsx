@@ -325,6 +325,11 @@ export default function Reports() {
     });
   };
 
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+    clearFilters();
+  };
+
   const exportReport = (format, reportType) => {
     try {
       message.loading(
@@ -552,21 +557,52 @@ export default function Reports() {
     },
   ];
 
+  const STATUS_LABELS = {
+    concluida: "Concluída",
+    em_andamento: "Em andamento",
+    cancelada: "Cancelada",
+  };
+
   const tripsColumns = [
     { title: "Destino", dataIndex: "destination", key: "destination" },
     { title: "Motorista", dataIndex: "driver", key: "driver" },
     {
       title: "Caminhão",
-      dataIndex: ["Truck", "plate"],
       key: "truck",
-      render: (plate, record) => record.Truck?.plate || "N/A",
+      render: (_, record) => record.Truck?.plate || "N/A",
     },
     {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      render: (status) => (
-        <Tag color={status === "Concluída" ? "green" : "orange"}>{status}</Tag>
+      render: (status) => {
+        const colors = { concluida: "green", em_andamento: "orange", cancelada: "red" };
+        return <Tag color={colors[status] || "default"}>{STATUS_LABELS[status] || status}</Tag>;
+      },
+    },
+    {
+      title: "Frete",
+      dataIndex: "freightValue",
+      key: "freightValue",
+      align: "right",
+      render: (v) => formatCurrency(v),
+    },
+    {
+      title: "Despesas",
+      dataIndex: "_totalExpenses",
+      key: "totalExpenses",
+      align: "right",
+      render: (v) => <span style={{ color: "#ff4d4f" }}>{formatCurrency(v || 0)}</span>,
+    },
+    {
+      title: "Lucro",
+      dataIndex: "_profit",
+      key: "profit",
+      align: "right",
+      render: (v) => (
+        <span style={{ color: (v || 0) >= 0 ? "#52c41a" : "#ff4d4f", fontWeight: 600 }}>
+          {formatCurrency(v || 0)}
+        </span>
       ),
     },
     {
@@ -629,8 +665,18 @@ export default function Reports() {
               onChange={(value) => handleFilterChange("status", value)}
             >
               <Option value="todos">Todos</Option>
-              <Option value="Ativo">Ativo</Option>
-              <Option value="Inativo">Inativo</Option>
+              {activeTab === "trips" ? (
+                <>
+                  <Option value="em_andamento">Em andamento</Option>
+                  <Option value="concluida">Concluída</Option>
+                  <Option value="cancelada">Cancelada</Option>
+                </>
+              ) : (
+                <>
+                  <Option value="Ativo">Ativo</Option>
+                  <Option value="Inativo">Inativo</Option>
+                </>
+              )}
             </Select>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -673,7 +719,7 @@ export default function Reports() {
       {/* Abas de Relatórios */}
       <Tabs
         activeKey={activeTab}
-        onChange={setActiveTab}
+        onChange={handleTabChange}
         type="card"
         size="large"
         style={{ marginBottom: "24px" }}
@@ -744,6 +790,20 @@ export default function Reports() {
               <Col xs={24} sm={12} lg={6}>
                 <Card>
                   <Statistic
+                    title="Total Viagens"
+                    value={reportData.summary?.totalTrips || 0}
+                    prefix={<CompassOutlined style={{ color: "#1890ff" }} />}
+                    suffix={
+                      <Tag color="orange" style={{ marginLeft: 8 }}>
+                        {reportData.summary?.activeTrips || 0} em andamento
+                      </Tag>
+                    }
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card>
+                  <Statistic
                     title="Manutenções"
                     value={reportData.summary?.totalMaintenance || 0}
                     prefix={<ToolOutlined style={{ color: "#faad14" }} />}
@@ -765,15 +825,6 @@ export default function Reports() {
                     title="Funcionários Inativos"
                     value={reportData.summary?.inactiveEmployees || 0}
                     prefix={<TeamOutlined style={{ color: "#ff4d4f" }} />}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title="Empresas Inativas"
-                    value={reportData.summary?.inactiveCompanies || 0}
-                    prefix={<BankOutlined style={{ color: "#ff4d4f" }} />}
                   />
                 </Card>
               </Col>
@@ -1117,6 +1168,67 @@ export default function Reports() {
                       "Nenhuma manutenção encontrada com os filtros aplicados",
                   }}
                 />
+
+                {maintenanceData.summary?.truckRanking?.length > 0 && (
+                  <>
+                    <Divider orientation="left" style={{ marginTop: 32 }}>
+                      Ranking de Custo por Caminhão
+                    </Divider>
+                    <Table
+                      size="small"
+                      pagination={false}
+                      rowKey="truckId"
+                      dataSource={maintenanceData.summary.truckRanking}
+                      columns={[
+                        { title: "#", render: (_, __, i) => i + 1, width: 40 },
+                        { title: "Caminhão", dataIndex: "name", key: "name" },
+                        { title: "Placa", dataIndex: "plate", key: "plate" },
+                        { title: "Registros", dataIndex: "count", key: "count", align: "center" },
+                        {
+                          title: "Custo Total",
+                          dataIndex: "total",
+                          key: "total",
+                          align: "right",
+                          render: (v) => (
+                            <span style={{ color: "#ff4d4f", fontWeight: 600 }}>
+                              {formatCurrency(v)}
+                            </span>
+                          ),
+                        },
+                      ]}
+                    />
+                  </>
+                )}
+
+                {Object.keys(maintenanceData.summary?.costByService || {}).length > 0 && (
+                  <>
+                    <Divider orientation="left" style={{ marginTop: 32 }}>
+                      Custo por Tipo de Serviço
+                    </Divider>
+                    <Table
+                      size="small"
+                      pagination={false}
+                      rowKey="service"
+                      dataSource={Object.entries(maintenanceData.summary.costByService)
+                        .map(([service, total]) => ({ service, total }))
+                        .sort((a, b) => b.total - a.total)}
+                      columns={[
+                        { title: "Serviço", dataIndex: "service", key: "service" },
+                        {
+                          title: "Total Gasto",
+                          dataIndex: "total",
+                          key: "total",
+                          align: "right",
+                          render: (v) => (
+                            <span style={{ color: "#faad14", fontWeight: 600 }}>
+                              {formatCurrency(v)}
+                            </span>
+                          ),
+                        },
+                      ]}
+                    />
+                  </>
+                )}
               </>
             )}
           </Card>
@@ -1264,28 +1376,34 @@ export default function Reports() {
             {tripsData && (
               <>
                 <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
-                  <Col xs={24} sm={8}>
+                  <Col xs={24} sm={6}>
                     <Statistic
-                      title="Total"
+                      title="Total Viagens"
                       value={tripsData.summary?.total || 0}
                     />
                   </Col>
-                  <Col xs={24} sm={8}>
+                  <Col xs={24} sm={6}>
+                    <Statistic
+                      title="Total Frete"
+                      value={formatCurrency(tripsData.summary?.totalFreight || 0)}
+                      valueStyle={{ color: "#1890ff" }}
+                    />
+                  </Col>
+                  <Col xs={24} sm={6}>
                     <Statistic
                       title="Total Despesas"
-                      value={formatCurrency(
-                        tripsData.summary?.totalExpenses || 0,
-                      )}
+                      value={formatCurrency(tripsData.summary?.totalExpenses || 0)}
                       valueStyle={{ color: "#ff4d4f" }}
                     />
                   </Col>
-                  <Col xs={24} sm={8}>
+                  <Col xs={24} sm={6}>
                     <Statistic
-                      title="Por Status"
-                      value={
-                        Object.keys(tripsData.summary?.byStatus || {}).length
-                      }
-                      suffix="status"
+                      title="Lucro Total"
+                      value={formatCurrency(tripsData.summary?.totalProfit || 0)}
+                      valueStyle={{
+                        color: (tripsData.summary?.totalProfit || 0) >= 0 ? "#52c41a" : "#ff4d4f",
+                        fontWeight: 700,
+                      }}
                     />
                   </Col>
                 </Row>

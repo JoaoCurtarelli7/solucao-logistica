@@ -422,6 +422,7 @@ export default function LoginAndRegister() {
         <aside className="login-brand fade-in" aria-hidden={false}>
           <div className="login-brand__glow login-brand__glow--1" aria-hidden />
           <div className="login-brand__glow login-brand__glow--2" aria-hidden />
+          <div className="login-brand__glow login-brand__glow--3" aria-hidden />
           <div className="login-brand__grid" aria-hidden />
           <div className="login-brand__inner">
             <div className="login-brand__mark">
@@ -455,6 +456,20 @@ export default function LoginAndRegister() {
                 <span>Fluxos integrados de cargas, viagens e manutenção</span>
               </li>
             </ul>
+            <div className="login-brand__stats" aria-hidden>
+              <div className="login-brand__stat-card">
+                <span className="login-brand__stat-value">100%</span>
+                <span className="login-brand__stat-label">Online</span>
+              </div>
+              <div className="login-brand__stat-card">
+                <span className="login-brand__stat-value">Multi</span>
+                <span className="login-brand__stat-label">Empresas</span>
+              </div>
+              <div className="login-brand__stat-card">
+                <span className="login-brand__stat-value">Seguro</span>
+                <span className="login-brand__stat-label">JWT + RBAC</span>
+              </div>
+            </div>
             <p className="login-brand__footnote">
               © {new Date().getFullYear()} · Ambiente corporativo
             </p>

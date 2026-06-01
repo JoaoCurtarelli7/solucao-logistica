@@ -10,6 +10,8 @@ import {
   message,
   Popconfirm,
   DatePicker,
+  Select,
+  Tag,
   Result,
 } from "antd";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -111,8 +113,25 @@ export default function TripExpenses() {
   const totalExpenses = calculateTotal();
   const profit = freightValue - totalExpenses;
 
+  const CATEGORY_COLORS = {
+    "Combustível": "orange",
+    "Pedágio": "blue",
+    "Alimentação": "green",
+    "Hospedagem": "purple",
+    "Manutenção": "red",
+    "Outros": "default",
+  };
+
   const columns = [
     { title: "Descrição", dataIndex: "description", key: "description" },
+    {
+      title: "Categoria",
+      dataIndex: "category",
+      key: "category",
+      render: (cat) => (
+        <Tag color={CATEGORY_COLORS[cat] || "default"}>{cat || "—"}</Tag>
+      ),
+    },
     {
       title: "Valor",
       dataIndex: "amount",
@@ -233,7 +252,14 @@ export default function TripExpenses() {
             rules={[{ required: true, message: "Categoria obrigatória" }]}
             style={{ flex: 1 }}
           >
-            <Input placeholder="Categoria (ex: Combustível)" />
+            <Select placeholder="Categoria">
+              <Select.Option value="Combustível">Combustível</Select.Option>
+              <Select.Option value="Pedágio">Pedágio</Select.Option>
+              <Select.Option value="Alimentação">Alimentação</Select.Option>
+              <Select.Option value="Hospedagem">Hospedagem</Select.Option>
+              <Select.Option value="Manutenção">Manutenção</Select.Option>
+              <Select.Option value="Outros">Outros</Select.Option>
+            </Select>
           </Form.Item>
 
           <Form.Item

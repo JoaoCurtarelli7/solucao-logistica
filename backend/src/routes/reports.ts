@@ -17,7 +17,9 @@ export async function reportRoutes(app: FastifyInstance) {
         totalLoads,
         totalTrucks,
         totalMaintenance,
-        totalTransactions
+        totalTransactions,
+        totalTrips,
+        activeTrips,
       ] = await Promise.all([
         prisma.employee.count({ where: { tenantId } }),
         prisma.employee.count({ where: { tenantId, status: "Ativo" } }),
@@ -27,6 +29,8 @@ export async function reportRoutes(app: FastifyInstance) {
         prisma.truck.count({ where: { tenantId } }),
         prisma.maintenance.count({ where: { Truck: { tenantId } } }),
         prisma.transaction.count({ where: { Employee: { tenantId } } }),
+        prisma.trip.count({ where: { tenantId } }),
+        prisma.trip.count({ where: { tenantId, status: "em_andamento" } }),
       ]);
 
       return rep.send({
@@ -40,7 +44,9 @@ export async function reportRoutes(app: FastifyInstance) {
           totalLoads,
           totalTrucks,
           totalMaintenance,
-          totalTransactions
+          totalTransactions,
+          totalTrips,
+          activeTrips,
         },
         generatedAt: new Date().toISOString()
       });
@@ -222,12 +228,34 @@ export async function reportRoutes(app: FastifyInstance) {
 
       const totalCost = maintenance.reduce((sum, maint) => sum + (maint.value || 0), 0);
 
+      const costByService = maintenance.reduce((acc: Record<string, number>, maint) => {
+        const key = maint.service || "Sem serviço";
+        acc[key] = (acc[key] || 0) + (maint.value || 0);
+        return acc;
+      }, {});
+
+      const truckCostMap = maintenance.reduce((acc: Record<string, { name: string; plate: string; total: number; count: number }>, maint) => {
+        const id = String(maint.truckId);
+        if (!acc[id]) {
+          acc[id] = { name: maint.Truck?.name || "—", plate: maint.Truck?.plate || "—", total: 0, count: 0 };
+        }
+        acc[id].total += (maint.value || 0);
+        acc[id].count += 1;
+        return acc;
+      }, {});
+
+      const truckRanking = Object.entries(truckCostMap)
+        .map(([truckId, data]) => ({ truckId, ...data }))
+        .sort((a, b) => b.total - a.total);
+
       return rep.send({
         maintenance,
         summary: {
           total: maintenance.length,
           totalCost,
-          averageCost: maintenance.length > 0 ? totalCost / maintenance.length : 0
+          averageCost: maintenance.length > 0 ? totalCost / maintenance.length : 0,
+          costByService,
+          truckRanking,
         },
         filters: { startDate, endDate, truckId },
         generatedAt: new Date().toISOString()
@@ -296,7 +324,7 @@ export async function reportRoutes(app: FastifyInstance) {
         startDate: z.coerce.date().optional(),
         endDate: z.string().optional(),
         truckId: z.coerce.number().optional(),
-        status: z.enum(["em_andamento", "finalizado"]).optional(),
+        status: z.enum(["em_andamento", "concluida", "cancelada"]).optional(),
       }).parse(req.query);
 
       const whereClause: any = { tenantId };
@@ -320,15 +348,23 @@ export async function reportRoutes(app: FastifyInstance) {
         orderBy: { date: 'desc' }
       });
 
-      const totalExpenses = trips.reduce((sum, trip) => {
-        return sum + trip.TripExpense.reduce((expSum, exp) => expSum + (exp.amount || 0), 0);
-      }, 0);
+      const tripsWithProfit = trips.map((trip) => {
+        const tripExpenses = trip.TripExpense.reduce((s, e) => s + Number(e.amount || 0), 0);
+        const freight = Number(trip.freightValue || 0);
+        return { ...trip, _totalExpenses: tripExpenses, _profit: freight - tripExpenses };
+      });
+
+      const totalExpenses = tripsWithProfit.reduce((s, t) => s + t._totalExpenses, 0);
+      const totalFreight = tripsWithProfit.reduce((s, t) => s + Number(t.freightValue || 0), 0);
+      const totalProfit = totalFreight - totalExpenses;
 
       return rep.send({
-        trips,
+        trips: tripsWithProfit,
         summary: {
           total: trips.length,
+          totalFreight,
           totalExpenses,
+          totalProfit,
           byStatus: trips.reduce((acc, trip) => {
             acc[trip.status] = (acc[trip.status] || 0) + 1;
             return acc;
