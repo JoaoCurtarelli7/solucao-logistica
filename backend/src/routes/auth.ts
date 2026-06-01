@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "../types/fastify";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
-import { generateToken, hashPassword } from "../lib/auth";
+import { generateToken, hashPassword, generateResetToken, verifyResetToken } from "../lib/auth";
+import { sendPasswordResetEmail } from "../services/emailService";
 import bcrypt from "bcrypt";
 
 const BOOTSTRAP_ADMIN_PERMISSIONS = [
@@ -150,6 +151,98 @@ export async function authRoutes(app: FastifyInstance) {
       }
       console.error("❌ Erro ao registrar:", error);
       return rep.code(500).send({ message: "Erro ao criar usuário" });
+    }
+  });
+
+  // Renova o token sem precisar fazer login novamente
+  app.post("/auth/refresh", async (req: FastifyRequest, rep: FastifyReply) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return rep.code(401).send({ message: "Token não fornecido" });
+    }
+    const token = authHeader.slice(7);
+    try {
+      const jwt = await import("jsonwebtoken");
+      const secret = process.env.JWT_SECRET || "supersecret";
+      // Aceita tokens até 1h após expirar para refresh
+      const decoded = jwt.default.verify(token, secret, { ignoreExpiration: true }) as any;
+      const iat = decoded.iat as number;
+      const now = Math.floor(Date.now() / 1000);
+      // Só aceita refresh se o token foi emitido há menos de 24h
+      if (now - iat > 86400) {
+        return rep.code(401).send({ message: "Token muito antigo. Faça login novamente." });
+      }
+      const { iat: _i, exp: _e, ...payload } = decoded;
+      const newToken = generateToken(payload);
+      return rep.send({ token: newToken });
+    } catch {
+      return rep.code(401).send({ message: "Token inválido" });
+    }
+  });
+
+  // Solicita reset de senha — envia e-mail com link
+  app.post("/auth/forgot-password", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (req: FastifyRequest, rep: FastifyReply) => {
+    try {
+      const { email } = z.object({ email: z.string().email() }).parse(req.body);
+      const user = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, email: true, status: true } });
+
+      // Sempre responde 200 para não vazar se e-mail existe
+      if (!user || user.status !== "active") {
+        return rep.send({ message: "Se o e-mail estiver cadastrado, você receberá o link em breve." });
+      }
+
+      const resetToken = generateResetToken(user.id);
+      const appUrl = process.env.APP_URL || "http://localhost:3000";
+      const resetUrl = `${appUrl}/reset-password?token=${resetToken}`;
+
+      sendPasswordResetEmail(user.email, user.name, resetUrl).catch((err) =>
+        console.error("[email] Erro ao enviar reset:", err.message),
+      );
+
+      return rep.send({ message: "Se o e-mail estiver cadastrado, você receberá o link em breve." });
+    } catch (error: any) {
+      if (error?.name === "ZodError") {
+        return rep.code(400).send({ message: "E-mail inválido" });
+      }
+      console.error("❌ Erro no forgot-password:", error);
+      return rep.code(500).send({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // Redefine a senha usando o token do e-mail
+  app.post("/auth/reset-password", async (req: FastifyRequest, rep: FastifyReply) => {
+    try {
+      const { token, password } = z.object({
+        token: z.string().min(1),
+        password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+      }).parse(req.body);
+
+      let decoded: { userId: number; purpose: string };
+      try {
+        decoded = verifyResetToken(token);
+      } catch {
+        return rep.code(400).send({ message: "Link de redefinição inválido ou expirado." });
+      }
+
+      if (decoded.purpose !== "password-reset") {
+        return rep.code(400).send({ message: "Token inválido." });
+      }
+
+      const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { id: true, status: true } });
+      if (!user || user.status !== "active") {
+        return rep.code(404).send({ message: "Usuário não encontrado ou inativo." });
+      }
+
+      const hashed = await hashPassword(password);
+      await prisma.user.update({ where: { id: decoded.userId }, data: { password: hashed } });
+
+      return rep.send({ message: "Senha redefinida com sucesso. Você já pode fazer login." });
+    } catch (error: any) {
+      if (error?.name === "ZodError") {
+        return rep.code(400).send({ message: "Dados inválidos", errors: error.errors });
+      }
+      console.error("❌ Erro no reset-password:", error);
+      return rep.code(500).send({ message: "Erro interno do servidor" });
     }
   });
 

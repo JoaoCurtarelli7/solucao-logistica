@@ -468,14 +468,25 @@ export async function loadBillingClosingRoutes(app: FastifyInstance) {
           },
           orderBy: { createdAt: "desc" },
         });
-        const targetClosing =
+        let targetClosing =
           closings.find((c) => c.companyId === closing.companyId) ??
-          closings.find((c) => c.companyId === null);
+          closings.find((c) => c.companyId === null) ??
+          null;
 
+        // Automação: cria fechamento de caixa automaticamente se não existir
         if (!targetClosing) {
-          return rep.code(400).send({
-            message:
-              "Não existe fechamento de caixa para este mês/empresa. Crie um fechamento de caixa antes de finalizar.",
+          const month = await prisma.month.findUnique({
+            where: { id: closing.monthId },
+            select: { name: true },
+          });
+          targetClosing = await prisma.closing.create({
+            data: {
+              monthId: closing.monthId,
+              companyId: closing.companyId,
+              name: `Fechamento ${month?.name ?? closing.monthId}`,
+              status: "aberto",
+              tenantId,
+            },
           });
         }
 

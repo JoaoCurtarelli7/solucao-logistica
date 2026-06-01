@@ -17,7 +17,12 @@ import {
   FileTextOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RiseOutlined,
+  FallOutlined,
+  CompassOutlined,
+  ToolOutlined,
 } from "@ant-design/icons";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useNavigate } from "react-router-dom";
 import api from "../../lib/api";
 import dayjs from "dayjs";
@@ -112,7 +117,6 @@ export default function Home() {
       detail: `${summary.activeEmployees} ativos`,
       icon: <TeamOutlined style={{ color: "#1677ff" }} />,
       accent: "#1677ff",
-      progress: employeeActivePercentage,
     },
     {
       key: "companies",
@@ -121,13 +125,12 @@ export default function Home() {
       detail: `${summary.activeCompanies} ativas`,
       icon: <BankOutlined style={{ color: "#16a34a" }} />,
       accent: "#16a34a",
-      progress: companyActivePercentage,
     },
     {
       key: "loads",
       title: "Cargas",
       value: summary.totalLoads,
-      detail: "Cargas registradas",
+      detail: "Registradas",
       icon: <FileTextOutlined style={{ color: "#f59e0b" }} />,
       accent: "#f59e0b",
     },
@@ -139,22 +142,57 @@ export default function Home() {
       icon: <CarOutlined style={{ color: "#7c3aed" }} />,
       accent: "#7c3aed",
     },
+    {
+      key: "trips",
+      title: "Viagens",
+      value: summary.totalTrips ?? 0,
+      detail: `${summary.activeTrips ?? 0} em andamento`,
+      icon: <CompassOutlined style={{ color: "#0891b2" }} />,
+      accent: "#0891b2",
+    },
+    {
+      key: "maintenance",
+      title: "Manutenção (30d)",
+      value: formatCurrency(summary.maintenanceCost ?? 0),
+      detail: "Custo últimos 30 dias",
+      icon: <ToolOutlined style={{ color: "#dc2626" }} />,
+      accent: "#dc2626",
+      isText: true,
+    },
   ];
 
   const financialCards = [
     {
+      key: "credits",
+      title: "Total entradas",
+      value: formatCurrency(summary.totalCredits ?? 0),
+      helper: "Todas as entradas financeiras",
+      accent: "#16a34a",
+      icon: <RiseOutlined />,
+    },
+    {
+      key: "debits",
+      title: "Total saídas",
+      value: formatCurrency(summary.totalDebits ?? 0),
+      helper: "Saídas + impostos",
+      accent: "#dc2626",
+      icon: <FallOutlined />,
+    },
+    {
+      key: "balance",
+      title: "Saldo",
+      value: formatCurrency(summary.balance ?? 0),
+      helper: "Entradas − Saídas",
+      accent: (summary.balance ?? 0) >= 0 ? "#16a34a" : "#dc2626",
+      icon: <DollarOutlined />,
+    },
+    {
       key: "salary",
       title: "Folha mensal",
       value: formatCurrency(summary.totalSalaries),
-      helper: `${summary.activeEmployees} funcionários em atividade`,
-      accent: "#16a34a",
-    },
-    {
-      key: "system",
-      title: "Custo operacional",
-      value: formatCurrency(summary.totalSalaries),
-      helper: "Baseado na folha salarial atual",
+      helper: `${summary.activeEmployees} funcionários ativos`,
       accent: "#1677ff",
+      icon: <TeamOutlined />,
     },
   ];
 
@@ -226,36 +264,17 @@ export default function Home() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         {totalOverview.map((item) => (
-          <Col xs={24} sm={12} xl={6} key={item.key}>
+          <Col xs={24} sm={12} xl={4} key={item.key}>
             <Card style={statCardStyle} bodyStyle={{ padding: 16 }}>
-              <Space
-                align="start"
-                style={{ width: "100%", justifyContent: "space-between" }}
-              >
+              <Space align="start" style={{ width: "100%", justifyContent: "space-between" }}>
                 <div>
-                  <Text style={{ color: "#667085", fontSize: 13 }}>
-                    {item.title}
-                  </Text>
-                  <Title
-                    level={3}
-                    style={{ margin: "6px 0 4px", color: "#101828" }}
-                  >
+                  <Text style={{ color: "#667085", fontSize: 13 }}>{item.title}</Text>
+                  <Title level={4} style={{ margin: "4px 0 2px", color: "#101828", fontSize: item.isText ? 16 : undefined }}>
                     {item.value}
                   </Title>
                   <Text style={{ color: "#98a2b3", fontSize: 12 }}>{item.detail}</Text>
                 </div>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    background: `${item.accent}14`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${item.accent}14`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   {item.icon}
                 </div>
               </Space>
@@ -264,77 +283,54 @@ export default function Home() {
         ))}
       </Row>
 
-      <Row gutter={[16, 16]}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         <Col xs={24} xl={14}>
-          <Card
-            title="Ações rápidas"
-            style={sectionCardStyle}
-            bodyStyle={{ padding: 16 }}
-          >
+          <Card title="Financeiro — últimos 6 meses" style={sectionCardStyle} bodyStyle={{ padding: 16 }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={dashboardData.charts?.monthlyData ?? []} margin={{ top: 4, right: 16, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => formatCurrency(v)} />
+                <Legend />
+                <Bar dataKey="credits" name="Entradas" fill="#52c41a" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="debits" name="Saídas" fill="#ff4d4f" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="maintenance" name="Manutenção" fill="#faad14" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        </Col>
+
+        <Col xs={24} xl={10}>
+          <Card title="Resumo financeiro" style={sectionCardStyle} bodyStyle={{ padding: 16 }}>
+            <Space direction="vertical" size={12} style={{ width: "100%" }}>
+              {financialCards.map((item) => (
+                <div key={item.key} style={{ border: "1px solid #edf2f7", borderRadius: 12, padding: "12px 16px", background: "#fbfdff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <Text style={{ color: "#667085", display: "block", fontSize: 12 }}>{item.title}</Text>
+                    <Text strong style={{ fontSize: 18, color: item.accent, lineHeight: 1.3 }}>{item.value}</Text>
+                    <Text style={{ color: "#98a2b3", fontSize: 11, display: "block" }}>{item.helper}</Text>
+                  </div>
+                  <div style={{ color: item.accent, fontSize: 20 }}>{item.icon}</div>
+                </div>
+              ))}
+            </Space>
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24}>
+          <Card title="Ações rápidas" style={sectionCardStyle} bodyStyle={{ padding: 16 }}>
             <Row gutter={[12, 12]}>
               {quickActions.map((action) => (
-                <Col xs={24} sm={12} key={action.key}>
-                  <Button
-                    type={action.type || "default"}
-                    icon={action.icon}
-                    onClick={() => navigate(action.path)}
-                    size="large"
-                    style={{
-                      width: "100%",
-                      borderRadius: 12,
-                      height: 46,
-                      justifyContent: "flex-start",
-                    }}
-                  >
+                <Col xs={24} sm={12} md={6} key={action.key}>
+                  <Button type={action.type || "default"} icon={action.icon} onClick={() => navigate(action.path)} size="large" style={{ width: "100%", borderRadius: 12, height: 46, justifyContent: "flex-start" }}>
                     {action.label}
                   </Button>
                 </Col>
               ))}
             </Row>
-          </Card>
-        </Col>
-
-        <Col xs={24} xl={10}>
-          <Card
-            title="Resumo da operação"
-            style={sectionCardStyle}
-            bodyStyle={{ padding: 16 }}
-          >
-            <Space direction="vertical" size={18} style={{ width: "100%" }}>
-              {financialCards.map((item) => (
-                <div
-                  key={item.key}
-                  style={{
-                    border: "1px solid #edf2f7",
-                    borderRadius: 16,
-                    padding: 16,
-                    background: "#fbfdff",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#667085",
-                      display: "block",
-                      marginBottom: 8,
-                    }}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text
-                    strong
-                    style={{
-                      display: "block",
-                      fontSize: 24,
-                      color: item.accent,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    {item.value}
-                  </Text>
-                  <Text style={{ color: "#98a2b3" }}>{item.helper}</Text>
-                </div>
-              ))}
-            </Space>
           </Card>
         </Col>
       </Row>

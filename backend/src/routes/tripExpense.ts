@@ -182,7 +182,8 @@ export async function tripExpenseRoutes(app: FastifyInstance) {
           date: data.date,
           category: data.category,
           notes: data.notes ?? null,
-          Trip: { connect: { id: data.tripId } },
+          tripId: data.tripId,
+          tenantId,
         },
         include: {
           Trip: {

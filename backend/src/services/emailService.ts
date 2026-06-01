@@ -46,6 +46,39 @@ export async function sendWelcomeEmail(to: string, name: string, tenantName: str
   });
 }
 
+export async function sendPasswordResetEmail(to: string, name: string, resetUrl: string) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    // Em dev: loga o link no console para teste sem SMTP
+    console.warn(`[email:reset] SMTP não configurado. Link de reset para ${to}:`);
+    console.warn(`[email:reset] ${resetUrl}`);
+    return;
+  }
+
+  const transporter = createTransporter();
+
+  await transporter.sendMail({
+    from: `Derlei Sistema <${FROM}>`,
+    to,
+    subject: "Redefinição de senha — Derlei Sistema",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #1a1a2e;">Olá, ${name}!</h2>
+        <p>Recebemos uma solicitação para redefinir sua senha.</p>
+        <p>Clique no botão abaixo para criar uma nova senha. Este link expira em <strong>15 minutos</strong>.</p>
+        <p style="margin-top: 24px;">
+          <a href="${resetUrl}"
+             style="background:#1a1a2e; color:#fff; padding:12px 24px; border-radius:6px; text-decoration:none; font-weight:bold;">
+            Redefinir senha
+          </a>
+        </p>
+        <p style="color:#666; margin-top: 24px; font-size: 13px;">
+          Se você não solicitou a redefinição, ignore este e-mail. Sua senha permanece a mesma.
+        </p>
+      </div>
+    `,
+  });
+}
+
 export async function sendPlanExpiringEmail(to: string, name: string, daysLeft: number) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
 

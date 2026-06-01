@@ -14,12 +14,21 @@ export async function comparePasswords(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-// Gera um token JWT válido por 1 hora
+// Gera um token JWT válido por 8 horas
 export function generateToken(payload: object) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "8h" });
 }
 
 // Verifica e decodifica o token JWT
 export function verifyToken(token: string) {
   return jwt.verify(token, JWT_SECRET);
+}
+
+// Token de curta duração para reset de senha (15 minutos)
+export function generateResetToken(userId: number): string {
+  return jwt.sign({ userId, purpose: "password-reset" }, JWT_SECRET, { expiresIn: "15m" });
+}
+
+export function verifyResetToken(token: string): { userId: number; purpose: string } {
+  return jwt.verify(token, JWT_SECRET) as { userId: number; purpose: string };
 }

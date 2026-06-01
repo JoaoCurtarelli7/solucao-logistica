@@ -41,7 +41,7 @@ export async function maintenanceRoutes(app: FastifyInstance) {
       if (!truck) {
         return rep.code(404).send({ message: "Caminhão não encontrado" });
       }
-      const maintenance = await prisma.maintenance.create({ data });
+      const maintenance = await prisma.maintenance.create({ data: { ...data, tenantId } });
       return rep.code(201).send(maintenance);
     } catch (error) {
       console.error(error);

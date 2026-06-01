@@ -23,11 +23,14 @@ import Register from "./pages/Register";
 import AdminPanel from "./pages/Admin";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminLayout from "./components/SuperAdminLayout";
+import ResetPassword from "./pages/ResetPassword";
+import NotFound from "./pages/NotFound";
 import { UserProvider } from "./context/userContext";
 
 const router = createBrowserRouter([
-  // Página pública de solicitação de acesso (sem layout)
+  // Páginas públicas sem layout
   { path: "/solicitar-acesso", element: <Register /> },
+  { path: "/reset-password", element: <ResetPassword /> },
 
   // Super Admin — layout e login totalmente separados, sem vínculo com tenant
   { path: "/super-admin/login", element: <SuperAdminLogin /> },
@@ -65,6 +68,8 @@ const router = createBrowserRouter([
       { path: "/maintenance/services", element: <MaintenanceServices /> },
     ],
   },
+  // 404 catch-all
+  { path: "*", element: <NotFound /> },
 ]);
 
 export default function AppRoutes() {

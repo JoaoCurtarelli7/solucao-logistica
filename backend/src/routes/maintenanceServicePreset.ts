@@ -25,13 +25,15 @@ function prismaCatalogErrorMessage(error: unknown): string | null {
 export async function maintenanceServicePresetRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
 
-  // Listar serviços do catálogo (padrão + salvos)
+  // Listar serviços do catálogo (globais isDefault + do tenant)
   app.get(
     "/maintenance-service-presets",
     { preHandler: requirePermission("maintenance.view") },
-    async (_req: FastifyRequest, rep: FastifyReply) => {
+    async (req: FastifyRequest, rep: FastifyReply) => {
       try {
+        const tenantId = req.user!.tenantId;
         const presets = await prisma.maintenanceServicePreset.findMany({
+          where: { OR: [{ tenantId }, { tenantId: null }] },
           orderBy: [{ isDefault: "desc" }, { name: "asc" }],
         });
         return rep.send(presets);
@@ -52,7 +54,10 @@ export async function maintenanceServicePresetRoutes(app: FastifyInstance) {
     async (req: FastifyRequest, rep: FastifyReply) => {
       try {
         const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
-        const preset = await prisma.maintenanceServicePreset.findUnique({ where: { id } });
+        const tenantId = req.user!.tenantId;
+        const preset = await prisma.maintenanceServicePreset.findFirst({
+          where: { id, OR: [{ tenantId }, { tenantId: null }] },
+        });
         if (!preset) return rep.code(404).send({ message: "Serviço não encontrado" });
         return rep.send(preset);
       } catch (error) {
@@ -76,14 +81,18 @@ export async function maintenanceServicePresetRoutes(app: FastifyInstance) {
         const { name } = bodySchema.parse(req.body);
         const trimmed = name.trim();
 
+        const tenantId = req.user!.tenantId;
+
         const existing = await prisma.maintenanceServicePreset.findFirst({
-          where: { name: trimmed, id: { not: id } },
+          where: { name: trimmed, tenantId, id: { not: id } },
         });
         if (existing) {
           return rep.code(400).send({ message: "Já existe um serviço com este nome" });
         }
 
-        const preset = await prisma.maintenanceServicePreset.findUnique({ where: { id } });
+        const preset = await prisma.maintenanceServicePreset.findFirst({
+          where: { id, tenantId },
+        });
         if (!preset) return rep.code(404).send({ message: "Serviço não encontrado" });
         if (preset.isDefault) {
           return rep.code(400).send({ message: "Não é possível editar serviços padrão do sistema" });
@@ -115,7 +124,10 @@ export async function maintenanceServicePresetRoutes(app: FastifyInstance) {
     async (req: FastifyRequest, rep: FastifyReply) => {
       try {
         const { id } = z.object({ id: z.coerce.number() }).parse(req.params);
-        const preset = await prisma.maintenanceServicePreset.findUnique({ where: { id } });
+        const tenantId = req.user!.tenantId;
+        const preset = await prisma.maintenanceServicePreset.findFirst({
+          where: { id, tenantId },
+        });
         if (!preset) return rep.code(404).send({ message: "Serviço não encontrado" });
         if (preset.isDefault) {
           return rep.code(400).send({ message: "Não é possível deletar serviços padrão do sistema" });
@@ -142,15 +154,16 @@ export async function maintenanceServicePresetRoutes(app: FastifyInstance) {
         const { name } = bodySchema.parse(req.body);
         const trimmed = name.trim();
 
-        const existing = await prisma.maintenanceServicePreset.findUnique({
-          where: { name: trimmed },
+        const tenantId = req.user!.tenantId;
+        const existing = await prisma.maintenanceServicePreset.findFirst({
+          where: { name: trimmed, tenantId },
         });
         if (existing) {
           return rep.send(existing);
         }
 
         const created = await prisma.maintenanceServicePreset.create({
-          data: { name: trimmed, isDefault: false },
+          data: { name: trimmed, isDefault: false, tenantId },
         });
         return rep.code(201).send(created);
       } catch (error) {

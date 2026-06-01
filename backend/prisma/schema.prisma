@@ -16,18 +16,23 @@ model Tenant {
   planExpiresAt      DateTime?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @default(now())
-  User               User[]
-  Employee           Employee[]
-  Truck              Truck[]
-  Trip               Trip[]
-  Month              Month[]
-  Company            Company[]
-  FinancialEntry     FinancialEntry[]
-  FinancialPeriod    FinancialPeriod[]
-  Load               Load[]
-  Closing            Closing[]
-  LoadBillingClosing LoadBillingClosing[]
-  Subscription       Subscription?
+  User                     User[]
+  Employee                 Employee[]
+  Truck                    Truck[]
+  Trip                     Trip[]
+  Month                    Month[]
+  Company                  Company[]
+  FinancialEntry           FinancialEntry[]
+  FinancialPeriod          FinancialPeriod[]
+  Load                     Load[]
+  Closing                  Closing[]
+  LoadBillingClosing       LoadBillingClosing[]
+  Subscription             Subscription?
+  Maintenance              Maintenance[]
+  Transaction              Transaction[]
+  TripExpense              TripExpense[]
+  MaintenanceServicePreset MaintenanceServicePreset[]
+  AuditLog                 AuditLog[]
 }
 
 model Subscription {
@@ -186,18 +191,26 @@ model Maintenance {
   value     Float
   notes     String?
   truckId   Int
+  tenantId  Int
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
   Truck     Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  Tenant    Tenant   @relation(fields: [tenantId], references: [id])
 
   @@index([truckId], map: "idx_maintenance_truckId")
+  @@index([tenantId], map: "idx_maintenance_tenantId")
 }
 
 model MaintenanceServicePreset {
   id        Int      @id @default(autoincrement())
-  name      String   @unique
+  name      String
   isDefault Boolean  @default(false)
+  tenantId  Int?
   createdAt DateTime @default(now())
+  Tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([name, tenantId])
+  @@index([tenantId], map: "idx_maintenancePreset_tenantId")
 }
 
 model Month {
@@ -255,9 +268,12 @@ model Transaction {
   date        DateTime @default(now())
   description String?
   employeeId  Int
+  tenantId    Int
   Employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  Tenant      Tenant   @relation(fields: [tenantId], references: [id])
 
   @@index([employeeId], map: "idx_transaction_employeeId")
+  @@index([tenantId], map: "idx_transaction_tenantId")
 }
 
 model Trip {
@@ -290,11 +306,14 @@ model TripExpense {
   category    String
   notes       String?
   tripId      Int
+  tenantId    Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now())
   Trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  Tenant      Tenant   @relation(fields: [tenantId], references: [id])
 
   @@index([tripId], map: "idx_tripExpense_tripId")
+  @@index([tenantId], map: "idx_tripExpense_tenantId")
 }
 
 model Truck {
@@ -370,8 +389,12 @@ model RolePermission {
 model AuditLog {
   id        Int      @id @default(autoincrement())
   userId    Int?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenantId  Int?
   action    String
   details   String?
   createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  Tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId], map: "idx_auditLog_tenantId")
 }

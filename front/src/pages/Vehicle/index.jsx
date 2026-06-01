@@ -391,6 +391,71 @@ export default function VehicleList() {
 
       {(() => {
         const now = dayjs();
+
+        // Documentos vencidos ou vencendo em 30 dias
+        const DOC_LABELS = {
+          insuranceExpiry: "Seguro",
+          tachographCalibrationExpiry: "Tacógrafo",
+          docExpiry: "CRLV/Doc",
+        };
+        const expiringDocs = [];
+        data.forEach((truck) => {
+          Object.entries(DOC_LABELS).forEach(([field, label]) => {
+            const date = truck[field];
+            if (!date) return;
+            const d = dayjs(date);
+            const diff = d.diff(now, "day");
+            if (diff <= 30) {
+              expiringDocs.push({ truck, label, diff, expired: diff < 0 });
+            }
+          });
+        });
+
+        const critical = expiringDocs.filter((e) => e.expired);
+        const warning = expiringDocs.filter((e) => !e.expired);
+
+        return (
+          <>
+            {critical.length > 0 && (
+              <Alert
+                type="error"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`${critical.length} documento${critical.length > 1 ? "s" : ""} VENCIDO${critical.length > 1 ? "S" : ""}`}
+                description={
+                  <Space wrap>
+                    {critical.map((e, i) => (
+                      <Tag key={i} color="red">
+                        {e.truck.name} ({e.truck.plate}) — {e.label}: venceu há {Math.abs(e.diff)} dia{Math.abs(e.diff) !== 1 ? "s" : ""}
+                      </Tag>
+                    ))}
+                  </Space>
+                }
+              />
+            )}
+            {warning.length > 0 && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`${warning.length} documento${warning.length > 1 ? "s" : ""} vencendo em até 30 dias`}
+                description={
+                  <Space wrap>
+                    {warning.map((e, i) => (
+                      <Tag key={i} color="orange">
+                        {e.truck.name} ({e.truck.plate}) — {e.label}: {e.diff === 0 ? "vence hoje" : `${e.diff} dia${e.diff !== 1 ? "s" : ""}`}
+                      </Tag>
+                    ))}
+                  </Space>
+                }
+              />
+            )}
+          </>
+        );
+      })()}
+
+      {(() => {
+        const now = dayjs();
         const stale = data.filter((truck) => {
           const list = truck.Maintenance ?? truck.maintenances ?? [];
           if (list.length === 0) return true;

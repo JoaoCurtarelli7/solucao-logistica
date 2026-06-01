@@ -347,7 +347,8 @@ export async function employeeRoutes(app: FastifyInstance) {
           amount,
           date: transactionDate,
           description,
-          Employee: { connect: { id } }, // <- este é o pulo do gato
+          employeeId: id,
+          tenantId,
         },
       });
 

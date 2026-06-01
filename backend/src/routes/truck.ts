@@ -175,7 +175,8 @@ export async function truckRoutes(app: FastifyInstance) {
           km: maintenanceData.km,
           value: maintenanceData.value,
           notes: maintenanceData.notes,
-          truckId: id
+          truckId: id,
+          tenantId,
         }
       });
       
